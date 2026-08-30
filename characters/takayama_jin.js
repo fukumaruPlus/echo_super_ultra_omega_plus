@@ -4,7 +4,7 @@
 //
 //  ร่าง "อัลฟา" (ท่าไม้ตาย) เป็นแกนกลางของตัวละคร — เปลี่ยนพฤติกรรมเกือบทุกอย่างขณะทำงานอยู่:
 //    · โจมตีปกติแปะ "เลือดไหล" ให้เป้าหมาย 3 หน่วยทุกครั้ง (onAttackLanded)
-//    · ชนะการโจมตีปกติแล้วมีโอกาส 50% ตีพลาด — ดาเมจ 0 แต่ยังนับว่าโจมตีไปแล้ว (tryMiss)
+//    · ชนะการโจมตีปกติแล้วมีโอกาส 20% ตีพลาด (ตีโดน 80%) — ดาเมจ 0 แต่ยังนับว่าโจมตีไปแล้ว (tryMiss)
 //    · มีเป้าหมายให้เลือกมากกว่า 1 คน = สุ่มเป้าหมายเสมอ ไม่ใช่ผู้เล่นเลือก (maybeRandomTarget)
 //    · ไม่มีเกราะแล้วโดนดาเมจ = เลือดไหลตัวเอง 1 หน่วย (ไม่จำกัดจำนวนครั้งต่อเทิร์น — onDamaged)
 //    · "เลือดไหล" ของตัวเองไม่ทำร้ายจิน กลับฟื้นเลือดแทน (hbleedHeals — เฉพาะตอนอยู่ในอัลฟาเท่านั้น)
@@ -22,10 +22,11 @@
 const ID = "jin";
 
 // ---------- ไข่ต้ม (สกิลพื้นฐาน) ----------
-const BASIC_USES_PER_TURN = 2;
-const BASIC_HEAL_HP = 2;
-const BASIC_HEAL_SKILL = 3;
-const BASIC_ROLL_HP = 50; // 0-49 ฟื้นเลือด · 50-99 ฟื้นแต้มสกิล (50/50)
+//  ไม่ใช้แต้มสกิลเลย แต่จ่ายด้วย "พลังชีวิตจริง" แทน — เป็นเครื่องแปลงเลือดเป็นแต้มสกิลล้วนๆ
+//  ยังไม่นับเป็นการใช้สกิลของเทิร์น (ไม่งั้นจะไร้ประโยชน์ เพราะกดแล้วใช้ Alpha/กระชากต่อไม่ได้)
+const BASIC_USES_PER_TURN = 1;
+const BASIC_COST_HP = 3;    // หักพลังชีวิตจริง 3 หน่วย (ไม่สนเกราะ)
+const BASIC_GAIN_SKILL = 3; // ได้แต้มสกิล 3
 
 // ---------- กระชาก (สกิลรอง) ----------
 const ORGANS_TURNS = 1;      // "เครื่องใน": 1 เทิร์น
@@ -36,7 +37,7 @@ const ALPHA_TURNS = 5;
 const ALPHA_BLEED_ON_ATK = 3;
 
 // ---------- ความบ้าคลั่ง (สกิลติดตัว 1) ----------
-const MADNESS_MISS_CHANCE = 0.5;
+const MADNESS_MISS_CHANCE = 0.2; // ตีพลาด 20% (ตีโดน 80%)
 const FAKE_HP_RESERVE = 7; // ค่าอ้างอิงเชิงฟังก์ชัน (ดู tryFakeDeath) — จำนวนจริงคำนวณจากดาเมจที่ทะลุ 0 ไป
 
 // ---------- ฉันได้กลิ่นเลือด (สกิลติดตัว 2) ----------
@@ -112,21 +113,22 @@ module.exports = {
     return "";
   },
 
-  // ---------- สกิลพื้นฐาน: ไข่ต้ม ----------
+  // ---------- สกิลพื้นฐาน: ไข่ต้ม — แลกพลังชีวิตจริง 3 เป็นแต้มสกิล 3 (1 ครั้ง/เทิร์น) ----------
+  //  ราคาสกิล 0 แต้ม แต่จ่ายด้วยเลือดจริงแบบไม่สนเกราะ (คอนเวนชันเดียวกับ "ฝันไปเถอะ" ของริต้า เบอร์นัล)
+  //  กดตอนเลือดน้อยกว่า 3 = ตายได้จริง — ในร่างอัลฟา "ความบ้าคลั่ง" จะรับไว้ด้วยเลือดสำรองตามปกติ
   applyBoiledEgg(engine, p) {
     p.jinBasicUses = (p.jinBasicUses || 0) + 1;
-    const left = Math.max(0, BASIC_USES_PER_TURN - p.jinBasicUses);
-    const tail = ` (เหลือกดได้อีก ${left} ครั้งในเทิร์นนี้)`;
-    if (Math.random() * 100 < BASIC_ROLL_HP) {
-      const heal = engine.healHp(p, BASIC_HEAL_HP);
-      engine.log(`🥚 ${p.name} ไข่ต้ม — ฟื้นพลังชีวิต +${heal}${tail}`);
-      return ` — พลังชีวิต +${heal}`;
-    }
+    engine.dealDirect(p, BASIC_COST_HP);
+    engine.maybeBeatSave(p); engine.maybeBeatMode(p); engine.maybeEva3(p); engine.maybeWakeKotone(p);
     const before = p.skillPoints;
-    engine.addSkill(p, BASIC_HEAL_SKILL, "passive");
+    engine.addSkill(p, BASIC_GAIN_SKILL, "passive");
     const got = p.skillPoints - before;
-    engine.log(`🥚 ${p.name} ไข่ต้ม — ฟื้นแต้มสกิล +${got}${tail}`);
-    return ` — แต้มสกิล +${got}`;
+    engine.log(`🥚 ${p.name} ไข่ต้ม — จ่ายพลังชีวิต ${BASIC_COST_HP} หน่วย (ไม่สนเกราะ) แลกแต้มสกิล +${got}`);
+    if (p.alive && p.hp <= 0) {
+      engine.instantDeath(p);
+      if (!p.alive) engine.log(`💀 ${p.name} เลือดจริงหมด ตกรอบ!`);
+    }
+    return ` — เลือด -${BASIC_COST_HP} · แต้มสกิล +${got}`;
   },
 
   // ---------- สกิลรอง: กระชาก ----------

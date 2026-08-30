@@ -36,17 +36,39 @@ function alpha(p, turns = 5) { p.statuses.jinAlpha = turns; return p; }
 
 // ---------- สกิลพื้นฐาน: ไข่ต้ม ----------
 
-test('ไข่ต้ม: 50/50 ระหว่างฟื้นเลือด 2 กับฟื้นแต้มสกิล 3 และนับโควตา 2 ครั้ง/เทิร์น', () => {
-  const p = mkPlayer({ hp: 3, skillPoints: 2 });
-  withRandom(0.1, () => jin.applyBoiledEgg(engine, p));      // < 50 -> ฟื้นเลือด
-  assert.equal(p.hp, 5, 'ฟื้นพลังชีวิต 2 หน่วย');
-  assert.equal(p.skillPoints, 2, 'ไม่แตะแต้มสกิล');
-  withRandom(0.9, () => jin.applyBoiledEgg(engine, p));      // >= 50 -> ฟื้นแต้มสกิล
-  assert.equal(p.skillPoints, 5, 'ฟื้นแต้มสกิล 3 หน่วย');
-  assert.equal(p.jinBasicUses, 2, 'นับโควตาครบ 2 ครั้ง');
-  assert.equal(jin.canUseSkill(engine, p, 'basic'), false, 'กดครั้งที่ 3 ในเทิร์นเดียวไม่ได้');
+test('ไข่ต้ม: แลกพลังชีวิตจริง 3 เป็นแต้มสกิล 3 · กดได้ 1 ครั้ง/เทิร์น', () => {
+  const p = mkPlayer({ hp: 7, armor: 3, skillPoints: 2 });
+  jin.applyBoiledEgg(engine, p);
+  assert.equal(p.hp, 4, 'หักพลังชีวิตจริง 3 หน่วย');
+  assert.equal(p.armor, 3, 'ไม่สนเกราะ — เกราะไม่ถูกแตะเลย');
+  assert.equal(p.skillPoints, 5, 'ได้แต้มสกิล +3');
+  assert.equal(jin.canUseSkill(engine, p, 'basic'), false, 'กดครั้งที่ 2 ในเทิร์นเดียวไม่ได้');
   jin.onRoundStartTick(engine, p);
   assert.equal(jin.canUseSkill(engine, p, 'basic'), true, 'โควตาเต็มใหม่ต้นเทิร์นถัดไป');
+});
+
+test('ไข่ต้ม: ราคา 0 แต้ม — ใช้ได้แม้แต้มสกิลหมดเกลี้ยง (นี่คือทางหาแต้มของจิน)', () => {
+  const { CHAR_BY_ID } = require('../../characters.js');
+  assert.equal(CHAR_BY_ID.jin.basic.cost, 0, 'ไม่ใช้แต้มสกิลเลย');
+  const p = mkPlayer({ hp: 7, skillPoints: 0 });
+  assert.equal(jin.canUseSkill(engine, p, 'basic'), true);
+  jin.applyBoiledEgg(engine, p);
+  assert.equal(p.skillPoints, 3, 'แต้มสกิล 0 -> 3');
+});
+
+test('ไข่ต้ม: เลือดไม่พอแล้วกด = ตกรอบจริง (ร่างปกติ)', () => {
+  const p = mkPlayer({ hp: 3, armor: 2, skillPoints: 0 });
+  jin.applyBoiledEgg(engine, p);
+  assert.equal(p.alive, false, 'เลือดจริง 3 - 3 = 0 -> ตกรอบ');
+});
+
+test('ไข่ต้ม: ในร่างอัลฟา เลือดไม่พอแล้วกด -> เลือดสำรองรับไว้ ไม่ตายทันที', () => {
+  const p = alpha(mkPlayer({ hp: 2, armor: 0, skillPoints: 0 }));
+  engine.setRoundNumber(5);
+  jin.applyBoiledEgg(engine, p);
+  assert.equal(p.alive, true, 'ความบ้าคลั่งรับไว้ด้วยเลือดสำรอง');
+  assert.equal(jin.debtActive(p), true);
+  assert.equal(p.skillPoints, 3, 'ยังได้แต้มสกิลตามปกติ');
 });
 
 // ---------- สกิลรอง: กระชาก ----------
@@ -127,12 +149,13 @@ test('Alpha: การโจมตีปกติแปะเลือดไห�
 
 // ---------- สกิลติดตัว: ความบ้าคลั่ง ----------
 
-test('ความบ้าคลั่ง: ตีพลาด 50% เฉพาะในร่างอัลฟา', () => {
+test('ความบ้าคลั่ง: ตีพลาด 20% (ตีโดน 80%) เฉพาะในร่างอัลฟา', () => {
   const p = mkPlayer();
   withRandom(0.1, () => assert.equal(jin.tryMiss(engine, p), false, 'ร่างปกติไม่มีทางตีพลาด'));
   alpha(p);
-  withRandom(0.1, () => assert.equal(jin.tryMiss(engine, p), true, 'โรลต่ำกว่า 0.5 = พลาด'));
-  withRandom(0.9, () => assert.equal(jin.tryMiss(engine, p), false, 'โรลตั้งแต่ 0.5 ขึ้นไป = เข้าเป้า'));
+  withRandom(0.1, () => assert.equal(jin.tryMiss(engine, p), true, 'โรลต่ำกว่า 0.2 = พลาด'));
+  withRandom(0.25, () => assert.equal(jin.tryMiss(engine, p), false, 'โรล 0.25 = เข้าเป้า (เดิม 0.5 เคยพลาด)'));
+  withRandom(0.9, () => assert.equal(jin.tryMiss(engine, p), false, 'โรลสูง = เข้าเป้า'));
 });
 
 test('ความบ้าคลั่ง: มีเป้าหมายหลายคน -> สุ่มทับเสมอ · เหลือคนเดียว -> ไม่สุ่ม', () => {
@@ -340,12 +363,12 @@ test('เครื่องใน: ดันการสวนกลับทั
   assert.deepEqual((ps.jinCounterPending || []).map((c) => c.kind), ['arm'], 'เส้นทางสกิลก็ติดที่ 50%');
 });
 
-test('ราคาสกิล: กระชาก 2 แต้ม · Alpha 4 แต้ม', () => {
+test('ราคาสกิล: ไข่ต้ม 0 · กระชาก 2 · Alpha 6 แต้ม', () => {
   const { CHAR_BY_ID } = require('../../characters.js');
   const ch = CHAR_BY_ID.jin;
-  assert.equal(ch.basic.cost, 2, 'ไข่ต้ม 2 แต้ม');
+  assert.equal(ch.basic.cost, 0, 'ไข่ต้มไม่ใช้แต้มสกิล (จ่ายด้วยเลือดแทน)');
   assert.equal(ch.secondary.cost, 2, 'กระชาก 2 แต้ม');
-  assert.equal(ch.ultimate.cost, 4, 'Alpha 4 แต้ม');
+  assert.equal(ch.ultimate.cost, 6, 'Alpha 6 แต้ม');
 });
 
 test('"นี่แหละตัวฉัน": ต้องมีเลือดไหล >= 5 · สวนกลับเท่าเลือดไหลที่มี แล้วล้างทิ้ง', () => {
