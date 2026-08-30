@@ -3247,8 +3247,6 @@ function dealRound() {
     // คอนเนอร์ RK800 (สกิลติดตัว 3 ปัญญาประดิษฐ์): ครบ 10 เทิร์นหลังตาย -> กลับเข้าสนามด้วยเลือด 3 เกราะ 2
     //  ต้องอยู่ "ก่อน" บล็อกข้ามผู้เล่นที่ตายแล้ว ไม่งั้นเทิร์นที่ฟื้นจะไม่ได้รับไพ่ใบแรก
     if (!p.alive) CHAR_HOOKS.conner.maybeRevive(engine, p);
-    // อิสึกะ ชิโด (สกิลไม้ตาย ฝากด้วยนะตัวฉัน): กลับมาหลังครบกำหนด (หรือทันทีถ้าเหลือคู่ต่อสู้คนสุดท้าย)
-    if (!p.alive) CHAR_HOOKS.shido.maybeRevive(engine, p);
     if (!p.alive) { p.cards = []; p.locked = true; p.busted = false; p.overloadDrawReady = false; continue; }
 
     if (isYuuki(p) && p.hp <= 4) {
@@ -3483,6 +3481,7 @@ function dealRound() {
   const yuukiUltimateDue = !!yuukiBoss() && yuukiTurns > 0 && yuukiTurns % 5 === 0;
   if (yuukiUltimateDue) queueYuukiCutscene(YUUKI_VIDEO.ultimate, "STAR OF FALL", 7, "yuukiUltimate");
   captureTurnSnapshot(); // จุดย้อนเวลาของเทิร์นนี้ (เอฟเฟกต์ต้นเทิร์นทำงานครบแล้ว ยังไม่มีใครกดอะไร)
+  pushSnapshotHistory();  // เก็บใบเดียวกันเข้าประวัติย้อนหลัง 6 เทิร์น (ท่าไม้ตายของชิโดย้อนกลับไปหยิบ)
   gameState = "PLAYING";
   startPhaseTimer(cardPhaseSeconds(), resolveRound);
   if (cutsceneQueue.length) { pausePlayingForCutscene(yuukiUltimateDue ? applyYuukiUltimate : undefined); return; } // วีดีโอทำงานก่อนผล Star of Fall
@@ -4717,6 +4716,63 @@ function checkAllLocked() {
 // ใช้ตอนเกิด Overload Force เพื่อย้อนทุกการกระทำในเทิร์นนั้นทิ้ง — คืนแต้มสกิล/โควตาสกิลที่กดไป/ไอเทม/เหรียญ
 // ให้ครบ เพราะ Overload Force แจกไพ่ใหม่ในเทิร์นเดิม ถ้าไม่ย้อน คนที่กดสกิล "หลังเปิดไพ่" จะเสียของฟรี
 let turnSnapshot = null;
+// ประวัติสแนปช็อตต้นเทิร์นย้อนหลัง — ใช้โดยท่าไม้ตาย "ฝากด้วยนะตัวฉัน" (อิสึกะ ชิโด) ที่ย้อนเวลากลับ 5 เทิร์น
+//  โครงสร้างเดียวกับ turnSnapshot ของ Overload Force เป๊ะ แค่เก็บหลายใบเป็นวงแหวนแทนใบเดียว
+//  (เก็บ SNAPSHOT_HISTORY_MAX ใบพอ — ลึกกว่าที่ท่าไม้ตายต้องการ 1 ใบ เผื่อกรณีเทิร์นต้นเกม)
+const SNAPSHOT_HISTORY_MAX = 6;
+let snapshotHistory = [];
+function buildSnapshot() {
+  return {
+    round: roundNumber,
+    players: structuredClone(players),
+    roundSkills: structuredClone(roundSkills),
+    shopItems: structuredClone(shopItems),
+    kaiOverhaulSlots: structuredClone(kaiOverhaulSlots),
+    g: {
+      cycleShift, nightResetPending, oberonDevour, dayForceUntil, transformCounter,
+      yunaLongingUsed, yunaWindowEnd, yunaEffect, yunaTargetId, yunaLongingPendingId, yunaPity,
+    },
+  };
+}
+// นำสแนปช็อตกลับมาใช้ — โครงเดียวกับ restoreTurnSnapshot() แต่รับใบไหนก็ได้
+//  keepPerPlayer: ฟิลด์ที่ "ห้ามย้อน" รายผู้เล่น (นอกเหนือจากข้อมูลการเชื่อมต่อ) เช่นคูลดาวน์ท่าไม้ตายของชิโด
+//  ไม่งั้นการย้อนเวลาจะลบข้อมูลว่าเคยใช้ท่านี้ไปแล้ว = ย้อนวนได้ไม่จำกัด
+function applySnapshot(snap, keepPerPlayer) {
+  if (!snap) return false;
+  for (const [id, saved] of Object.entries(snap.players)) {
+    const live = players[id];
+    if (!live) continue; // ออกจากเกมไปแล้ว — ไม่ปลุกกลับ
+    const keep = {
+      socketId: live.socketId, connected: live.connected,
+      sessionToken: live.sessionToken, ready: live.ready,
+    };
+    if (typeof keepPerPlayer === "function") Object.assign(keep, keepPerPlayer(live) || {});
+    for (const k of Object.keys(live)) delete live[k];
+    Object.assign(live, structuredClone(saved), keep);
+  }
+  roundSkills = snap.roundSkills;
+  shopItems = snap.shopItems;
+  kaiOverhaulSlots = snap.kaiOverhaulSlots;
+  ({
+    cycleShift, nightResetPending, oberonDevour, dayForceUntil, transformCounter,
+    yunaLongingUsed, yunaWindowEnd, yunaEffect, yunaTargetId, yunaLongingPendingId, yunaPity,
+  } = snap.g);
+  lastAttack = null;
+  return true;
+}
+function pushSnapshotHistory() {
+  try {
+    snapshotHistory.push(buildSnapshot());
+    while (snapshotHistory.length > SNAPSHOT_HISTORY_MAX) snapshotHistory.shift();
+  } catch { /* structuredClone พังด้วยเหตุใดก็ตาม = ข้ามเทิร์นนี้ไป ไม่ใช่เรื่องคอขาดบาดตาย */ }
+}
+function clearSnapshotHistory() { snapshotHistory = []; }
+// สแนปช็อตของ "N เทิร์นก่อนหน้า" — ถ้ายังไม่ลึกพอก็คืนใบเก่าสุดที่มี (ต้นเกมยังย้อนไม่ครบ 5)
+function snapshotBefore(turns) {
+  if (!snapshotHistory.length) return null;
+  const idx = Math.max(0, snapshotHistory.length - 1 - turns);
+  return snapshotHistory[idx];
+}
 
 function captureTurnSnapshot() {
   try {
@@ -4733,7 +4789,7 @@ function captureTurnSnapshot() {
   } catch { turnSnapshot = null; }
 }
 
-function clearTurnSnapshot() { turnSnapshot = null; }
+function clearTurnSnapshot() { turnSnapshot = null; clearSnapshotHistory(); }
 
 function restoreTurnSnapshot() {
   const snap = turnSnapshot;
@@ -6474,7 +6530,8 @@ function endTurn() {
     p.statuses.triggerForm = Math.max(0, (p.statuses.triggerForm || 0) - 1);
     if (p.statuses.triggerForm <= 0) CHAR_HOOKS.ultraman_trigger.restore(engine, p, false);
   }
-  if (yuukiBoss() && aliveHumans().length === 0 && !yuukiWinShown) {
+  //  ระหว่างรอย้อนเวลาของชิโด ห้ามประกาศชัยชนะยูกิ — มนุษย์ที่ "ตายหมด" กำลังจะถูกย้อนกลับมาทั้งวง
+  if (yuukiBoss() && aliveHumans().length === 0 && !yuukiWinShown && !CHAR_HOOKS.shido.rewindPending(engine)) {
     yuukiWinShown = true;
     queueYuukiCutscene(YUUKI_VIDEO.win, "นายมันอ่อนแอเกินไป", 6, "yuukiWin");
     lastLog.push("☠️ ยูกิเอาชนะผู้เล่นทุกคน — ผู้เล่นทั้งหมดพ่ายแพ้!");
@@ -6488,6 +6545,14 @@ function endTurn() {
   CHAR_HOOKS.shido.flushDeathVideo(engine);
   // เล่นฉากระเบิด/ยูนะ/ชัยชนะยูกิ (ถ้ามี) ให้จบก่อน แล้วค่อยสรุปจบเกม/ขึ้นรอบถัดไป
   runCutsceneQueue(() => {
+    // อิสึกะ ชิโด "ฝากด้วยนะตัวฉัน": ย้อนเวลากลับ 5 เทิร์น — จุดนี้คือหลังวีดีโอรอยต่อเล่นจบแล้ว
+    //  ต้องอยู่ "ก่อน" alivePlayers()/เงื่อนไขจบเกมทั้งหมด ไม่งั้นรายชื่อที่คำนวณไว้จะเป็นของก่อนย้อน
+    //  (ชิโดเพิ่งตาย เกมอาจนับว่าเหลือผู้ชนะคนสุดท้ายทั้งที่อีกครู่ทุกคนจะถูกย้อนกลับมา)
+    let shidoRewound = false;
+    for (const sp of Object.values(players)) {
+      if (CHAR_HOOKS.shido.applyRewind(engine, sp)) shidoRewound = true;
+    }
+
     const stillAlive = alivePlayers();
     const total = Object.keys(players).length;
 
@@ -6503,12 +6568,8 @@ function endTurn() {
     // สกิลติดตัว 2 ริดดี้ (characters/riddhe.js): เหลือแค่คู่พันธมิตรบันชี × ยูนิคอร์นบนสนาม -> ถามจะคงพันธมิตรจนจบเกมไหม
     CHAR_HOOKS.riddhe.maybeAskFinalAlliance(engine, stillAlive);
 
-    // อิสึกะ ชิโด: กำลังรอเกิดใหม่จาก "ฝากด้วยนะตัวฉัน" -> เกมยังจบไม่ได้ ต้องรอเขากลับมาก่อน
-    //  (ต่างจากคอนเนอร์ RK800 ที่เกมจบก่อนครบกำหนดแล้วอดฟื้น — สเปคของชิโดระบุให้ฟื้นทันทีในกรณีนี้)
-    const shidoPending = CHAR_HOOKS.shido.blocksGameOver(engine);
-
     const teamWin = remainingTeamWinInfo(stillAlive, total);
-    if (!shidoPending && teamWin.over) {
+    if (!shidoRewound && teamWin.over) {
       winningTeamId = teamWin.teamId;
       if (winningTeamId) {
         const winners = stillAlive.filter((p) => p.teamId === winningTeamId).map((p) => p.name).join(" & ");
@@ -6519,7 +6580,7 @@ function endTurn() {
       gameState = "GAMEOVER";
       timeLeft = 0;
       broadcastState();
-    } else if (!shidoPending && !teamModeActive() && total >= 2 && stillAlive.length <= 1) {
+    } else if (!shidoRewound && !teamModeActive() && total >= 2 && stillAlive.length <= 1) {
       winningTeamId = null;
       if (stillAlive.length === 1) lastLog.push(`🏆 ${stillAlive[0].name} คือผู้ชนะคนสุดท้าย!`);
       else lastLog.push("ไม่มีผู้รอด — เสมอ");
@@ -6986,6 +7047,11 @@ const engine = {
   riddheAllied,
   riddheGrantFreeNtdToAlly(rAlly, byId) { return CHAR_HOOKS.riddhe.grantFreeNtdToAlly(engine, rAlly, byId); },
   hasQueuedCutscene() { return cutsceneQueue.length > 0; },
+  // ---------- ระบบย้อนเวลา (ท่าไม้ตายของอิสึกะ ชิโด) ----------
+  snapshotBefore,        // หยิบสแนปช็อตต้นเทิร์นของ N เทิร์นก่อนหน้า (ไม่ลึกพอ = ใบเก่าสุดที่มี)
+  pushSnapshotHistory,   // เปิดไว้ให้เทสต์สร้างประวัติจำลองได้ (โค้ดจริงเรียกจาก dealRound เท่านั้น)
+  applySnapshot,         // เขียนสภาพสนามทั้งหมดกลับไปเป็นของสแนปช็อตใบนั้น
+  clearSnapshotHistory,  // ลบประวัติทิ้ง (อนาคตที่ถูกย้อนไปแล้วใช้ต่อไม่ได้)
   get roundSkills() { return roundSkills; }, // สกิลที่ถูกกดในเทิร์นนี้ (หลักสูตร "พิเศษ" ของไบเลธอ่านว่าใครกดระดับไหน)
   takumiBlackoutActive,
   doomWeaponMarkPending,

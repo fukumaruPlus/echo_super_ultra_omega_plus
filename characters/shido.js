@@ -41,11 +41,9 @@ const SWORD_MUSIC = "shido_theme"; // shido_theme.mp3 — เล่นค้า�
 
 // ---------- ท่าไม้ตาย ฝากด้วยนะตัวฉัน ----------
 const GUARD_TURNS = 2;           // กับดักเปิดอยู่กี่เทิร์น (นับถอยหลังบนการ์ดสกิล เห็นคนเดียว)
-const REVIVE_DELAY = 5;          // ตายระหว่างกับดักเปิด -> เกิดใหม่อีกกี่เทิร์น
-const REVIVE_HP = 5;
-const REVIVE_ARMOR = 3;
-const REVIVE_SKILL = 4;          // ฟื้นแต้มสกิลให้ด้วยตอนกลับมา
-const REVIVE_RUSH_ALIVE = 1;     // เหลือผู้เล่นอื่นไม่เกินเท่านี้คน -> ฟื้นเทิร์นถัดไปทันที ไม่ต้องรอครบ 5
+const REWIND_TURNS = 5;          // ย้อนเวลากลับไปกี่เทิร์น
+const REWIND_HEAL = 2;           // ย้อนกลับมาแล้วฟื้นพลังชีวิตให้ชิโดเพิ่มอีก
+const REWIND_LOCK_TURNS = 5;     // ย้อนแล้วห้ามกดท่าไม้ตายอีกกี่เทิร์น (กันย้อนวนไม่รู้จบ — ดูหมายเหตุด้านล่าง)
 
 const IMG = {
   base: "/characters/shido/shido.jpg",
@@ -69,16 +67,16 @@ module.exports = {
   SWORD_TURNS,
   SWORD_SKILL_REGEN,
   GUARD_TURNS,
-  REVIVE_DELAY,
-  REVIVE_HP,
-  REVIVE_ARMOR,
-  REVIVE_SKILL,
+  REWIND_TURNS,
+  REWIND_HEAL,
+  REWIND_LOCK_TURNS,
 
   // ---------- ฟิลด์เฉพาะตัวละคร: ต้องล้างทุกแมตช์ใหม่ (เรียกจาก resetCombat ของ server.js) ----------
   resetCombat(p) {
     p.shidoRecorded = RECORD_BASE; // ความเสียหายที่บันทึกไว้ (เริ่มที่พื้น 3 — ไม่มีทางต่ำกว่านี้)
     p.shidoGuardTurns = 0;        // ฝากด้วยนะตัวฉัน: กับดักเหลืออีกกี่เทิร์น (เห็นคนเดียว)
-    p.shidoReviveRound = 0;       // ตายพร้อมกับดัก -> เทิร์นที่จะฟื้น (0 = ไม่มีคิว)
+    p.shidoRewindPending = false; // ตายพร้อมกับดัก -> รอย้อนเวลาตอนจบเทิร์น
+    p.shidoRewindLock = 0;        // ย้อนไปแล้ว: ห้ามกดท่าไม้ตายจนถึงรอบนี้ (ฟิลด์นี้ "ไม่ถูกย้อน")
     p.shidoDeathVideoPending = false; // รอเล่น shido_skill3.mp4 เป็นรอยต่อท้ายเทิร์นที่กับดักทำงาน
   },
 
@@ -143,7 +141,11 @@ module.exports = {
     if (!isShido(p)) return true;
     if (tier === "basic") return !spiritOn(p);   // ภูติยังมีผลอยู่ = กดซ้ำไม่ได้
     // Sandalphon กดได้เสมอ — ค่าที่บันทึกมีพื้นอยู่ที่ 3 อยู่แล้ว ต่อให้ยังไม่เคยโดนตีเลย
-    if (tier === "ultimate") return (p.shidoGuardTurns || 0) <= 0; // กับดักเปิดค้างอยู่ = กดซ้ำไม่ได้
+    if (tier === "ultimate") {
+      if ((p.shidoGuardTurns || 0) > 0) return false;              // กับดักเปิดค้างอยู่ = กดซ้ำไม่ได้
+      if (engine.roundNumber < (p.shidoRewindLock || 0)) return false; // เพิ่งย้อนเวลาไป ยังอยู่ในคูลดาวน์
+      return true;
+    }
     return true;
   },
 
@@ -195,15 +197,16 @@ module.exports = {
     return healed;
   },
 
-  // ---------- ท่าไม้ตาย: ชิโดตายระหว่างกับดักเปิดอยู่ -> จองคิวเกิดใหม่ ----------
-  //  ไม่ใช่การกันตาย: ปล่อยให้ตกรอบจริงก่อน แล้วค่อยจองคิว (แพทเทิร์นเดียวกับคอนเนอร์ RK800)
+  // ---------- ท่าไม้ตาย: ชิโดตายระหว่างกับดักเปิดอยู่ -> จองการย้อนเวลา ----------
+  //  ไม่ใช่การกันตาย: ปล่อยให้ตกรอบจริงก่อน แล้วค่อยจองไว้ทำตอนจบเทิร์น
+  //  (ย้อนเวลากลางท่อ instantDeath ไม่ได้ — โค้ดที่เรียกมันยังถือ reference ผู้เล่นชุดเก่าค้างอยู่ทั้งสแตก)
   //  เรียกจาก instantDeath() หลังตั้ง p.alive = false แล้ว
   onDeath(engine, p) {
     if (!isShido(p) || (p.shidoGuardTurns || 0) <= 0) return;
     p.shidoGuardTurns = 0;
-    p.shidoReviveRound = engine.roundNumber + REVIVE_DELAY;
+    p.shidoRewindPending = true;
     p.shidoDeathVideoPending = true; // เล่นเป็นรอยต่อท้ายเทิร์นนี้ (ดู flushDeathVideo)
-    engine.log(`✨ ${p.name} ฝากด้วยนะตัวฉัน — ร่างสลายไป แต่จะกลับมาอีกครั้ง`);
+    engine.log(`✨ ${p.name} ฝากด้วยนะตัวฉัน — เวลากำลังจะหมุนกลับ...`);
   },
 
   // วีดีโอ shido_skill3.mp4 เล่น "หลังหน้าจอโจมตี" เป็นรอยต่อก่อนขึ้นเทิร์นถัดไป
@@ -216,34 +219,51 @@ module.exports = {
     }
   },
 
-  // ---------- เกมยังจบไม่ได้ถ้าชิโดกำลังรอเกิดใหม่ ----------
-  //  ต่างจากคอนเนอร์ RK800 ที่ "เกมจบก่อนก็ไม่ได้ฟื้น" — ของชิโดระบุชัดว่าต้องรอเขากลับมาก่อน
-  blocksGameOver(engine) {
-    return Object.values(engine.players).some((p) => isShido(p) && !p.alive && (p.shidoReviveRound || 0) > 0);
+  // ---------- มีการย้อนเวลารออยู่ไหม ----------
+  //  endTurn() ใช้ระงับเงื่อนไขจบเกมไว้ก่อน: ชิโดเพิ่งตาย เกมอาจนับว่าเหลือผู้ชนะคนสุดท้ายทั้งที่
+  //  อีกครู่ทุกคนจะถูกย้อนกลับไปเป็นเมื่อ 5 เทิร์นก่อน (คนที่ตายไปแล้วก็กลับมา)
+  rewindPending(engine) {
+    return Object.values(engine.players).some((p) => isShido(p) && p.shidoRewindPending);
   },
 
-  // ---------- ฟื้นคืนชีพ — เรียกจาก dealRound() ก่อนบล็อกข้ามผู้เล่นที่ตายแล้ว ----------
-  //  เร่งให้ฟื้นเทิร์นถัดไปทันทีถ้าเหลือผู้เล่นอื่นไม่เกิน 1 คน (ไม่งั้นเกมจะค้างรอครบ 5 เทิร์นโดยไม่มีอะไรเกิดขึ้น)
-  maybeRevive(engine, p) {
-    if (!isShido(p) || p.alive || (p.shidoReviveRound || 0) <= 0) return false;
-    const othersAlive = engine.alivePlayers().filter((o) => o.id !== p.id).length;
-    const rush = othersAlive <= REVIVE_RUSH_ALIVE;
-    if (!rush && engine.roundNumber < p.shidoReviveRound) return false;
-    p.shidoReviveRound = 0;
-    p.alive = true;
-    p.hp = Math.min(engine.maxHpOf(p), REVIVE_HP);
-    p.armor = Math.min(engine.maxArmorOf(p), REVIVE_ARMOR);
-    p.result = null;
-    p.locked = false;
-    p.shield = 0;
-    p.statuses = {};
-    p.statusAmt = {};
-    p.shidoRecorded = RECORD_BASE; // กลับมาเริ่มนับใหม่จากพื้น
-    // ฟื้นแต้มสกิลให้ด้วย ไม่งั้นกลับมาแบบกดอะไรไม่ได้เลย (ท่านี้กินไป 8 แต้ม)
-    //  ตั้งค่าตรงๆ ไม่ผ่าน addSkill: ตอนนี้ยังไม่ผ่านด่านบล็อกการฟื้นแต้ม (stagger/manaSeal ฯลฯ)
-    //  เพราะเพิ่งล้าง statuses ทิ้งไปแล้ว และ "การเกิดใหม่" ควรได้ทุนตั้งต้นเท่ากันเสมอ
-    p.skillPoints = Math.min(engine.maxSkillOf(p), REVIVE_SKILL);
-    engine.log(`✨ ${p.name} ฝากด้วยนะตัวฉัน — กลับมาอีกครั้งด้วยพลังชีวิต ${p.hp} เกราะ ${p.armor} และแต้มสกิล ${p.skillPoints}${rush ? " (เหลือคู่ต่อสู้คนสุดท้าย จึงฟื้นทันที)" : ""}!`);
+  // ---------- ย้อนเวลากลับ 5 เทิร์น ----------
+  //  เรียกจาก endTurn() "หลังวีดีโอเล่นจบ" และ "ก่อน" เงื่อนไขจบเกม/ขึ้นรอบถัดไป
+  //  ย้อนทุกอย่างที่สแนปช็อตเก็บไว้: พลังชีวิต/เกราะ/สถานะ/แต้มสกิล/เหรียญ/ไอเทม/คนที่ตายไปแล้ว
+  //  รวมถึงเลขรอบ + วงจรกลางวัน-กลางคืน + ของในร้านค้า
+  //
+  //  กันย้อนวนไม่รู้จบ: สแนปช็อตย้อนแต้มสกิล 8 หน่วยคืนให้ชิโดและลบร่องรอยว่าเคยกดท่านี้ไปด้วย
+  //  ถ้าไม่กันอะไรเลยเขาจะกดย้อนซ้ำได้ทุกครั้งที่ตาย -> เกมไม่มีวันจบ
+  //  จึงเก็บ p.shidoRewindLock ไว้ "นอกการย้อน" (ส่งผ่าน keepPerPlayer ของ applySnapshot)
+  //  = ย้อนไปรอบ 7 แล้วล็อกถึงรอบ 12 -> ต้องเดินหน้าครบ 5 เทิร์นจริงๆ ก่อนถึงจะอาร์มกับดักได้อีก
+  applyRewind(engine, p) {
+    if (!isShido(p) || !p.shidoRewindPending) return false;
+    p.shidoRewindPending = false;
+
+    const snap = engine.snapshotBefore(REWIND_TURNS);
+    if (!snap) {
+      // ไม่มีประวัติให้ย้อน (เพิ่งเริ่มเกมจริงๆ) — ตาข่ายสำรอง: อย่างน้อยอย่าให้เขาตายฟรีทั้งที่จ่าย 8 แต้ม
+      p.alive = true;
+      p.hp = Math.max(1, Math.min(engine.maxHpOf(p), REWIND_HEAL));
+      p.locked = false;
+      p.result = null;
+      engine.log(`⏳ ${p.name} ฝากด้วยนะตัวฉัน — ยังไม่มีอดีตให้ย้อนกลับไป จึงกลับมาด้วยพลังชีวิต ${p.hp}`);
+      return true;
+    }
+
+    const shidoId = p.id;
+    const lockUntil = snap.round + REWIND_LOCK_TURNS;
+    engine.applySnapshot(snap, (live) => (live.id === shidoId
+      ? { shidoRewindLock: lockUntil, shidoRewindPending: false, shidoGuardTurns: 0 }
+      : null));
+    engine.setRoundNumber(snap.round - 1); // dealRound() จะ ++ กลับเป็น snap.round แล้วเล่นเทิร์นนั้นใหม่
+    engine.clearSnapshotHistory();         // ประวัติหลังจุดนี้เป็น "อนาคตที่ถูกลบทิ้ง" แล้ว
+
+    // ชิโดฉบับที่ถูกย้อนกลับมา = object เดิม (applySnapshot เขียนทับในที่) แต่หยิบใหม่กันพลาด
+    const me = engine.players[shidoId];
+    if (me) {
+      const healed = engine.healHp(me, REWIND_HEAL);
+      engine.log(`⏳ ${me.name} ฝากด้วยนะตัวฉัน — ย้อนเวลากลับไปรอบที่ ${snap.round} ทุกอย่างกลับเป็นเหมือนเดิม!${healed > 0 ? ` (ฟื้นพลังชีวิตเพิ่ม +${healed})` : ""}`);
+    }
     return true;
   },
 

@@ -36,7 +36,8 @@ function mk(id, characterId, position) {
     cards: [], skillPoints: 8, gold: 0, teamId: null, evadeStacks: [], inventory: [],
     dmgArmor: 0, dmgHp: 0, gainedSkill: 0, locked: false, result: null, connected: true,
     isLoser: false, isWinner: false, busted: false,
-    shidoRecorded: shido.RECORD_BASE, shidoGuardTurns: 0, shidoReviveRound: 0, shidoDeathVideoPending: false,
+    shidoRecorded: shido.RECORD_BASE, shidoGuardTurns: 0, shidoDeathVideoPending: false,
+    shidoRewindPending: false, shidoRewindLock: 0,
   };
 }
 
@@ -200,15 +201,15 @@ test('ฝากด้วยนะตัวฉัน: เป็นสกิลเ
   assert.equal(shido.canUseSkill(engine, s, 'ultimate'), true);
 });
 
-test('ฝากด้วยนะตัวฉัน: ตายระหว่างกับดักเปิด -> จองคิวเกิดใหม่ + คิววีดีโอรอยต่อ', () => {
+test('ฝากด้วยนะตัวฉัน: ตายระหว่างกับดักเปิด -> จองการย้อนเวลา + คิววีดีโอรอยต่อ', () => {
   const { s } = setup();
   shido.applyGuard(engine, s);
   s.hp = 0;
   engine.instantDeath(s);
   assert.equal(s.alive, false, 'ตกรอบจริงก่อน ไม่ใช่การกันตาย');
-  assert.equal(s.shidoReviveRound, engine.roundNumber + shido.REVIVE_DELAY);
+  assert.equal(s.shidoRewindPending, true);
   assert.equal(s.shidoGuardTurns, 0, 'กับดักถูกใช้ไปแล้ว');
-  assert.equal(shido.blocksGameOver(engine), true, 'เกมยังจบไม่ได้');
+  assert.equal(shido.rewindPending(engine), true, 'เกมยังจบไม่ได้');
 
   assert.deepEqual(queued, [], 'วีดีโอยังไม่คิวตอนตาย');
   shido.flushDeathVideo(engine);
@@ -217,43 +218,90 @@ test('ฝากด้วยนะตัวฉัน: ตายระหว่า
   assert.deepEqual(queued, ['shidoGuard'], 'ไม่คิวซ้ำ');
 });
 
-test('ฝากด้วยนะตัวฉัน: ตายตอนกับดักไม่ได้เปิด -> ไม่มีการเกิดใหม่', () => {
+test('ฝากด้วยนะตัวฉัน: ตายตอนกับดักไม่ได้เปิด -> ไม่มีการย้อนเวลา', () => {
   const { s } = setup();
   s.hp = 0;
   engine.instantDeath(s);
-  assert.equal(s.shidoReviveRound, 0);
-  assert.equal(shido.blocksGameOver(engine), false);
+  assert.equal(s.shidoRewindPending, false);
+  assert.equal(shido.rewindPending(engine), false);
 });
 
-test('ฝากด้วยนะตัวฉัน: ฟื้นเมื่อครบกำหนด ด้วยเลือด 5 เกราะ 3 แต้มสกิล 4', () => {
-  const { s } = setup();
-  shido.applyGuard(engine, s);
-  s.hp = 0;
-  engine.instantDeath(s);
-  const due = s.shidoReviveRound;
+// ---- ย้อนเวลาจริง: ใช้ระบบสแนปช็อตของ engine ตัวเดียวกับ Overload Force ----
+//  จำลองประวัติด้วยการเรียก engine.pushSnapshotHistory ผ่าน dealRound ไม่ได้ในเทสต์ระดับ hook
+//  จึงยัดสแนปช็อตเข้าไปเองผ่าน API ที่ engine เปิดไว้ แล้วตรวจว่า applyRewind คืนสภาพครบ
+function snapNow(round) {
+  engine.setRoundNumber(round);
+  engine.pushSnapshotHistory();
+}
 
-  engine.setRoundNumber(due - 1);
-  assert.equal(shido.maybeRevive(engine, s), false, 'ยังไม่ถึงกำหนด');
-  assert.equal(s.alive, false);
-
-  engine.setRoundNumber(due);
-  assert.equal(shido.maybeRevive(engine, s), true);
-  assert.equal(s.alive, true);
-  assert.equal(s.hp, shido.REVIVE_HP);
-  assert.equal(s.armor, shido.REVIVE_ARMOR);
-  assert.equal(s.skillPoints, shido.REVIVE_SKILL);
-  assert.equal(s.shidoRecorded, shido.RECORD_BASE, 'กลับมาเริ่มนับใหม่จากพื้น');
-  assert.equal(shido.blocksGameOver(engine), false);
-});
-
-test('ฝากด้วยนะตัวฉัน: เหลือคู่ต่อสู้คนเดียว -> ฟื้นเทิร์นถัดไปทันที ไม่ต้องรอครบ 5', () => {
+test('ย้อนเวลา: คืนพลังชีวิต/เกราะ/เหรียญ/แต้มสกิล/สถานะ และปลุกคนที่ตายไปแล้ว', () => {
   const { s, a, b } = setup();
+  engine.clearSnapshotHistory();
+
+  // --- สภาพ ณ รอบที่ 5 (จุดที่จะย้อนกลับไป) ---
+  s.hp = 4; s.armor = 2; s.gold = 12; s.skillPoints = 7;
+  a.hp = 5; a.gold = 4;
+  b.hp = 7;
+  snapNow(5);
+  for (let r = 6; r <= 10; r++) snapNow(r); // เดินหน้าอีก 5 เทิร์น
+
+  // --- สภาพปัจจุบัน (รอบที่ 10) พังยับ ---
+  s.hp = 1; s.armor = 0; s.gold = 0; s.skillPoints = 0;
+  s.statuses.stun = 3;
+  a.hp = 1; a.gold = 30;
+  b.alive = false; b.hp = 0;
+
   shido.applyGuard(engine, s);
   s.hp = 0;
   engine.instantDeath(s);
-  b.alive = false; // เหลือ A คนเดียวที่ยังอยู่
+  assert.equal(shido.applyRewind(engine, engine.players.S), true);
 
-  assert.equal(shido.maybeRevive(engine, s), true, 'ไม่รอครบกำหนด');
+  const s2 = engine.players.S, a2 = engine.players.A, b2 = engine.players.B;
+  assert.equal(s2.alive, true, 'ชิโดกลับมามีชีวิต');
+  assert.equal(s2.hp, 4 + shido.REWIND_HEAL, 'คืนเลือดของรอบที่ 5 แล้วฟื้นเพิ่มอีก 2');
+  assert.equal(s2.armor, 2);
+  assert.equal(s2.gold, 12, 'ย้อนเหรียญ');
+  assert.equal(s2.skillPoints, 7, 'ย้อนแต้มสกิล');
+  assert.equal(s2.statuses.stun, undefined, 'ย้อนสถานะ');
+  assert.equal(a2.hp, 5);
+  assert.equal(a2.gold, 4);
+  assert.equal(b2.alive, true, 'คนที่ตายไปแล้วกลับมา');
+  assert.equal(b2.hp, 7);
+  assert.equal(engine.roundNumber, 4, 'ตั้งเป็น snap.round - 1 เพื่อให้ dealRound ++ กลับเป็นรอบที่ 5');
+  assert.equal(shido.rewindPending(engine), false);
+});
+
+test('ย้อนเวลา: คูลดาวน์ 5 เทิร์นรอดจากการย้อน (กันย้อนวนไม่รู้จบ)', () => {
+  const { s } = setup();
+  engine.clearSnapshotHistory();
+  s.skillPoints = 8;
+  snapNow(5);
+  for (let r = 6; r <= 10; r++) snapNow(r);
+
+  shido.applyGuard(engine, s);
+  s.hp = 0;
+  engine.instantDeath(s);
+  shido.applyRewind(engine, engine.players.S);
+
+  const s2 = engine.players.S;
+  assert.equal(s2.skillPoints, 8, 'แต้มสกิลถูกย้อนคืนมาเต็ม');
+  assert.equal(s2.shidoRewindLock, 5 + shido.REWIND_LOCK_TURNS, 'แต่คูลดาวน์ไม่ถูกย้อนทิ้ง');
+
+  engine.setRoundNumber(5);
+  assert.equal(shido.canUseSkill(engine, s2, 'ultimate'), false, 'ยังกดไม่ได้ทั้งที่แต้มเต็ม');
+  engine.setRoundNumber(5 + shido.REWIND_LOCK_TURNS - 1);
+  assert.equal(shido.canUseSkill(engine, s2, 'ultimate'), false);
+  engine.setRoundNumber(5 + shido.REWIND_LOCK_TURNS);
+  assert.equal(shido.canUseSkill(engine, s2, 'ultimate'), true, 'ครบ 5 เทิร์นแล้วกดได้');
+});
+
+test('ย้อนเวลา: ยังไม่มีประวัติให้ย้อน -> ตาข่ายสำรองคืนชีพด้วยเลือดขั้นต่ำ', () => {
+  const { s } = setup();
+  engine.clearSnapshotHistory();
+  shido.applyGuard(engine, s);
+  s.hp = 0;
+  engine.instantDeath(s);
+  assert.equal(shido.applyRewind(engine, s), true);
   assert.equal(s.alive, true);
-  assert.ok(a.alive);
+  assert.equal(s.hp, shido.REWIND_HEAL);
 });
