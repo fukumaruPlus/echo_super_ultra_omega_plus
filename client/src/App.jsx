@@ -123,7 +123,7 @@ export default function App() {
     const onFull = () => {
       curtainRef.current?.release();
       navLockRef.current = false;
-      alert("ขออภัย ห้องเต็มแล้ว (สูงสุด 6 คน)");
+      alert("ขออภัย ห้องเต็มแล้ว (สูงสุด 7 คน)");
     };
     const onInProgress = () => {
       curtainRef.current?.release();

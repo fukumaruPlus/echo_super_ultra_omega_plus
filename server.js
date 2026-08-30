@@ -114,7 +114,7 @@ app.get(/^\/(?!socket\.io).*/, (req, res) => res.sendFile(path.join(staticDir, "
 
 
 // ---------- ค่าคงที่ ----------
-const MAX_PLAYERS = 6;
+const MAX_PLAYERS = 7; // patch 2.8: เปิดช่องผู้เล่นที่ 7 (บอสยูกิย้ายไปนั่งช่อง 8)
 const CARD_TIME = 60;
 const OVERLOAD_FORCE_CHANCE = 0.30;
 const OVERLOAD_FORCE_CUTSCENE_SECONDS = 5; // overload_force_start.mp4 = 4.809s
@@ -127,6 +127,7 @@ const YUUKI_SCALE = Object.freeze({
   4: { hp: 23, armor: 2 },
   5: { hp: 26, armor: 4 },
   6: { hp: 30, armor: 5 },
+  7: { hp: 34, armor: 5 }, // patch 2.8: ช่องผู้เล่นที่ 7 — ต่อสเกลเดิม (+4 HP ต่อผู้เล่น 1 คน)
 });
 const YUUKI_VIDEO = {
   spawn: "/characters/yuuki/yuuki_overload.mp4",
@@ -1292,7 +1293,7 @@ function createYuukiBoss() {
   const p = {
     id: YUUKI_ID, socketId: null, connected: true, ready: true, isBoss: true,
     teamId: null, teamConfirmed: true, modeVote: null,
-    name: "ยูกิ Overload", position: 7, characterId: "yuuki", avatar: ch.avatar, img: ch.img,
+    name: "ยูกิ Overload", position: 8, characterId: "yuuki", avatar: ch.avatar, img: ch.img,
     cards: [], locked: true, busted: false, result: null,
   };
   const scale = yuukiStatsForPlayerCount(Object.values(players).filter((o) => !isYuuki(o)).length);
@@ -1317,7 +1318,7 @@ function createYuukiBoss() {
 }
 
 function yuukiStatsForPlayerCount(count) {
-  const playersCount = Math.max(1, Math.min(6, Math.trunc(Number(count) || 1)));
+  const playersCount = Math.max(1, Math.min(MAX_PLAYERS, Math.trunc(Number(count) || 1))); // patch 2.8: เพดานตามจำนวนผู้เล่นจริง (7 คน)
   return { players: playersCount, ...YUUKI_SCALE[playersCount] };
 }
 
@@ -1504,6 +1505,8 @@ function instantDeath(p) {
   p.hp = 0; p.alive = false; p.result = "dead"; p.locked = true;
   // คอนเนอร์ RK800 (สกิลติดตัว 3 ปัญญาประดิษฐ์): จองคิวฟื้นคืนชีพอีก 10 เทิร์น (ไม่ใช่การกันตาย — ตกรอบจริงก่อน)
   CHAR_HOOKS.conner.onDeath(engine, p);
+  // โมโรโบชิ ดัน (characters/dan.js): เป้าหมาย "จงหลบแต่อย่าหนี"/ศิษย์ตกรอบ (หรือดันเองตกรอบ) -> ปลดสถานะทั้งสองฝั่ง
+  CHAR_HOOKS.dan.onDeath(engine, p);
   CHAR_HOOKS.kai.pruneOverhaulSlots(engine); // ไค ชิซากิ: ผู้ถือรังสรรค์/ลงทัณฑ์ตกรอบ -> ลบออกจาก Overhaul tracker
   // ยูนะ: เป้าหมายที่ได้รับพร (Delete/Smile for You/Longing) ตาย/หมดสภาพ -> เพลง+บัฟยูนะปิดลงทันที
   //  ยกเว้น Break Beat Bark เพราะมีผลทั้งสนาม ไม่ผูกกับผู้เล่นคนใดคนหนึ่งโดยเฉพาะ
@@ -2173,6 +2176,7 @@ function resetCombat(p) {
   CHAR_HOOKS.conner.resetCombat(p); // คอนเนอร์: ความเครียดของทุกคน + คำขาดจับกุม/สถานะไล่ล่า/โควตาฟื้นคืนชีพ
   CHAR_HOOKS.byleth.resetCombat(p); // ความรู้/หลักสูตร/ผลทบทวนบทเรียนที่ค้าง + ธงสตั้น-ห้ามสกิลพื้นฐานที่หลักสูตรของไบเลธตั้งไว้ให้คนอื่น
   CHAR_HOOKS.haruka.resetCombat(p); // harukaBasicUses / harukaBleedProcs (โควตารายเทิร์น) + harukaStunPending (สตั้นค้างจากการสวนกลับ)
+  CHAR_HOOKS.dan.resetCombat(p); // โมโรโบชิ ดัน: เป้าหมาย "จงหลบแต่อย่าหนี" / ศิษย์ / สตรีคแพ้แต้มติดกัน
   CHAR_HOOKS.eiji.resetCombat(p); // eijiOrdinal (สแตค Ordinal Scale ของเทิร์นนี้) + eijiDodgeUsedRound (โควตาหลบ 1 ครั้ง/เทิร์น)
   // ---------- เจ้าแห่งเน็ตบ้าน (patch 1.9) ----------
   p.contractPartner = null; // เจ้าแห่งเน็ตบ้าน: id คู่สัญญาปัจจุบัน (มีได้ 1 คน)
@@ -2528,6 +2532,11 @@ function buildStateFor(viewerId) {
         secondaryPub = pub(CHAR_HOOKS.kotone.dynamicSkillFor(p, ch, "secondary", nightNow));
         ultimatePub = pub(CHAR_HOOKS.kotone.dynamicSkillFor(p, ch, "ultimate", nightNow));
       }
+      // โมโรโบชิ ดัน (patch 2.8 new): สกิลติดตัว "ครูฝึกสุดเหี้ยม" — เป้าหมาย "จงหลบแต่อย่าหนี" แพ้แต้มติดกัน 2 ครั้ง
+      //  -> ปุ่มท่าไม้ตายกลายเป็น "อย่าให้ฉันต้องเฆี่ยนตี" (ต้องคิดสูตรเดียวกับ useSkill เป๊ะ ไม่งั้นราคาบนปุ่มไม่ตรงกับที่หักจริง)
+      if (ch.id === "dan") {
+        ultimatePub = pub(CHAR_HOOKS.dan.dynamicSkillFor(engine, p, ch, "ultimate"));
+      }
       // โอกูริ แคป (Rework): ยุคทองครบ 3 + Stamina ชาร์จ 75 ขึ้นไป — ท่าไม้ตายกลายเป็น Ashen Trail
       if (ch.id === "oguri") {
         ultimatePub = pub(oguriAshenReady(p) ? ch.ultimate2 : ch.ultimate);
@@ -2665,6 +2674,9 @@ function buildStateFor(viewerId) {
         connorFrozen: !!p.connorFrozen, // ถูกแช่เพราะอยู่นอกวงไล่ล่า (บังคับไพ่แตก กดอะไรไม่ได้)
         connorRevives: p.characterId === "conner" ? (p.connorRevives || 0) : undefined,        // ใช้ฟื้นคืนชีพไปแล้วกี่ครั้ง
         connorRevivesMax: p.characterId === "conner" ? CHAR_HOOKS.conner.REVIVE_MAX : undefined,
+        // โมโรโบชิ ดัน (patch 2.8): ช่องท่าไม้ตายตอนนี้เป็น "อย่าให้ฉันต้องเฆี่ยนตี" อยู่หรือเปล่า
+        //  client ใช้ตัดสินว่าต้องให้จิ้มเป้าหมายก่อนไหม (ท่า 2 เล็งเป้าเดิมอัตโนมัติ) — อย่าเดาจากชื่อ/ราคาสกิล
+        danWhip: p.characterId === "dan" ? CHAR_HOOKS.dan.whipReady(engine, p) : undefined,
         connorReviveIn: p.characterId === "conner" && !p.alive && p.connorReviveRound
           ? Math.max(0, p.connorReviveRound - roundNumber) : undefined,                         // เหลือกี่เทิร์นก่อนกลับมา
         connorAnalyze: p.characterId === "conner" ? !!p.connorAnalyze : undefined,              // เทิร์นนี้กดวิเคราะห์แล้ว (= ไม่โจมตี)
@@ -2779,6 +2791,7 @@ function queueCutscene(p, key) {
       playerId: p.id, name: p.name,
       img: t.img, color: POSITION_COLORS[p.position] || "#9B4F96",
       video: t.video, title: t.title, label: t.label, voice: t.voice || null,
+      noIntro: !!t.noIntro, // true = ตัดการ์ดเปิดตัว 950ms ทิ้ง เข้าวีดีโอทันที (คลิปสั้นมาก)
     },
   });
 }
@@ -3376,6 +3389,8 @@ function dealRound() {
     if (p.characterId === "eiji") CHAR_HOOKS.eiji.onRoundStartTick(engine, p);
     // ---------- มิซึซาว่า ฮารุกะ (characters/haruka.js): รีเซ็ตโควตาสกิลพื้นฐาน 2 ครั้ง + โควตาเลือดไหลของสกิลติดตัว ----------
     if (p.characterId === "haruka") CHAR_HOOKS.haruka.onRoundStartTick(engine, p);
+    // ---------- โมโรโบชิ ดัน (characters/dan.js): ไม้ค้ำพยุงร่าง — ฟื้นพลังชีวิตต่อเทิร์น ----------
+    if (p.characterId === "dan") CHAR_HOOKS.dan.onRoundStartTick(engine, p);
     // ---------- คอนเนอร์ RK800 (characters/conner.js): รีเซ็ตโควตา "จั่วไพ่ = เครียด +1 ต่อเทิร์น" + ธงวิเคราะห์สถานการณ์ ----------
     CHAR_HOOKS.conner.onRoundStartTick(engine, p);
     // ---------- อาจารย์ ไบเลธ (characters/byleth.js): รีเซ็ตโควตาสกิล 5 ครั้ง + หลักสูตรกินความรู้เทิร์นละ 1 ----------
@@ -3666,6 +3681,9 @@ function useSkill(id, tier, targets, item) {
   if (ch && ch.id === "takuto" && tier === "basic" && (p.statuses.apprivoise || 0) > 0) skill = ch.basic2;
   // patch 2.2.5: กันตาย (สกิลติดตัว 1) เคยทำงานไปแล้ว — ท่าไม้ตายเปลี่ยนเป็นร่วมเดินทางไปกับฉันเถอะถาวร (แทนพิชิตแสงดาว)
   if (ch && ch.id === "takuto" && tier === "ultimate" && p.beatSaved) skill = ch.ultimate2;
+  // โมโรโบชิ ดัน (patch 2.8 new): สกิลติดตัว "ครูฝึกสุดเหี้ยม" — เป้าหมาย "จงหลบแต่อย่าหนี" แพ้แต้มติดกัน 2 ครั้ง
+  //  (ไม่นับไพ่แตก) -> ช่องท่าไม้ตายกลายเป็น "อย่าให้ฉันต้องเฆี่ยนตี" สำหรับเทิร์นนั้น (publicState คิดสูตรเดียวกัน)
+  if (ch && ch.id === "dan") skill = CHAR_HOOKS.dan.dynamicSkillFor(engine, p, ch, tier);
   if (!skill) return;
   const isEscanorSkill = p.characterId === "escanor";
   const isHisakawaSkill = p.characterId === "hisakawa_sister";
@@ -3870,6 +3888,19 @@ function useSkill(id, tier, targets, item) {
     if (tier === "secondary" || tier === "ultimate") {
       connerTarget = CHAR_HOOKS.conner.prepareTarget(engine, p, tier, targets);
       if (!connerTarget) return;
+    }
+  }
+  // ---------- โมโรโบชิ ดัน (characters/dan.js) ----------
+  //  พื้นฐาน: กดซ้ำไม่ได้ระหว่างไม้ค้ำยังมีผล · สกิลรอง/ท่าไม้ตาย 1: ต้องเลือกเป้าหมาย 1 คน
+  //  ท่าไม้ตาย 2 (อย่าให้ฉันต้องเฆี่ยนตี): เล็งเป้าหมายเดิมอัตโนมัติ ไม่ต้องให้ผู้เล่นส่ง targets มา
+  const isDanPick = p.characterId === "dan";
+  let danTarget = null;
+  let danWhipTarget = null; // เป้าหมายของท่าไม้ตาย 2 ที่รอลงดาเมจหลังวีดีโอจบ
+  if (isDanPick) {
+    if (!CHAR_HOOKS.dan.canUseSkill(engine, p, tier)) return;
+    if (tier === "secondary" || tier === "ultimate") {
+      danTarget = CHAR_HOOKS.dan.prepareTarget(engine, p, tier, targets);
+      if (!danTarget) return;
     }
   }
   // ---------- ชเรด เอลัน (patch พิเศษ) ----------
@@ -4085,6 +4116,16 @@ function useSkill(id, tier, targets, item) {
   if (isEiji) flashSuffix = CHAR_HOOKS.eiji.applyInstantSkill(engine, p, tier) || flashSuffix;
   // ---------- มิซึซาว่า ฮารุกะ (characters/haruka.js): ไข่ต้ม และอาหารเสริม / amazon punish / New Omega ----------
   if (isHaruka) flashSuffix = CHAR_HOOKS.haruka.applyInstantSkill(engine, p, tier) || flashSuffix;
+  // ---------- โมโรโบชิ ดัน (characters/dan.js): ไม้ค้ำ / นายทำให้ฉันผิดหวัง / ฉันบอกว่าอย่าหนี ----------
+  if (isDanPick) {
+    flashSuffix = CHAR_HOOKS.dan.applyInstantSkill(engine, p, tier, danTarget) || flashSuffix;
+    if (tier === "ultimate" && danTarget) {
+      // ท่าไม้ตายทั้งสองแบบเล่นวีดีโอทุกครั้ง (queueCutscene ตรงๆ ไม่ใช่ triggerCutscene)
+      //  ท่า 1 แค่แปะสถานะ -> เล่นวีดีโอเฉยๆ ก็พอ · ท่า 2 ลงดาเมจ -> หน่วงไว้ให้ลงหลังวีดีโอจบ
+      if (CHAR_HOOKS.dan.whipReady(engine, p)) { queueCutscene(p, "danWhip"); danWhipTarget = danTarget; }
+      else queueCutscene(p, "danChase");
+    }
+  }
   // ---------- คอนเนอร์ RK800 (characters/conner.js): วิเคราะห์สถานการณ์ / ข่มขวัญ-จับกุม / จัดการปิดคดี ----------
   if (isConnerPick) {
     flashSuffix = CHAR_HOOKS.conner.applyInstantSkill(engine, p, tier, connerTarget) || flashSuffix;
@@ -4295,6 +4336,12 @@ function useSkill(id, tier, targets, item) {
   // วีดีโอสวนกลับที่ค้างคิว (Wonder of U ซาโตรุ) — เล่นทันทีช่วงจั่วการ์ด
   if (gameState === "PLAYING" && cutsceneQueue.length) {
     if (isIgnisImpact) pausePlayingForCutscene(() => CHAR_HOOKS.ignis.applyImpact(engine, p, ignisImpactTarget));
+    else if (danWhipTarget) {
+      // โมโรโบชิ ดัน: "อย่าให้ฉันต้องเฆี่ยนตี" — วีดีโอก่อน แล้วค่อยลงความเสียหาย (แพทเทิร์นเดียวกับจัดการปิดคดี)
+      const dt = danWhipTarget;
+      danWhipTarget = null;
+      pausePlayingForCutscene(() => CHAR_HOOKS.dan.applyWhip(engine, p, dt));
+    }
     else if (connerCloseCase) {
       const t = connerCloseCase;
       connerCloseCase = null;
@@ -4304,6 +4351,8 @@ function useSkill(id, tier, targets, item) {
   // ตาข่ายสำรอง (คอนเนอร์ "จัดการปิดคดี"): ไม่ได้เข้าเส้นทางคัตซีนด้วยเหตุใดก็ตาม -> ลงดาเมจทันที
   //  ไม่งั้นแต้มสกิล 8 หน่วยหายไปเปล่าๆ โดยเป้าหมายไม่โดนอะไรเลย
   if (connerCloseCase) CHAR_HOOKS.conner.applyCloseCase(engine, p, connerCloseCase);
+  // ตาข่ายสำรองเดียวกันของ "อย่าให้ฉันต้องเฆี่ยนตี" — ไม่ได้เข้าเส้นทางคัตซีน -> ลงดาเมจทันที
+  if (danWhipTarget) CHAR_HOOKS.dan.applyWhip(engine, p, danWhipTarget);
   broadcastState();
   checkAllLocked();
 }
@@ -5067,6 +5116,9 @@ function afterResolve() {
   CHAR_HOOKS.escanor.onAfterResolve(engine);
   // ---------- ทาคุมิ ฟุจิวาระ (characters/takumi.js): ถึงจะมองไม่เห็น แต่ฉันยังอยู่ — คนแรกที่ไพ่แตกระหว่างบัฟยังทำงาน ----------
   CHAR_HOOKS.takumi.tryBustTrigger(engine);
+  // ---------- โมโรโบชิ ดัน (characters/dan.js): "จงหลบแต่อย่าหนี" ลงโทษเป้าหมาย + ครูฝึกสุดเหี้ยมกวาดคนไพ่แตก ----------
+  //  ต้องอยู่หลังเอฟเฟกต์ที่กวาดคนไพ่แตกตัวอื่น เพื่อให้ผลบวก 1 หน่วยของสกิลติดตัวเป็นชั้นสุดท้ายเสมอ
+  CHAR_HOOKS.dan.onAfterResolve(engine);
 
   const activated = [];
   for (const p of alivePlayers()) {
@@ -5308,6 +5360,8 @@ function computeAttackBase(engine, attacker, target) {
   // veilAtk/partnerAtk: ungated ตั้งใจ (แจกให้ผู้เล่นอื่นได้ ไม่ผูกกับตัวละครเจ้าของสกิล) — อยู่ที่นี่ ไม่ใช่ hook
   const veilAtk = !triggerForm && (attacker.statuses.veil || 0) > 0;
   const partnerAtk = !triggerForm && CHAR_HOOKS.broadband_man.contractBuffActive(engine, attacker);
+  // ศิษย์ (โมโรโบชิ ดัน): ungated เหมือน veil/partner — เป็นบัฟที่แจกให้ผู้เล่นคนอื่น ไม่ผูกกับตัวละครเจ้าของสกิล
+  const discipleAtk = !triggerForm && (attacker.statuses.danDisciple || 0) > 0;
   const isRevenge = attacker.characterId === "banagher" && attacker.ntdTarget && attacker.ntdTarget === target.id;
   const isRival = attacker.characterId === "banagher" && attacker.ntdRivalId && attacker.ntdRivalId === target.id;
   const ntdBonus = (isRevenge || isRival || paradiseAtk) ? 1 : 0;
@@ -5320,10 +5374,10 @@ function computeAttackBase(engine, attacker, target) {
   const cardAtkBonus = triggerForm ? 0 : (attacker.statusAmt.cardAtkBonus || 0); // Trigger เสริมพลังตัวเองไม่ได้
   const heroSwordAtk = triggerForm ? 0 : (((attacker.statuses.heroSword || 0) > 0) ? 2 : 0);
 
-  const base = baseHook + hookBonus + (veilAtk ? 1 : 0) + (empowerAtk ? 1 : 0) + (partnerAtk ? 1 : 0) + cardAtkBonus + heroSwordAtk;
+  const base = baseHook + hookBonus + (veilAtk ? 1 : 0) + (empowerAtk ? 1 : 0) + (partnerAtk ? 1 : 0) + (discipleAtk ? CHAR_HOOKS.dan.DISCIPLE_ATK_BONUS : 0) + cardAtkBonus + heroSwordAtk;
   return {
     base,
-    storiumAtk, paradiseAtk, isRevenge, isRival, ntdBonus, veilAtk, empowerAtk, partnerAtk, cardAtkBonus, heroSwordAtk,
+    storiumAtk, paradiseAtk, isRevenge, isRival, ntdBonus, veilAtk, empowerAtk, partnerAtk, discipleAtk, cardAtkBonus, heroSwordAtk,
     oberonDayAtk, shradeDayOff, phenexPurgeAtk, hakunoInvertAtk, hakunoNoRegenAtk,
     ...hookCtx,
   };
@@ -5366,6 +5420,9 @@ function doAttack(byId, targetId) {
     }
   }
   attacker.didAttackRound = true;
+  // โมโรโบชิ ดัน (characters/dan.js): เป้าหมายที่ถูกขับรถตาม "ชนะการจั่วและได้โจมตี" จริง -> ปลดสถานะทันที
+  //  วางไว้ตรงนี้ (ก่อนคิดดาเมจ) เพราะเงื่อนไขคือ "ได้ตี" ไม่ใช่ "ตีโดน" — ต่อให้เป้าหมายหลบได้ก็ยังนับ
+  CHAR_HOOKS.dan.onChasedAttacked(engine, attacker);
   attacker.nanayaReattackReady = false; // หัวใจฆาตกร (นานายะ ชิกิ): กำลังใช้โอกาสโจมตีซ้ำนี้อยู่ (หรือไม่เกี่ยวข้องกับตัวละครนี้)
 
   let riddheTaunted = false;
@@ -5689,6 +5746,8 @@ function doAttack(byId, targetId) {
   //  และสกิลติดตัว 4 "การป้องกันตัว" โรล 15% ถ้าคนตีไม่ใช่คนเดิมกับครั้งก่อน (คิววีดีโอไว้ ดาเมจลงที่ postAttackFollowup)
   CHAR_HOOKS.conner.onConnerAttacked(engine, attacker, target);
   const connerCounterFired = CHAR_HOOKS.conner.onAttackedNormally(engine, attacker, target);
+  // โมโรโบชิ ดัน (characters/dan.js): "ศิษย์" หันมาโจมตีปกติใส่ดัน -> เล่น dan_skill2.mp4 แล้วสวนคืน 3 หน่วย
+  const danCounterFx = CHAR_HOOKS.dan.onAttackedNormally(engine, attacker, target);
   // Ginga Strium (ฮิคารุ, characters/hikaru.js): โจมตีโดนเป้าหมาย -> ติดลุกไหม้ให้เป้าหมาย / ถูกโจมตีขณะอยู่ในร่างนี้ -> ผู้โจมตีติดลุกไหม้สวนกลับ
   CHAR_HOOKS.hikaru.onAttackBurnApply(engine, attacker, target);
   const escanorAttackVideoQueued = CHAR_HOOKS.escanor.onAttackLanded(engine, attacker, target);
@@ -5968,6 +6027,7 @@ function doAttack(byId, targetId) {
   if (batReflectDmg > 0) addFx({ name: `เข้ามาเลย — ความเสียหายเกิดกับผู้โจมตีด้วย -${batReflectDmg}`, img: BAT_SKILL3_IMG, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   // ---------- มิซึซาว่า ฮารุกะ (characters/haruka.js) ----------
   if (harukaPunishFx.punishStacks > 0) addFx({ name: `จงไปสู่สุขติ — ระเบิดเลือดไหล +${harukaPunishFx.punishStacks}`, img: CHAR_HOOKS.haruka.IMG.skill2, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
+  if (danCounterFx) addFx({ name: `นายทำให้ฉันผิดหวัง — สวนกลับศิษย์ -${danCounterFx.dmg}`, img: CHAR_HOOKS.dan.IMG.skill2, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (connerCounterFired) addFx({ name: "การป้องกันตัว — สวนกลับผู้โจมตีทั้งสองคน", img: CHAR_HOOKS.conner.IMG.base, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (bylethSwordUsed > 0) addFx({ name: `ดาบต้องสาป +${bylethSwordUsed}`, img: CHAR_HOOKS.byleth.IMG.skill2, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
   if (harukaBleedApplied > 0) addFx({ name: `โอเมก้า — เลือดไหล +${harukaBleedApplied}`, img: CHAR_HOOKS.haruka.IMG.ult, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
@@ -5995,7 +6055,7 @@ function doAttack(byId, targetId) {
   //  / อย่าอยู่เลย แกน่ะ! (ริต้า เบอร์นัล patch 2.1.6) / ฉันยัง...มองเห็นอยู่!!! กันตาย + อย่างนายน่ะ จะไปเข้าใจอะไร (สึงาชิ ทาคุโตะ patch 2.2.4):
   //  เล่นวีดีโอที่ค้างคิวก่อน แล้วค่อยขึ้นสรุปความเสียหาย
   //  (ปกติทุกท่าอื่นจะขึ้นสรุปความเสียหายก่อนแล้วค่อยเล่นวีดีโอค้างคิวตอนจบ — ท่าเหล่านี้กลับลำดับเฉพาะตัว)
-  if ((yuukiAttackVideoQueued || isYuuki(target) || beamPlusAtk || (beam && attacker.characterId === "banagher") || unibeam2Atk || storiumAtk || phenexPurgeAtk || miyakoUltAtk || triggerMultiAtk || triggerZeperionAtk || escanorAttackVideoQueued || (beatSaveFired && target.characterId === "takuto") || takutoUlt2VideoQueued || eijiSwordFx.videoQueued || harukaPunishFx.videoQueued || (harukaCounterFx && harukaCounterFx.videoQueued)) && cutsceneQueue.length) runCutsceneQueue(showAttackFx);
+  if ((yuukiAttackVideoQueued || isYuuki(target) || beamPlusAtk || (beam && attacker.characterId === "banagher") || unibeam2Atk || storiumAtk || phenexPurgeAtk || miyakoUltAtk || triggerMultiAtk || triggerZeperionAtk || escanorAttackVideoQueued || (beatSaveFired && target.characterId === "takuto") || takutoUlt2VideoQueued || eijiSwordFx.videoQueued || harukaPunishFx.videoQueued || (harukaCounterFx && harukaCounterFx.videoQueued) || (danCounterFx && danCounterFx.videoQueued)) && cutsceneQueue.length) runCutsceneQueue(showAttackFx);
   else showAttackFx();
 }
 
@@ -6116,6 +6176,8 @@ function endTurn() {
         }
         // เชื่อมผลจบลง (Resonance): ตัดลิงก์ทั้งสองฝั่ง
         // ไค ชิซากิ: เชื่อมต่อ/คู่ปรับ หมดอายุ -> ล้าง mirror ทั้งสองฝั่ง (โค้ดแยกจาก Resonance ของ Bard)
+        // โมโรโบชิ ดัน: "จงหลบแต่อย่าหนี"/"ศิษย์" หมดเวลา -> ล้างธงฝั่งดันและฝั่งเป้าหมายให้ครบ
+        if (k === "danChase" || k === "danDisciple") CHAR_HOOKS.dan.onStatusExpire(engine, p, k);
         if (k === "kaiLink") CHAR_HOOKS.kai.onExpireKaiLink(p);
         if (k === "kaiRival1" || k === "kaiRival2") CHAR_HOOKS.kai.onExpireKaiRival(p);
         // ทาคุมิ ฟุจิวาระ: ถึงจะมองไม่เห็น แต่ฉันยังอยู่ หมดเวลาเองตามธรรมชาติ (ไม่มีใครไพ่แตกใน 5 เทิร์น) -> รีเซ็ต guard ให้ใช้ท่าไม้ตายรอบหน้าได้ปกติ
@@ -6566,7 +6628,7 @@ io.on('connection', (socket) => {
     if (!consumeEventQuota(socket, 'reserve', 8, 10_000) || playerIdFor(socket)) return;
     const pos = Number(position);
     if (!pos) { releaseReservation(socket.id); broadcastPositions(); return; }
-    if (pos < 1 || pos > 6 || positionUsedByOther(pos, socket.id)) return;
+    if (pos < 1 || pos > MAX_PLAYERS || positionUsedByOther(pos, socket.id)) return;
     reservePosition(socket.id, pos);
     broadcastPositions();
   });
@@ -6576,7 +6638,7 @@ io.on('connection', (socket) => {
     if (Object.keys(players).length >= MAX_PLAYERS) { socket.emit("full"); return; }
     if (gameState !== "LOBBY") { socket.emit("inProgress"); return; }
     const pos = Number(position);
-    if (!pos || pos < 1 || pos > 6 || positionUsedByOther(pos, socket.id)) { socket.emit("positionTaken"); return; }
+    if (!pos || pos < 1 || pos > MAX_PLAYERS || positionUsedByOther(pos, socket.id)) { socket.emit("positionTaken"); return; }
     releaseReservation(socket.id);
     let ch = CHAR_BY_ID[characterId];
     if (!ch || ch.locked) ch = CHARACTERS.find((c) => !c.locked) || CHARACTERS[0];
@@ -6885,6 +6947,9 @@ const engine = {
   sameTeam,
   friendlyEffectBlocked,
   withEffectSource,
+  // ต้นตอของเอฟเฟกต์ที่กำลังทำงานอยู่ (ตั้งโดย withEffectSource) — hook ที่ต้องรู้ว่า "ใครเป็นคนทำ"
+  //  ในจังหวะที่ไม่มีพารามิเตอร์ผู้กระทำส่งมาให้ (เช่น adjustIncomingDamage) อ่านตรงนี้
+  get effectSourceId() { return effectSourceId; },
   get roundNumber() { return roundNumber; },
   setRoundNumber(v) { roundNumber = v; },
   get attackerId() { return attackerId; },

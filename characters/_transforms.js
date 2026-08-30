@@ -7,9 +7,21 @@
 //  voice = เสียงพากย์เล่นต่อเมื่อวีดีโอจบ | music = เพลงสกิลที่ค้างหลัง cutscene
 // ============================================================
 const connorImg = require("./conner").IMG; // คอนเนอร์ RK800: ใช้ path รูปชุดเดียวกับไฟล์ตัวละครกันค่าซ้ำสองที่
+const danImg = require("./dan").IMG;       // โมโรโบชิ ดัน: เหตุผลเดียวกัน
 
 module.exports = function buildTransforms(img) {
   return {
+    // ---------- โมโรโบชิ ดัน (patch 2.8 new) ----------
+    //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก (สกิลรอง 5.27 -> 7 · ไล่ตาม 7.67 -> 9
+    //  · เฆี่ยนตี 8.75 -> 10 · ชนตอนแพ้แต้ม 6.14 -> 8 · ชนตอนไพ่แตก 8.73 -> 10 · ครูฝึกด่า 1.71 -> 4)
+    //  ทุกคลิปเรียกผ่าน queueCutscene ตรงๆ = เล่นทุกครั้งที่ทำงาน ไม่มีตัวไหนเล่นครั้งเดียวต่อเกม
+    //  danScold ตั้ง noIntro: คลิปสั้นมาก (1.7 วิ) ถ้ามีการ์ดเปิดตัว 950ms คร่อมอยู่จะเห็นวีดีโอแทบไม่ทัน
+    danDisciple:   { img: danImg.skill2,  video: "/characters/dan/skill2/dan_skill2.mp4",     title: "นายทำให้ฉันผิดหวัง", label: "สวนกลับศิษย์",   seconds: 7,  music: null, afterReveal: false },
+    danChase:      { img: danImg.skill3,  video: "/characters/dan/skill3/dan_skill3.mp4",     title: "ฉันบอกว่าอย่าหนี",   label: "ปล่อยท่าไม้ตาย", seconds: 9,  music: null, afterReveal: false },
+    danWhip:       { img: danImg.skill3b, video: "/characters/dan/skill3/dan_skill3.2.mp4",   title: "อย่าให้ฉันต้องเฆี่ยนตี", label: "ปล่อยท่าไม้ตาย", seconds: 10, music: null, afterReveal: false },
+    danChaseLose:  { img: danImg.skill3,  video: "/characters/dan/dan_skill3_hit1.mp4",       title: "จงหลบแต่อย่าหนี",    label: "ขับรถชน",       seconds: 8,  music: null, afterReveal: false },
+    danChaseBust:  { img: danImg.skill3,  video: "/characters/dan/dan_skill3_hit2.mp4",       title: "จงหลบแต่อย่าหนี",    label: "ขับรถชนเต็มแรง", seconds: 10, music: null, afterReveal: false },
+    danScold:      { img: danImg.base,    video: "/characters/dan/dan_passive.mp4",           title: "ครูฝึกสุดเหี้ยม",    label: "สกิลติดตัวทำงาน", seconds: 4,  music: null, afterReveal: false, noIntro: true },
     // ---------- คอนเนอร์ RK800 (patch 2.7 new) ----------
     //  seconds วัดจาก mvhd จริงแล้วเผื่อเวลาตัดฉาก ~1 วินาที (เปิดตัว 6.94 · สอบปากคำ 10.89 · ปิดคดี 16.29
     //  · ไล่ล่า 1/2/3 = 7.06/8.86/13.40 · จับกุมสำเร็จ 6.00 · หนีรอด 9.45 · ป้องกันตัว 17.00)

@@ -59,7 +59,8 @@ function isTargetable(p, iAmAttacker, c) {
   // คอนเนอร์ RK800: สกิลรองเลือกใครก็ได้ที่ไม่ใช่ตัวเอง/เพื่อนร่วมทีม — ท่าไม้ตายเลือกได้เฉพาะระดับ "อาชญากร"
   //  (ฝั่ง server กันซ้ำที่ CHAR_HOOKS.conner.prepareTarget อีกชั้น ตรงนี้แค่กันกดพลาด)
   const connorTarget = !!c.connorSel && !self && !friendly && (c.connorSel !== "ultimate" || p.connorLevel === "criminal");
-  return (normalAttackTarget || !!c.anataSel || c.dawnSel || c.appleSel || c.bbSel || c.shSel || c.skSel || c.doomSel || c.saObSel || escanorSkillTarget || c.ignisSel || c.ignisImpactSel || c.bgSel || !!c.bardPending || c.nanayaSel || c.tpSel || c.kaiCreateSel || c.kaiPunishSel || c.msMarkSel || c.msRuptureSel || c.psSealSel || bylethStrikeTarget || connorTarget || gunTarget) && p.alive;
+  const danTarget = !!c.danSel && !self && !friendly; // โมโรโบชิ ดัน: เล็งใครก็ได้ที่ไม่ใช่ตัวเอง/เพื่อนร่วมทีม
+  return (normalAttackTarget || !!c.anataSel || c.dawnSel || c.appleSel || c.bbSel || c.shSel || c.skSel || c.doomSel || c.saObSel || escanorSkillTarget || c.ignisSel || c.ignisImpactSel || c.bgSel || !!c.bardPending || c.nanayaSel || c.tpSel || c.kaiCreateSel || c.kaiPunishSel || c.msMarkSel || c.msRuptureSel || c.psSealSel || bylethStrikeTarget || connorTarget || danTarget || gunTarget) && p.alive;
 }
 // แตะ/คลิกการ์ดคู่ต่อสู้แล้วต้องทำอะไร — ไล่ตามโหมดเลือกเป้าหมายที่เปิดอยู่ ไม่มีเลยก็โจมตีปกติ
 function resolveAttackPick(id, c) {
@@ -82,6 +83,7 @@ function resolveAttackPick(id, c) {
   if (c.kaiPunishSel) return c.pickKaiPunish(id);
   if (c.bylethStrikeSel) return c.pickBylethStrike(id);
   if (c.connorSel) return c.pickConnor(id);
+  if (c.danSel) return c.pickDan(id);
   if (c.msMarkSel) return c.pickMsMark(id);
   if (c.msRuptureSel) return c.pickMsRupture(id);
   if (c.psSealSel) return c.pickPsSeal(id);
@@ -105,10 +107,12 @@ function Cutscene({ cs }) {
     return onVolumeChange(() => { if (ref.current) ref.current.volume = videoVolume(); });
   }, [cs.id]); // remount ต่อ cutscene -> เล่นวีดีโอใหม่เสมอ (กันจอดำตอนท่าเดียวกันต่อกัน)
   useEffect(() => {
+    // noIntro (โมโรโบชิ ดัน "ครูฝึกสุดเหี้ยม"): คลิปสั้นมาก — ข้ามการ์ดเปิดตัวไปเข้าวีดีโอเลย
+    if (cs.noIntro) { setIntroDone(true); return; }
     setIntroDone(false);
     const t = setTimeout(() => setIntroDone(true), 950);
     return () => clearTimeout(t);
-  }, [cs.id]);
+  }, [cs.id, cs.noIntro]);
 
   return (
     <div className="fixed inset-0 z-50 bg-black overflow-hidden">
@@ -786,6 +790,9 @@ function rankTiers(players) {
 }
 
 // ตำแหน่งผู้เล่นคนอื่น (นอกจากตัวเรา) รอบโต๊ะ — [top%, left%] จัดตามจำนวน ไม่เรียงแถว
+// [top%, left%] ของการ์ดผู้เล่นคนอื่นบนกระดานจอคอม (index = จำนวนคนอื่นในสนาม)
+//  ข้อกำหนดสำคัญ: ห้ามมีช่องไหนทับ "กองการ์ดกลาง" ซึ่งอยู่ที่ top 40% / left 45-55%
+//  (การ์ดกว้าง w-28 = กว้าง +-6.2% ที่ความกว้างออกแบบต่ำสุด 900px)
 const SLOTS = {
   0: [],
   1: [[8, 50]],
@@ -793,6 +800,10 @@ const SLOTS = {
   3: [[9, 17], [6, 50], [9, 83]],
   4: [[9, 18], [9, 82], [44, 11], [44, 89]],
   5: [[9, 17], [6, 50], [9, 83], [50, 11], [50, 89]],
+  // patch 2.8 (ช่องผู้เล่นที่ 7): 6 คนอื่น — แถวบน 4 ใบ + ข้างละ 1 ใบ
+  //  แถวบนคู่กลางวางที่ 38/62% (ขอบในสุด 44.2/55.8%) จึงเว้นช่องกองการ์ดกลางไว้ทั้งแนวนอน
+  //  และ top 4% ทำให้ปลายล่างของการ์ดยังอยู่เหนือกองการ์ดที่เริ่มต้นที่ 40% อีกชั้นหนึ่ง
+  6: [[7, 15], [4, 38], [4, 62], [7, 85], [50, 9], [50, 91]],
 };
 
 // เอฟเฟครอบการ์ด: Beat Mode = สายฟ้าเขียว (ถาวร) / สวมเกราะราชัน = โกลว์แดง
@@ -1185,6 +1196,10 @@ const STATUS_INFO = {
   // ---------- มิซึซาว่า ฮารุกะ (patch 2.5 new) ----------
   harukaOmega:  { icon: "🦾", label: "โอเมก้า", cls: "bg-echo-gold text-gray-900", desc: "New Omega: การโจมตีปกติมอบสถานะ \"เลือดไหล\" ให้เป้าหมาย 3 หน่วยทุกครั้ง · และมีโอกาส 15% สวนกลับผู้ที่โจมตีปกติใส่ฮารุกะเป็นความเสียหาย 1 หน่วย พร้อมแปะเลือดไหลให้ผู้โจมตี 2 หน่วย และมอบสตั้น 1 เทิร์นในเทิร์นถัดไป" },
   harukaPunish: { icon: "⚖️", label: "จงไปสู่สุขติ", cls: "bg-echo-magenta", desc: "amazon punish: การโจมตีปกติครั้งถัดไปที่ใส่เป้าหมายซึ่งมี \"เลือดไหล\" ตั้งแต่ 3 หน่วยขึ้นไป จะจุดชนวนให้ระเบิดเป็นความเสียหายเพิ่มตามจำนวนหน่วยที่ติดอยู่ แล้วล้างเลือดไหลทั้งหมด — ถ้ายังไม่ถึง 3 หน่วย สถานะนี้จะยังไม่ถูกใช้" },
+  // ---------- โมโรโบชิ ดัน (patch 2.8 new) ----------
+  danCrutch:   { icon: "🦯", label: "ไม้ค้ำ", cls: "bg-echo-armor", desc: "ไม้ค้ำ: ฟื้นพลังชีวิต 1 หน่วยตอนเริ่มเทิร์น ตามจำนวนเทิร์นที่เหลือ — ระหว่างที่ยังมีผลอยู่ ดันกดสกิลพื้นฐานซ้ำไม่ได้" },
+  danDisciple: { icon: "🎓", label: "ศิษย์", cls: "bg-echo-gold text-gray-900", desc: "ศิษย์ (โมโรโบชิ ดัน): พลังโจมตี +1 หน่วย — แต่ถ้าโจมตีปกติใส่ดัน จะโดนสวนคืนทันที 3 หน่วย และความเสียหายที่ดันได้รับจากศิษย์คนนี้จะลดลง 2 หน่วย" },
+  danChase:    { icon: "🚗", label: "จงหลบแต่อย่าหนี", cls: "bg-echo-hp", desc: "จงหลบแต่อย่าหนี (โมโรโบชิ ดัน): ทุกครั้งที่แต้มแพ้จะโดนรถชน 1 หน่วย และถ้าการ์ดแตกจะโดน 2 หน่วย — แต่ถ้าชนะการจั่วแล้วได้โจมตี สถานะนี้จะถูกหยุดลงก่อนเวลาปกติ \u00b7 แพ้แต้มติดกัน 2 ครั้ง (ไม่นับการ์ดแตก) ดันจะเปลี่ยนท่าไม้ตายเป็น \"อย่าให้ฉันต้องเฆี่ยนตี\"" },
   // ---------- ซาโตรุ อาเคฟุ (patch 2.0.8.2) ----------
   oblada:   { icon: "🎵", label: "สิ่งแปลกปลอม", cls: "bg-echo-hp", desc: "ObLa Di, ObLa Da: รับความเสียหาย 1 หน่วยทุกๆ 2 เทิร์น เป็นเวลา 4 เทิร์น" },
   // ---------- ริดดี้ มาร์เซนาส (patch 2.0.9) ----------
@@ -2788,6 +2803,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
   const [bylethSwordOpen, setBylethSwordOpen] = useState(false);   // ไบเลธ: หน้าต่างเลือกแบบของ "ดาบต้องสาป"
   const [bylethCourseOpen, setBylethCourseOpen] = useState(false);  // ไบเลธ: หน้าต่างเลือกหลักสูตรของท่าไม้ตาย
   const [connorSel, setConnorSel] = useState(null);                 // คอนเนอร์: โหมดเลือกเป้าหมาย ("secondary" | "ultimate" | null)
+  const [danSel, setDanSel] = useState(null);                       // โมโรโบชิ ดัน: โหมดเลือกเป้าหมาย ("secondary" | "ultimate" | null)
   const [bylethStrikeSel, setBylethStrikeSel] = useState(false);    // ไบเลธ: โหมดเลือกเป้าหมายฟาดดาบ (เลือกตัวเองไม่ได้)
   const [msMarkSel, setMsMarkSel] = useState(false);         // ผู้สังหารเมจ: โหมดเลือกเป้าหมาย Witch Mark (เลือกตัวเองไม่ได้)
   const [msRuptureSel, setMsRuptureSel] = useState(false);   // ผู้สังหารเมจ: โหมดเลือกเป้าหมาย Mana Rupture (เลือกตัวเองไม่ได้)
@@ -2806,7 +2822,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
   const me = state.players.find((p) => p.id === state.youId);
   const boss = state.players.find((p) => p.isBoss && p.alive) || null;
   const others = state.players.filter((p) => p.id !== state.youId && !p.isBoss);
-  const slots = SLOTS[Math.min(others.length, 5)] || [];
+  const slots = SLOTS[Math.min(others.length, 6)] || [];
   const iAmAttacker = phase === "ATTACK" && state.attackerId === state.youId;
   const attacker = state.players.find((p) => p.id === state.attackerId);
   const rankedTiers = rankTiers(state.players);
@@ -3090,6 +3106,13 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
     // อาจารย์ ไบเลธ: สกิลรองเปิดหน้าต่างเลือกแบบ (ฟาดทันที/เสริมดาบ) · ท่าไม้ตายเปิดหน้าต่างเลือกหลักสูตร
     // คอนเนอร์ RK800: สกิลรอง/ท่าไม้ตายเข้าโหมดเลือกเป้าหมายก่อนส่งไป server
     if ((tier === "secondary" || tier === "ultimate") && ch?.id === "conner") { setConnorSel(tier); setSkillOpen(false); return; }
+    // โมโรโบชิ ดัน: สกิลรอง (นายทำให้ฉันผิดหวัง) และท่าไม้ตาย 1 (ฉันบอกว่าอย่าหนี) ต้องเลือกเป้าหมายก่อน
+    //  ท่าไม้ตาย 2 (อย่าให้ฉันต้องเฆี่ยนตี) เล็งเป้าเดิมอัตโนมัติ — ส่งไป server ตรงๆ ไม่ต้องจิ้มใคร
+    //  (ดูจากธง me.danWhip ที่ server คิดมาให้ ไม่ใช่เดาจากชื่อ/ราคาสกิลบนปุ่ม)
+    if ((tier === "secondary" || tier === "ultimate") && ch?.id === "dan") {
+      if (tier === "ultimate" && me?.danWhip) { socket.emit("useSkill", { tier }); setSkillOpen(false); return; }
+      setDanSel(tier); setSkillOpen(false); return;
+    }
     if (tier === "secondary" && ch?.id === "byleth") { setBylethSwordOpen(true); setSkillOpen(false); return; }
     if (tier === "ultimate" && ch?.id === "byleth") { setBylethCourseOpen(true); setSkillOpen(false); return; }
     // เจ้าแห่งเน็ตบ้าน: ท่าไม้ตายเข้าโหมดเลือกเป้าหมายยื่นข้อเสนอสัญญา
@@ -3210,6 +3233,11 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
   const pickConnor = (id) => {
     socket.emit("useSkill", { tier: connorSel, targets: [id] });
     setConnorSel(null);
+  };
+  // เลือกเป้าหมาย นายทำให้ฉันผิดหวัง / ฉันบอกว่าอย่าหนี (โมโรโบชิ ดัน) -> ส่งไป server ทันที
+  const pickDan = (id) => {
+    socket.emit("useSkill", { tier: danSel, targets: [id] });
+    setDanSel(null);
   };
   const pickBylethStrike = (id) => {
     socket.emit("useSkill", { tier: "secondary", item: "strike", targets: [id] });
@@ -3381,6 +3409,9 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
     if (connorSel && (phase !== "PLAYING" || done)) setConnorSel(null);
   }, [connorSel, phase, done]);
   useEffect(() => {
+    if (danSel && (phase !== "PLAYING" || me?.skillUsed || done)) setDanSel(null);
+  }, [danSel, phase, me?.skillUsed, done]);
+  useEffect(() => {
     if (appleOpen && (phase !== "PLAYING" || done)) setAppleOpen(false);
   }, [appleOpen, phase, done]);
   useEffect(() => {
@@ -3429,6 +3460,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
     kaiCreateSel, kaiPunishSel, msMarkSel, msRuptureSel, psSealSel, pickPsSeal, gunSel, pickGunTarget,
     bylethStrikeSel, pickBylethStrike,
     connorSel, pickConnor,
+    danSel, pickDan,
     pickAnata, pickDawn, pickGive, pickBb, pickSh, pickSk, pickDoom, pickSaOb, pickEscanor, pickIgnis, pickIgnisImpact, pickBg, pickBard, pickNanaya, pickTp,
     pickKaiCreate, pickKaiPunish, pickMsMark, pickMsRupture,
     kaiRivalId,
@@ -3596,6 +3628,12 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
           <div className="shrink-0 text-center mt-1.5 text-hard">
             <span className="text-lg font-black text-echo-hp animate-pulse">{connorSel === "ultimate" ? "⚖️ เลือกเป้าหมาย “จัดการปิดคดี” (เฉพาะระดับอาชญากร)" : "🚔 เลือกเป้าหมาย “ข่มขวัญ/จับกุม”"}</span>
             <button onClick={() => { clickSound(); setConnorSel(null); }} className="ml-2 text-sm font-bold bg-black/60 rounded-full px-3 py-1 border border-white/30">ยกเลิก</button>
+          </div>
+        )}
+      {danSel && (
+          <div className="shrink-0 text-center mt-1.5 text-hard">
+            <span className="text-lg font-black text-echo-gold animate-pulse">{danSel === "ultimate" ? "🚗 เลือกเป้าหมาย \u201cฉันบอกว่าอย่าหนี\u201d" : "🎓 เลือกผู้เล่นที่จะรับเป็น \u201cศิษย์\u201d"}</span>
+            <button onClick={() => { clickSound(); setDanSel(null); }} className="ml-2 text-sm font-bold bg-black/60 rounded-full px-3 py-1 border border-white/30">ยกเลิก</button>
           </div>
         )}
       {msMarkSel && (
@@ -4103,6 +4141,12 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
         <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-40 text-center text-hard whitespace-nowrap">
           <span className="text-xl font-black text-echo-hp animate-pulse bg-black/60 rounded-full px-5 py-1.5">🩸 คลิกเลือกเป้าหมาย Witch Mark</span>
           <button onClick={() => { clickSound(); setMsMarkSel(false); }} className="ml-2 text-sm font-bold bg-black/60 rounded-full px-3 py-1 border border-white/30">ยกเลิก</button>
+        </div>
+      )}
+      {danSel && (
+        <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-40 text-center text-hard">
+          <span className="text-xl font-black text-echo-gold animate-pulse bg-black/60 rounded-full px-5 py-1.5">{danSel === "ultimate" ? "🚗 เลือกเป้าหมาย \u201cฉันบอกว่าอย่าหนี\u201d" : "🎓 เลือกผู้เล่นที่จะรับเป็น \u201cศิษย์\u201d"}</span>
+          <button onClick={() => { clickSound(); setDanSel(null); }} className="ml-2 text-sm font-bold bg-black/60 rounded-full px-3 py-1 border border-white/30">ยกเลิก</button>
         </div>
       )}
       {msRuptureSel && (

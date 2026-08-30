@@ -11,7 +11,7 @@
 server.js (6.3k บรรทัด)          เอนจินกลางทั้งหมด: state, เฟส, การ์ด, ดาเมจ, สกิล, socket handler
 characters.js (1.7k)             DATA ล้วน — roster/ชื่อสกิล/desc/cost/img + POSITION_COLORS + publicRoster()
 characters/index.js              มัดรวม CHAR_HOOKS = { [characterId]: module } — ตัวละครใหม่ต้อง require+push ที่นี่
-characters/<id>.js               LOGIC ของตัวละครนั้น (37 ตัว) — export { id, ...methods(engine, ...) }
+characters/<id>.js               LOGIC ของตัวละครนั้น (38 ตัว) — export { id, ...methods(engine, ...) }
 characters/_universal_status.js  บัฟ/ดีบัฟกลาง (pure function ไม่พึ่ง engine)
 characters/_transforms.js        ตาราง metadata คัตซีน (TRANSFORMS) — data ล้วน
 characters/yuna.js               "ไอดอลประจำสนาม" ไม่ใช่ตัวละครที่เล่นได้ (ไม่อยู่ใน CHAR_HOOKS, require ตรง)
@@ -99,7 +99,7 @@ endTurn()              :5363  ลดเทิร์นสถานะทั้�
 
 ## 5. ท่อความเสียหาย (สำคัญที่สุด)
 
-**ค่าคงที่ฐาน**: `MAX_HP = 7` · `MAX_ARMOR = 3` · `MAX_SKILL = 8` (Bard = 9) · `MAX_PLAYERS = 6`
+**ค่าคงที่ฐาน**: `MAX_HP = 7` · `MAX_ARMOR = 3` · `MAX_SKILL = 8` (Bard = 9) · `MAX_PLAYERS = 7` (patch 2.8 — บอสยูกิย้ายไปนั่ง position 8)
 (เพดานเฉพาะตัว: ฮาคุโนะ 6-5/2-3 · เอสคานอร์ Last Stand 7/0 · เอวา 13 เกราะ 0 · **เอจิ 4/4**)
 
 **ลำดับการรับดาเมจ**: `shield` (กันครั้ง) → `armor` (เกราะ) → `hp` (เลือดจริง) — hp ถึง 0 = ตกรอบ
@@ -228,6 +228,28 @@ yuuki · nanaya · miyako (คอมโบ) · takuto (คอมโบ + คร�
   `p.connorCounterPending` แล้วลงดาเมจที่ `postAttackFollowup()` ซึ่งทำงานหลัง `runCutsceneQueue` ของ `doAttack` เสมอ
 - **คลิปชุดไล่ล่า/ป้องกันตัว/ปิดคดีเรียกผ่าน `queueCutscene` = เล่นทุกครั้ง** ส่วนเปิดตัว/สอบปากคำใช้ `triggerCutscene` = ครั้งเดียวต่อเกม
 เทสต์: [tests/characters/conner.test.js](tests/characters/conner.test.js)
+
+**โมโรโบชิ ดัน (patch 2.8)** — ครูฝึกที่ต่อยเองไม่ได้: `attackBaseOverride` คืน **0** (สกิลติดตัว 2 "อาการบาดเจ็บ")
+แต่บัฟทุกตัวยังบวกทับได้ เพราะ `computeAttackBase` บวก veil/empower/partner/cardAtkBonus ต่อจากค่าฐานเสมอ
+ดาเมจของเขามาจาก "ผลของการที่คนอื่นเล่นพลาด" ทั้งหมด และลงที่ `afterResolve()` เป็นหลัก
+- สถานะทั้ง 3 ตัวเป็น**สถานะนับเทิร์นปกติ** (ลดเทิร์นในลูป `endTurn()` ได้เลย ไม่ต้อง `continue`) แต่มี mirror
+  ที่ต้องล้างตอนหมดอายุ -> `CHAR_HOOKS.dan.onStatusExpire()` ถูกเรียกในลูปนั้น
+  - `danCrutch` (ที่ตัวดัน) ฟื้นเลือด 1/เทิร์นที่ `onRoundStartTick` · ระหว่างติดอยู่ `canUseSkill` ปิดสกิลพื้นฐาน
+  - `danDisciple` (ที่เป้าหมาย) เป็นบัฟ ATK **ungated** — อ่านที่ `computeAttackBase` เหมือน `veil`/`partner`
+    ไม่ใช่ที่ `damageBonus` ของ hook (เพราะเป็นบัฟที่แจกให้ผู้เล่นคนอื่น ไม่ผูกกับตัวละครเจ้าของสกิล)
+  - `danChase` (ที่เป้าหมาย) มี mirror สองทาง: `target.danChaseBy` + `dan.danChaseTargetId` — ปลดผ่าน
+    `stopChase()` จุดเดียวเสมอ (หมดอายุ / เป้าหมายชนะแล้วได้ตี / เป้าหมายหรือดันตกรอบ / เปลี่ยนเป้าหมายใหม่)
+- **ดาเมจ "จากศิษย์" ลดลง 2** ใช้ `engine.effectSourceId` (getter ที่ patch นี้เปิดให้ hook อ่าน) ใน
+  `adjustIncomingDamage` — ไม่มีพารามิเตอร์ผู้กระทำส่งมาให้ในท่อนั้น จึงต้องดูต้นตอจาก `withEffectSource`
+- **ท่าไม้ตายสลับตัวเองแบบมีเงื่อนไข**: เป้าหมาย `danChase` แพ้แต้มติดกัน 2 ครั้ง (`danLoseStreak`, ไม่นับไพ่แตก)
+  -> `dynamicSkillFor()` คืน `ultimate2` — ต้องคิดสูตรเดียวกันเป๊ะทั้งที่ `useSkill()` และ `publicState()`
+  และ client ตัดสินจากธง `me.danWhip` ที่ server ส่งมา **ห้ามเดาจากชื่อ/ราคาสกิลบนปุ่ม**
+- **ลำดับ "วีดีโอก่อน แล้วค่อยเกิดความเสียหาย"** ของท่าไม้ตาย 2 ใช้ `pausePlayingForCutscene(() => applyWhip())`
+  พร้อมตาข่ายสำรองลงดาเมจทันทีถ้าไม่ได้เข้าเส้นทางคัตซีน (แพทเทิร์นเดียวกับ "จัดการปิดคดี" ของคอนเนอร์)
+- **คลิปทุกตัวเรียกผ่าน `queueCutscene` = เล่นทุกครั้ง** ไม่มีคลิปไหนเล่นครั้งเดียวต่อเกม · `danScold`
+  (สกิลติดตัว 1) ตั้ง `noIntro: true` ใน `TRANSFORMS` -> client ข้ามการ์ดเปิดตัว 950ms เข้าวีดีโอเลย
+  และคลิปนี้ขึ้น **ครั้งเดียวต่อเทิร์น** ถึงจะมีคนไพ่แตกพร้อมกันหลายคน
+เทสต์: [tests/characters/dan.test.js](tests/characters/dan.test.js)
 
 ---
 
@@ -376,7 +398,11 @@ backToLobby   leave   disconnect
 | `transformNotice` | แจ้งแปลงร่างซ้ำ (ครั้งที่ 2+) |
 | `bardSfx` | เสียงโน้ต/บรรเลงของ Bard |
 
-- ไม่มีระบบห้อง — **เกมเดียวทั้งเซิร์ฟเวอร์**, สูงสุด 6 คน
+- ไม่มีระบบห้อง — **เกมเดียวทั้งเซิร์ฟเวอร์**, สูงสุด 7 คน (patch 2.8)
+  - `POSITION_COLORS` มี 8 คีย์: 1-7 คือที่นั่งผู้เล่น · **8 สงวนให้บอสยูกิ Overload** (ฝั่ง client `POSITIONS`
+    ไม่มีเลข 8 โดยตั้งใจ — ผู้เล่นเลือกไม่ได้) · `SLOTS[6]` ใน `client/src/screens/Game.jsx` คือผังการ์ด
+    ผู้เล่นคนอื่น 6 ใบ ที่ต้อง **ไม่ทับกองการ์ดกลาง** (top 40% / left 45-55%)
+  - `duo` ยังต้องการจำนวนคู่ (4 หรือ 6) และ `trio` ต้องการ 6 คนเป๊ะ — มี 7 คนในห้องจึงเหลือแค่ ffa/overload
 - `playerId` แยกจาก `socket.id` → รีคอนเนกต์กลับมาเป็นคนเดิมได้ภายใน `RECONNECT_GRACE_MS` (60s)
 - `buildStateFor` เป็นจุดเดียวที่ตัดสินว่าอะไรถูกซ่อน — เพิ่มฟิลด์ลับต้องระวังที่นี่
 
