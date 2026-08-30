@@ -32,7 +32,7 @@ const RECORD_BASE = 3;           // ค่าเริ่มต้นและ�
 // ---------- สกิลพื้นฐาน ภูติ ----------
 const SPIRIT_TURNS = 3;
 const SPIRIT_HEAL = 1;           // ฟื้นพลังชีวิตต่อเทิร์น (ติกตอนเริ่มเทิร์น)
-const SPIRIT_LIFESTEAL = 1;      // โจมตีปกติแล้วฟื้นพลังชีวิตเพิ่ม
+//  patch 2.9.2: เอาการดูดพลังชีวิตจากการโจมตีปกติออก — ซ้อนกับการฟื้นต่อเทิร์นแล้วยืนระยะเก่งเกินไป
 
 // ---------- สกิลรอง Sandalphon ----------
 const SWORD_TURNS = 3;
@@ -43,7 +43,7 @@ const SWORD_MUSIC = "shido_theme"; // shido_theme.mp3 — เล่นค้า�
 const GUARD_TURNS = 3;           // กับดักเปิดอยู่กี่เทิร์น (นับถอยหลังบนการ์ดสกิล เห็นคนเดียว)
 const REWIND_TURNS = 5;          // ย้อนเวลากลับไปกี่เทิร์น
 const REWIND_HEAL = 2;           // ย้อนกลับมาแล้วฟื้นพลังชีวิตให้ชิโดเพิ่มอีก
-const REWIND_LOCK_TURNS = 5;     // ย้อนแล้วห้ามกดท่าไม้ตายอีกกี่เทิร์น (กันย้อนวนไม่รู้จบ — ดูหมายเหตุด้านล่าง)
+const REWIND_LOCK_TURNS = 6;     // ย้อนแล้วห้ามกดท่าไม้ตายอีกกี่เทิร์น (กันย้อนวนไม่รู้จบ — ดูหมายเหตุด้านล่าง)
 
 const IMG = {
   base: "/characters/shido/shido.jpg",
@@ -63,7 +63,6 @@ module.exports = {
   RECORD_BASE,
   SPIRIT_TURNS,
   SPIRIT_HEAL,
-  SPIRIT_LIFESTEAL,
   SWORD_TURNS,
   SWORD_SKILL_REGEN,
   GUARD_TURNS,
@@ -158,10 +157,10 @@ module.exports = {
     return "";
   },
 
-  // สกิลพื้นฐาน ภูติ: ฟื้นเลือดต่อเทิร์น + ดูดเลือดจากการโจมตีปกติ
+  // สกิลพื้นฐาน ภูติ: ฟื้นเลือดต่อเทิร์น
   applySpirit(engine, p) {
     p.statuses.shidoSpirit = SPIRIT_TURNS;
-    engine.log(`🕊️ ${p.name} ภูติ — ฟื้นพลังชีวิต ${SPIRIT_HEAL} หน่วยต่อเทิร์น และการโจมตีปกติดูดพลังชีวิต ${SPIRIT_LIFESTEAL} หน่วย เป็นเวลา ${SPIRIT_TURNS} เทิร์น`);
+    engine.log(`🕊️ ${p.name} ภูติ — ฟื้นพลังชีวิต ${SPIRIT_HEAL} หน่วยต่อเทิร์น เป็นเวลา ${SPIRIT_TURNS} เทิร์น`);
     return ` (${SPIRIT_TURNS} เทิร์น)`;
   },
 
@@ -187,15 +186,6 @@ module.exports = {
 
   // กับดักเปิดอยู่ไหม — buildStateFor ใช้ตัดสินว่าจะโชว์แต้มสกิลหลอก (เต็มหลอด) ให้คนอื่นเห็นหรือเปล่า
   guardActive(p) { return isShido(p) && (p.shidoGuardTurns || 0) > 0; },
-
-  // ---------- สกิลพื้นฐาน ภูติ: ดูดพลังชีวิตจากการโจมตีปกติ ----------
-  //  เรียกจาก doAttack() หลังความเสียหายลงแล้ว — คืนจำนวนที่ฟื้นจริง (0 = ไม่ได้ฟื้น)
-  onAttackLanded(engine, attacker) {
-    if (!isShido(attacker) || !attacker.alive || !spiritOn(attacker)) return 0;
-    const healed = engine.healHp(attacker, SPIRIT_LIFESTEAL);
-    if (healed > 0) engine.log(`🕊️ ${attacker.name} ภูติ — การโจมตีดูดพลังชีวิตกลับมา +${healed}`);
-    return healed;
-  },
 
   // ---------- ท่าไม้ตาย: ชิโดตายระหว่างกับดักเปิดอยู่ -> จองการย้อนเวลา ----------
   //  ไม่ใช่การกันตาย: ปล่อยให้ตกรอบจริงก่อน แล้วค่อยจองไว้ทำตอนจบเทิร์น

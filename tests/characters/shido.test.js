@@ -114,7 +114,7 @@ test('ขอพลังให้ฉันด้วย: สกิลติดต
 });
 
 // ---------------------------------------------------------------- สกิลพื้นฐาน ภูติ
-test('ภูติ: ฟื้นเลือด 1/เทิร์น · ดูดเลือดตอนโจมตี · กดซ้ำระหว่างมีผลไม่ได้', () => {
+test('ภูติ: ฟื้นเลือด 1/เทิร์น และกดซ้ำระหว่างมีผลไม่ได้ (ไม่มีการดูดเลือดจากการโจมตีแล้ว)', () => {
   const { s } = setup();
   s.hp = 3;
   shido.applySpirit(engine, s);
@@ -123,12 +123,14 @@ test('ภูติ: ฟื้นเลือด 1/เทิร์น · ดู�
 
   shido.onRoundStartTick(engine, s);
   assert.equal(s.hp, 4, 'ฟื้น 1 หน่วยตอนเริ่มเทิร์น');
+  shido.onRoundStartTick(engine, s);
+  assert.equal(s.hp, 5);
 
-  assert.equal(shido.onAttackLanded(engine, s), shido.SPIRIT_LIFESTEAL);
-  assert.equal(s.hp, 5, 'โจมตีปกติดูดเลือดกลับมาอีก 1');
+  assert.equal(shido.onAttackLanded, undefined, 'ฮุคดูดเลือดถูกถอดออกแล้ว');
 
   delete s.statuses.shidoSpirit;
-  assert.equal(shido.onAttackLanded(engine, s), 0, 'หมดเวลาแล้วไม่ดูดเลือด');
+  shido.onRoundStartTick(engine, s);
+  assert.equal(s.hp, 5, 'หมดเวลาแล้วไม่ฟื้นต่อ');
   assert.equal(shido.canUseSkill(engine, s, 'basic'), true);
 });
 

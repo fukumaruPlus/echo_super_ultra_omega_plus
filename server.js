@@ -5845,8 +5845,6 @@ function doAttack(byId, targetId) {
   CHAR_HOOKS.kotone.onAttackConsumeLove(engine, attacker);
   // เอจิ (characters/eiji.js): Smile for You ลงตัวเอง -> ฟื้นเลือด · Delete ลงเป้าหมาย -> มอบ "ผุพัง"
   CHAR_HOOKS.eiji.onAttackLanded(engine, attacker, target);
-  // อิสึกะ ชิโด (characters/shido.js): ภูติ — การโจมตีปกติดูดพลังชีวิตกลับมา 1 หน่วย
-  const shidoLifesteal = CHAR_HOOKS.shido.onAttackLanded(engine, attacker);
   // ฮารุกะ (characters/haruka.js): โอเมก้า — การโจมตีปกติแปะ "เลือดไหล" ให้เป้าหมาย 2 หน่วย
   const harukaBleedApplied = CHAR_HOOKS.haruka.onAttackLanded(engine, attacker, target);
   // อาจารย์ ไบเลธ (characters/byleth.js): ดาบต้องสาปใช้ได้ครั้งเดียว -> สลายหลังหมัดนี้ · และถ้าเป้าหมายคือไบเลธที่แต้มน้อยสุด เตรียมโจมตีตอบ
@@ -6137,7 +6135,6 @@ function doAttack(byId, targetId) {
   if (batReflectDmg > 0) addFx({ name: `เข้ามาเลย — ความเสียหายเกิดกับผู้โจมตีด้วย -${batReflectDmg}`, img: BAT_SKILL3_IMG, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   // ---------- มิซึซาว่า ฮารุกะ (characters/haruka.js) ----------
   if (harukaPunishFx.punishStacks > 0) addFx({ name: `จงไปสู่สุขติ — ระเบิดเลือดไหล +${harukaPunishFx.punishStacks}`, img: CHAR_HOOKS.haruka.IMG.skill2, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
-  if (shidoLifesteal > 0) addFx({ name: `ภูติ — ดูดพลังชีวิต +${shidoLifesteal}`, img: CHAR_HOOKS.shido.IMG.skill1, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
   if (danCounterFx) addFx({ name: `นายทำให้ฉันผิดหวัง — สวนกลับศิษย์ -${danCounterFx.dmg}`, img: CHAR_HOOKS.dan.IMG.skill2, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (connerCounterFired) addFx({ name: "การป้องกันตัว — สวนกลับผู้โจมตีทั้งสองคน", img: CHAR_HOOKS.conner.IMG.base, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (bylethSwordUsed > 0) addFx({ name: `ดาบต้องสาป +${bylethSwordUsed}`, img: CHAR_HOOKS.byleth.IMG.skill2, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
