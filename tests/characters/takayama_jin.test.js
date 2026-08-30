@@ -182,20 +182,55 @@ test('เลือดสำรอง: ฟื้นเลือดทุกแห
   engine.healHp(p, 2);
   assert.equal(p.jinShadowHp, -1, 'ฮีลไปลดหนี้');
   assert.equal(p.hp, 1, 'พลังชีวิตจริงยังถูกตรึงไว้ที่ 1');
-  engine.healHp(p, 2);
-  assert.equal(p.jinShadowHp, 1, 'จ่ายหนี้ครบแล้ว');
-  jin.onRoundStartTick(engine, p);
-  assert.equal(p.alive, true, 'รอดพ้นความตาย');
-  assert.equal(jin.debtActive(p), false, 'หนี้ถูกล้าง');
+  engine.healHp(p, 2);              // จ่ายครบ -> คืนร่างทันที
+  assert.equal(jin.debtActive(p), false, 'หนี้ถูกล้างทันทีที่จ่ายครบ');
+  assert.equal(p.alive, true);
   assert.equal(p.hp, 1, 'กลับมาเป็นพลังชีวิตจริง');
 });
 
-test('เลือดสำรอง: ฟื้นไม่ทัน -> ตายจริงต้นเทิร์นถัดไป', () => {
+test('เลือดสำรอง: ได้ "เทิร์นถัดไป" ทั้งเทิร์นไว้ฟื้นเลือด — ต้นเทิร์นถัดไปทันทียังไม่ตาย', () => {
   const p = alpha(mkPlayer({ hp: 2, armor: 0 }));
+  engine.setRoundNumber(10);
   engine.dealMixed(p, 5);
-  engine.healHp(p, 1);              // ยังขาดอีก 3
+  assert.equal(p.jinDebtRound, 10, 'จำเทิร์นที่เริ่มติดหนี้');
+
+  engine.setRoundNumber(11);          // เทิร์นถัดไป — ต้องยังมีชีวิตเพื่อหาทางฟื้นเลือด
   jin.onRoundStartTick(engine, p);
-  assert.equal(p.alive, false, 'ฟื้นเลือดไม่ทัน = ตายตามปกติ');
+  assert.equal(p.alive, true, 'ต้นเทิร์นถัดไปยังไม่ตัดสิน (ไม่งั้นจะไม่มีโอกาสฟื้นเลือดเลย)');
+  assert.equal(jin.debtActive(p), true);
+
+  engine.setRoundNumber(12);          // หมดเวลาแล้ว
+  jin.onRoundStartTick(engine, p);
+  assert.equal(p.alive, false, 'ฟื้นไม่ทันภายในเทิร์นถัดไป = ตายจริง');
+});
+
+test('เลือดสำรอง: ฟื้นทันภายในเทิร์นถัดไป -> รอด', () => {
+  const p = alpha(mkPlayer({ hp: 2, armor: 0 }));
+  engine.setRoundNumber(10);
+  engine.dealMixed(p, 5);           // ต้องฟื้น 4
+  engine.setRoundNumber(11);
+  jin.onRoundStartTick(engine, p);
+  engine.healHp(p, 4);              // ฟื้นทันในเทิร์นถัดไป
+  assert.equal(jin.debtActive(p), false);
+  engine.setRoundNumber(12);
+  jin.onRoundStartTick(engine, p);
+  assert.equal(p.alive, true, 'จ่ายหนี้ทันเวลา = รอด');
+});
+
+test('เลือดสำรอง: ตายตอนอัลฟาเหลือเทิร์นสุดท้าย — ร่างหมดอายุแล้วยังต้องใช้สำรองต่อได้', () => {
+  const p = alpha(mkPlayer({ hp: 2, armor: 0 }), 1); // อัลฟาเหลือเทิร์นสุดท้าย
+  engine.setRoundNumber(10);
+  engine.dealMixed(p, 5);
+  assert.equal(p.alive, true, 'ตายในเทิร์นสุดท้ายของร่าง = ยังใช้เลือดสำรองได้');
+
+  delete p.statuses.jinAlpha;       // ร่างหมดอายุตอนจบเทิร์น
+  engine.setRoundNumber(11);
+  jin.onRoundStartTick(engine, p);
+  assert.equal(p.alive, true, 'ร่างหมดแล้วแต่ยังอยู่ในช่วงผ่อนผัน');
+
+  engine.dealMixed(p, 2);           // โดนซ้ำหลังร่างหมด
+  assert.equal(p.alive, true, 'ดาเมจระหว่างติดหนี้ต้องเพิ่มหนี้ ไม่ใช่ตายทันทีเพราะร่างหมด');
+  assert.equal(p.jinShadowHp, -5, 'หนี้สะสมเพิ่มขึ้นตามปกติ');
 });
 
 test('เลือดสำรอง: โดนดาเมจซ้ำระหว่างติดหนี้ = หนี้เพิ่มขึ้น ไม่ตายทันที', () => {

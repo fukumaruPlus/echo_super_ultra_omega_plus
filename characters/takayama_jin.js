@@ -198,21 +198,28 @@ module.exports = {
 
   // ---------- ความบ้าคลั่ง: ตายขณะอยู่ในอัลฟา = เลือดสำรอง (หนี้) แทนตายจริง ----------
   // เรียกจาก instantDeath()'s shared function — คืน true ถ้าใช้เลือดสำรองสำเร็จ (ผู้เรียกต้อง return ทันที)
+  //  ⚠️ เงื่อนไขคือ "อยู่ในอัลฟา ณ ตอนที่ตาย" *หรือ* "ติดหนี้เลือดสำรองอยู่แล้ว" — ข้อหลังสำคัญมาก
+  //     เพราะร่างอัลฟาอาจหมดอายุไปแล้ว (เช่นตายพอดีในเทิร์นสุดท้ายของร่าง) ระหว่างที่ยังใช้เลือดสำรองอยู่
+  //     ถ้าเช็คแต่ alphaOn จะกลายเป็นว่าโดนดาเมจอีกนิดเดียวก็ตายจริงทันที ทั้งที่สเปคบอกว่าดาเมจต้อง "เพิ่มหนี้" ต่อ
   tryFakeDeath(engine, p) {
-    if (!(isJin(p) && alphaOn(p)) || p.jinFakeDeathResolving) return false;
+    if (!isJin(p) || p.jinFakeDeathResolving) return false;
+    if (!alphaOn(p) && !this.debtActive(p)) return false;
     const shadow = p.jinShadowHp == null
       ? p.hp                      // ครั้งแรก: เก็บเลือดจริง (ติดลบได้) ไว้เป็นตัวตั้ง
       : p.jinShadowHp + (p.hp - 1); // ครั้งถัดไประหว่างติดหนี้: สะสมดาเมจก้อนใหม่เข้าไปในหนี้เดิม
     // เลือดสำรองมีจำกัด 7 หน่วย — ดาเมจที่ทะลุ 0 ลงไปเกินกว่านั้น = สำรองไม่พอ ตายจริงทันที
     if (-shadow >= FAKE_HP_RESERVE) {
       p.jinShadowHp = null;
+      p.jinDebtRound = 0;
       engine.log(`🐺💀 ${p.name} ความบ้าคลั่ง — ความเสียหายทะลุพลังชีวิตสำรอง ${FAKE_HP_RESERVE} หน่วย เลือดสำรองไม่พอรับไหว ตายจริงทันที!`);
       return false;
     }
+    // เทิร์นที่เริ่มติดหนี้ — ตั้งครั้งแรกครั้งเดียว (ดาเมจก้อนถัดๆ ไปไม่เลื่อนกำหนดตายออกไปเรื่อยๆ)
+    if (p.jinShadowHp == null) p.jinDebtRound = engine.roundNumber;
     p.jinShadowHp = shadow;
     p.hp = 1;
     const debt = Math.max(0, 1 - shadow);
-    engine.log(`🐺💀 ${p.name} ความบ้าคลั่ง — ยังไม่ตาย! ใช้พลังชีวิตสำรองรับไว้ก่อน (เหลือสำรอง ${FAKE_HP_RESERVE + shadow}/${FAKE_HP_RESERVE}) ต้องฟื้นเลือดอีก ${debt} หน่วยก่อนต้นเทิร์นถัดไป ไม่งั้นจะตายจริง`);
+    engine.log(`🐺💀 ${p.name} ความบ้าคลั่ง — ยังไม่ตาย! ใช้พลังชีวิตสำรองรับไว้ก่อน (เหลือสำรอง ${FAKE_HP_RESERVE + shadow}/${FAKE_HP_RESERVE}) ต้องฟื้นเลือดอีก ${debt} หน่วยภายในเทิร์นถัดไป ไม่งั้นจะตายจริง`);
     return true;
   },
   debtActive(p) { return isJin(p) && p.jinShadowHp != null; },
@@ -226,22 +233,30 @@ module.exports = {
     const before = p.jinShadowHp;
     p.jinShadowHp = Math.min(engine.maxHpOf(p), p.jinShadowHp + amount);
     const gained = p.jinShadowHp - before;
-    const debt = Math.max(0, 1 - p.jinShadowHp);
-    engine.log(`❤️‍🩹 ${p.name} ความบ้าคลั่ง — ฟื้นเลือดสำรอง +${gained}${debt > 0 ? ` (ยังขาดอีก ${debt} หน่วยถึงจะรอดพ้นความตาย)` : " — พอจะกลับมาเป็นเลือดจริงได้แล้ว!"}`);
+    // จ่ายหนี้ครบเมื่อไหร่กลับมาเป็นเลือดจริงทันที ไม่ต้องรอถึงกำหนดตัดสิน
+    if (p.jinShadowHp >= 1) {
+      p.hp = Math.min(engine.maxHpOf(p), p.jinShadowHp);
+      p.jinShadowHp = null;
+      p.jinDebtRound = 0;
+      engine.log(`❤️‍🩹 ${p.name} ความบ้าคลั่ง — ฟื้นเลือดสำรอง +${gained} · ชดเชยครบแล้ว กลับมาเป็นพลังชีวิตจริง ${p.hp} หน่วย!`);
+      return gained;
+    }
+    engine.log(`❤️‍🩹 ${p.name} ความบ้าคลั่ง — ฟื้นเลือดสำรอง +${gained} (ยังขาดอีก ${1 - p.jinShadowHp} หน่วยถึงจะรอดพ้นความตาย)`);
     return gained;
   },
 
   // ---------- ต้นเทิร์น: ตัดสินหนี้เลือดสำรองที่ค้างจากเทิร์นก่อน ----------
+  //  จินตายในเทิร์น N -> ต้องมี "เทิร์นถัดไป" (N+1) ทั้งเทิร์นไว้หาทางฟื้นเลือด
+  //  จึงตัดสินตอนต้นเทิร์น N+2 (ไม่ใช่ N+1 ซึ่งเท่ากับไม่ให้โอกาสเลย)
+  //  ถ้าจ่ายหนี้ครบระหว่างทาง healIntoDebt จะคืนร่างให้เองทันที เลยไม่ต้องเช็คกรณีรอดที่นี่
+  debtDue(engine, p) {
+    return this.debtActive(p) && engine.roundNumber > (p.jinDebtRound || 0) + 1;
+  },
   resolveDebt(engine, p) {
-    if (p.jinShadowHp >= 1) {
-      p.hp = Math.min(engine.maxHpOf(p), p.jinShadowHp);
-      p.jinShadowHp = null;
-      engine.log(`❤️‍🩹 ${p.name} ความบ้าคลั่ง — ฟื้นเลือดชดเชยทันเวลา กลับมาเป็นพลังชีวิตจริง ${p.hp} หน่วย!`);
-      return;
-    }
-    const debt = 1 - p.jinShadowHp;
-    engine.log(`💀 ${p.name} ความบ้าคลั่ง — ฟื้นเลือดไม่ทัน (ขาดอีก ${debt} หน่วย) ตายจริงตามปกติ!`);
+    const debt = Math.max(0, 1 - p.jinShadowHp);
+    engine.log(`💀 ${p.name} ความบ้าคลั่ง — ฟื้นเลือดไม่ทันภายในเทิร์นที่กำหนด (ขาดอีก ${debt} หน่วย) ตายจริงตามปกติ!`);
     p.jinShadowHp = null;
+    p.jinDebtRound = 0;
     p.jinFakeDeathResolving = true;
     p.hp = 0;
     engine.instantDeath(p);
@@ -384,7 +399,7 @@ module.exports = {
     // ---- ส่วนที่เป็นของจินเองเท่านั้น ----
     if (!isJin(p)) return;
     p.jinBasicUses = 0;
-    if (this.debtActive(p)) this.resolveDebt(engine, p);
+    if (this.debtDue(engine, p)) this.resolveDebt(engine, p);
   },
 
   // ---------- ฟิลด์ที่ต้องรีเซ็ตทุกแมตช์ — เรียกจาก resetCombat() ----------
@@ -396,5 +411,6 @@ module.exports = {
     p.jinNoDrawPending = 0;
     p.jinNoSkillPending = 0;
     p.jinCounterPending = null;  // การสวนกลับที่จองไว้ รอลงผลหลังวีดีโอจบ ([{ kind, byId }])
+    p.jinDebtRound = 0;          // เทิร์นที่เริ่มติดหนี้เลือดสำรอง (ตัดสินตอนต้นเทิร์นถัดจากเทิร์นถัดไป)
   },
 };
