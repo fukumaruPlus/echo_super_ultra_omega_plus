@@ -7,12 +7,12 @@
 //  ดาเมจของเขาจึงมาจาก "ผลของการที่คนอื่นเล่นพลาด" ล้วนๆ:
 //    · ครูฝึกสุดเหี้ยม — ใครไพ่แตกโดนเพิ่มอีก 1 หน่วย (ทุกคนยกเว้นดันเอง)
 //    · จงหลบแต่อย่าหนี — เป้าหมายที่ถูกขับรถตาม แพ้แต้ม = 1 หน่วย · ไพ่แตก = 2 หน่วย
-//    · ศิษย์ — คนที่รับบัฟไปแล้วดันมาตีดัน โดนสวนคืน 3 หน่วย
+//    · ศิษย์ — คนที่รับบัฟไปแล้วดันมาตีดัน โดนสวนคืน 3 หน่วย (แลกมาด้วยการที่บัฟหลุดทันที)
 //
 //  สถานะทั้ง 3 ตัวเป็นสถานะนับเทิร์นปกติ (ลดเทิร์นในลูปของ endTurn ได้เลย ไม่ต้อง continue):
 //    danCrutch   (ที่ตัวดัน)    3 เทิร์น — ฟื้นพลังชีวิต 1 หน่วยต่อเทิร์น · ระหว่างติดอยู่กดซ้ำไม่ได้
 //    danDisciple (ที่เป้าหมาย)  3 เทิร์น — เป้าหมายได้ ATK +1 แต่ถ้าตีดันจะโดนสวน + ดันรับดาเมจจากเขาน้อยลง 2
-//    danChase    (ที่เป้าหมาย)  5 เทิร์น — ลงโทษทุกเทิร์นที่แพ้/ไพ่แตก · เป้าหมายชนะแล้วได้ตี = หยุดก่อนกำหนด
+//    danChase    (ที่เป้าหมาย)  5 เทิร์น — ลงโทษทุกเทิร์นที่แพ้/ไพ่แตก · ตีดันครบ 2 ครั้ง = สลัดหลุดก่อนกำหนด
 //
 //  วีดีโอทุกคลิปของตัวละครนี้เรียกผ่าน queueCutscene ตรงๆ = **เล่นทุกครั้ง** ไม่มีคลิปไหนเล่นครั้งเดียวต่อเกม
 //  (dan_passive.mp4 ตั้ง noIntro ใน TRANSFORMS ด้วย — ตัดการ์ดเปิดตัว 950ms ทิ้ง เข้าวีดีโอเลย)
@@ -27,13 +27,15 @@ const CRUTCH_HEAL = 1;              // ฟื้นพลังชีวิต�
 // ---------- สกิลรอง นายทำให้ฉันผิดหวัง ----------
 const DISCIPLE_TURNS = 3;
 const DISCIPLE_ATK_BONUS = 1;       // อ่านจริงที่ computeAttackBase ใน server.js (บัฟ ungated ข้ามตัวละคร)
-const DISCIPLE_COUNTER_DMG = 3;     // ศิษย์โจมตีปกติใส่ดัน -> สวนคืน
+const DISCIPLE_COUNTER_DMG = 3;     // ศิษย์โจมตีปกติใส่ดัน -> สวนคืน (แล้วสถานะ "ศิษย์" หลุดทันที)
 const DISCIPLE_DMG_REDUCE = 2;      // ความเสียหายที่ดันได้รับ "จากศิษย์" ลดลง
 
 // ---------- ท่าไม้ตาย 1 ฉันบอกว่าอย่าหนี ----------
 const CHASE_TURNS = 5;
 const CHASE_LOSE_DMG = 1;           // เป้าหมายแต้มแพ้
 const CHASE_BUST_DMG = 2;           // เป้าหมายไพ่แตก
+const CHASE_BREAK_HITS = 2;         // เป้าหมายต้องโจมตีปกติใส่ดันครบเท่านี้ครั้ง ถึงจะสลัดสถานะหลุด
+const CHASE_EARLY_REFUND = 3;       // จบก่อนครบ 5 เทิร์น -> คืนแต้มสกิลให้ดัน
 const WHIP_STREAK = 2;              // แพ้แต้มติดกันครบเท่านี้ (ไม่นับไพ่แตก) -> ท่าไม้ตายกลายเป็นไม้ตาย 2
 
 // ---------- ท่าไม้ตาย 2 อย่าให้ฉันต้องเฆี่ยนตี ----------
@@ -77,15 +79,25 @@ function friendlyTo(engine, owner, other) {
 }
 
 // ปลดสถานะไล่ตามออกจากเป้าหมาย + ล้าง mirror ที่ตัวดัน (จุดเดียวที่ยกเลิก "จงหลบแต่อย่าหนี")
-function stopChase(engine, target, reason) {
+//  refund = true -> เป็นการ "จบก่อนครบ 5 เทิร์น" คืนแต้มสกิลให้ดัน CHASE_EARLY_REFUND หน่วย
+//  ตั้งใจไม่คืนตอนดันเปลี่ยนเป้าหมายเอง (นั่นคือการย้ายเป้า ไม่ใช่ท่าถูกสลัดหลุด — ไม่งั้นกดวนรีดแต้มได้)
+//  และไม่ส่ง src ให้ addSkill เพราะเป็นการ "คืนของที่จ่ายไป" ไม่ใช่ช่องทางฟื้นพลังงานจริง (ดีบัฟดูดซับเวทไม่ควรโรล)
+function stopChase(engine, target, reason, refund) {
   if (!target) return;
+  // กันเรียกซ้ำ: instantDeath() -> onDeath() ปลดสถานะให้ไปแล้ว จุดที่เรียกตามหลังต้องไม่คืนแต้มซ้ำอีกรอบ
+  if (!chaseOn(target) && !target.danChaseBy) return;
   const owner = ownerOf(engine, target, "danChaseBy") || danOf(engine);
   delete target.statuses.danChase;
   if (target.statusAmt) delete target.statusAmt.danChase;
   target.danChaseBy = null;
   target.danLoseStreak = 0;
+  target.danChaseHits = 0;
   if (owner && owner.danChaseTargetId === target.id) owner.danChaseTargetId = null;
   if (reason) engine.log(reason);
+  if (refund && owner && owner.alive) {
+    engine.addSkill(owner, CHASE_EARLY_REFUND);
+    engine.log(`⚡ ${owner.name} "ฉันบอกว่าอย่าหนี" จบก่อนครบ ${CHASE_TURNS} เทิร์น — คืนแต้มสกิล +${CHASE_EARLY_REFUND}`);
+  }
 }
 
 module.exports = {
@@ -100,6 +112,8 @@ module.exports = {
   CHASE_TURNS,
   CHASE_LOSE_DMG,
   CHASE_BUST_DMG,
+  CHASE_BREAK_HITS,
+  CHASE_EARLY_REFUND,
   WHIP_STREAK,
   WHIP_DMG,
   BUST_EXTRA_DMG,
@@ -110,6 +124,7 @@ module.exports = {
     p.danChaseBy = null;       // ฝั่งเป้าหมาย: id ดันเจ้าของสถานะ
     p.danDiscipleBy = null;    // ฝั่งศิษย์: id ดันที่มอบสถานะให้
     p.danLoseStreak = 0;       // ฝั่งเป้าหมาย: จำนวนครั้งที่แพ้แต้มติดกัน (ไม่นับไพ่แตก)
+    p.danChaseHits = 0;        // ฝั่งเป้าหมาย: จำนวนครั้งที่โจมตีปกติใส่ดันระหว่างถูกไล่ตาม (ครบ 2 = หลุด)
   },
 
   // ---------- สกิลติดตัว 2 อาการบาดเจ็บ: พลังโจมตีปกติฐาน 0 หน่วย ----------
@@ -228,8 +243,9 @@ module.exports = {
     t.statuses.danChase = CHASE_TURNS;
     t.danChaseBy = p.id;
     t.danLoseStreak = 0;
+    t.danChaseHits = 0;
     p.danChaseTargetId = t.id;
-    engine.log(`🚗 ${p.name} ฉันบอกว่าอย่าหนี! — ขับรถตาม ${t.name} ${CHASE_TURNS} เทิร์น (แพ้แต้ม -${CHASE_LOSE_DMG} · ไพ่แตก -${CHASE_BUST_DMG})`);
+    engine.log(`🚗 ${p.name} ฉันบอกว่าอย่าหนี! — ขับรถตาม ${t.name} ${CHASE_TURNS} เทิร์น (แพ้แต้ม -${CHASE_LOSE_DMG} · ไพ่แตก -${CHASE_BUST_DMG} · ต้องตีดันครบ ${CHASE_BREAK_HITS} ครั้งถึงจะสลัดหลุด)`);
     return ` — เป้าหมาย: ${t.name}`;
   },
 
@@ -247,7 +263,7 @@ module.exports = {
       engine.instantDeath(t);
       if (!t.alive) engine.log(`💀 ${t.name} เลือดจริงหมด ตกรอบ!`);
     }
-    if (!t.alive) stopChase(engine, t, `🚗 ${t.name} ตกรอบ — "จงหลบแต่อย่าหนี" หยุดทำงาน`);
+    if (!t.alive) stopChase(engine, t, `🚗 ${t.name} ตกรอบ — "จงหลบแต่อย่าหนี" หยุดทำงาน`, true);
   },
 
   // ---------- สกิลรอง: ศิษย์โจมตีปกติใส่ดัน -> เล่นวีดีโอ แล้วสวนคืน 3 หน่วย ----------
@@ -266,6 +282,12 @@ module.exports = {
       engine.maybeBeatSave(attacker); engine.maybeBeatMode(attacker); engine.maybeEva3(attacker); engine.maybeWakeKotone(attacker);
     });
     engine.log(`🎓 ${target.name} นายทำให้ฉันผิดหวัง — สวนคืน ${attacker.name} ทันที -${DISCIPLE_COUNTER_DMG}`);
+    // สวนได้ครั้งเดียวต่อการมอบ 1 ครั้ง แล้วสถานะ "ศิษย์" หลุดทันที
+    //  ไม่งั้นเป้าหมายจะโจมตีดันไม่ได้เลยตลอด 3 เทิร์น (โดนสวน 3 หน่วยทุกหมัด) — ดันต้องกดสกิลรองใหม่ถึงจะรับศิษย์อีกครั้ง
+    delete attacker.statuses.danDisciple;
+    if (attacker.statusAmt) delete attacker.statusAmt.danDisciple;
+    attacker.danDiscipleBy = null;
+    engine.log(`🎓 ${attacker.name} พ้นสภาพ "ศิษย์" — สั่งสอนกันไปแล้วหนึ่งครั้ง`);
     if (attacker.alive && attacker.hp <= 0) {
       engine.instantDeath(attacker);
       if (!attacker.alive) engine.log(`💀 ${attacker.name} เลือดจริงหมด ตกรอบ!`);
@@ -273,11 +295,20 @@ module.exports = {
     return { dmg: DISCIPLE_COUNTER_DMG, videoQueued: true };
   },
 
-  // ---------- ท่าไม้ตาย 1: เป้าหมายชนะแล้วได้โจมตีจริง -> หยุดก่อนเวลาปกติ ----------
-  //  เรียกจาก doAttack() ตอนเริ่มโจมตี (ต้องเป็น "ชนะแล้วได้ตี" จริงๆ ไม่ใช่แค่รอดเทิร์น)
-  onChasedAttacked(engine, attacker) {
+  // ---------- ท่าไม้ตาย 1: เป้าหมายต้อง "ตีดัน" ครบ 2 ครั้ง ถึงจะสลัดสถานะหลุดก่อนเวลาปกติ ----------
+  //  เรียกจาก doAttack() ตอนเริ่มโจมตี — นับที่ "ได้ออกหมัดใส่ดัน" ไม่ใช่ "ตีโดน"
+  //  (ดันหลบ/กันดาเมจได้ก็ยังนับ — เป้าหมายเสียเทิร์นโจมตีของตัวเองไปแล้วเหมือนกัน)
+  //  ตีคนอื่นไม่นับ: ต้องเป็นการหันมาสู้กับคนที่ไล่ตามเท่านั้น
+  onChasedAttacked(engine, attacker, target) {
     if (!attacker || !chaseOn(attacker)) return false;
-    stopChase(engine, attacker, `🚗 ${attacker.name} ชนะการจั่วและได้โจมตี — "จงหลบแต่อย่าหนี" ถูกหยุดลงก่อนเวลาปกติ`);
+    if (!isDan(target)) return false;
+    if (target.id !== attacker.danChaseBy) return false; // ดันคนอื่นที่ไม่ใช่คนไล่ตามอยู่
+    attacker.danChaseHits = (attacker.danChaseHits || 0) + 1;
+    if (attacker.danChaseHits < CHASE_BREAK_HITS) {
+      engine.log(`🚗 ${attacker.name} สู้กลับ ${target.name} (${attacker.danChaseHits}/${CHASE_BREAK_HITS}) — ยังสลัด "จงหลบแต่อย่าหนี" ไม่หลุด`);
+      return false;
+    }
+    stopChase(engine, attacker, `🚗 ${attacker.name} สู้กลับครบ ${CHASE_BREAK_HITS} ครั้ง — สลัด "จงหลบแต่อย่าหนี" หลุดก่อนเวลาปกติ!`, true);
     return true;
   },
 
@@ -308,19 +339,24 @@ module.exports = {
           engine.instantDeath(chased);
           if (!chased.alive) engine.log(`💀 ${chased.name} เลือดจริงหมด ตกรอบ!`);
         }
-        if (!chased.alive) stopChase(engine, chased, `🚗 ${chased.name} ตกรอบ — "จงหลบแต่อย่าหนี" หยุดทำงาน`);
+        if (!chased.alive) stopChase(engine, chased, `🚗 ${chased.name} ตกรอบ — "จงหลบแต่อย่าหนี" หยุดทำงาน`, true);
       } else {
         chased.danLoseStreak = 0; // ไม่ได้แพ้แต้มเทิร์นนี้ = ตัดสตรีคทิ้ง
       }
     }
 
     // ---- สกิลติดตัว 1 ครูฝึกสุดเหี้ยม: ใครไพ่แตกโดนเพิ่ม 1 หน่วย (ทุกคนยกเว้นดัน) ----
-    //  วีดีโอ "ไอ้โง่ เจ้าโง่ โง่จริงๆ" ขึ้นครั้งเดียวต่อเทิร์นถึงจะมีคนแตกพร้อมกันหลายคน
-    let scolded = false;
+    //  วีดีโอ "ไอ้โง่ เจ้าโง่ โง่จริงๆ" เป็นการด่าเฉพาะตัว — เล่นให้ **เฉพาะคนที่ไพ่แตก** เห็นเท่านั้น
+    //  (ส่ง onlyFor ให้ queueCutscene · คนอื่นยังหยุดรอครบเวลาเดียวกันแต่จอไม่ขึ้นคลิป)
+    //  และคิวคลิปเดียวต่อเทิร์นถึงจะมีคนแตกพร้อมกันหลายคน — รวมทุกคนไว้ในลิสต์เดียว
+    const scoldTargets = [];
     for (const o of engine.alivePlayers()) {
       if (isDan(o) || !engine.bustedOf(o)) continue;
       if (friendlyTo(engine, dan, o)) continue;
-      if (!scolded) { engine.queueCutscene(dan, "danScold"); scolded = true; }
+      scoldTargets.push(o);
+    }
+    if (scoldTargets.length) engine.queueCutscene(dan, "danScold", scoldTargets.map((o) => o.id));
+    for (const o of scoldTargets) {
       engine.withEffectSource(dan, () => {
         engine.dealMixed(o, BUST_EXTRA_DMG);
         o.wasAttacked = true;
@@ -331,7 +367,7 @@ module.exports = {
         engine.instantDeath(o);
         if (!o.alive) engine.log(`💀 ${o.name} เลือดจริงหมด ตกรอบ!`);
       }
-      if (!o.alive && chaseOn(o)) stopChase(engine, o, `🚗 ${o.name} ตกรอบ — "จงหลบแต่อย่าหนี" หยุดทำงาน`);
+      if (!o.alive && chaseOn(o)) stopChase(engine, o, `🚗 ${o.name} ตกรอบ — "จงหลบแต่อย่าหนี" หยุดทำงาน`, true);
     }
   },
 
@@ -339,7 +375,7 @@ module.exports = {
   //  เรียกจาก instantDeath() — ถ้าไม่ทำ ธง danChaseTargetId จะค้างชี้ไปที่คนตายทั้งแมตช์
   onDeath(engine, p) {
     if (!p) return;
-    if (chaseOn(p)) stopChase(engine, p, `🚗 ${p.name} ตกรอบ — "จงหลบแต่อย่าหนี" หยุดทำงาน`);
+    if (chaseOn(p)) stopChase(engine, p, `🚗 ${p.name} ตกรอบ — "จงหลบแต่อย่าหนี" หยุดทำงาน`, true);
     if (!isDan(p)) return;
     const t = this.chaseTargetOf(engine, p);
     if (t) stopChase(engine, t, `🚗 ${p.name} ตกรอบ — "จงหลบแต่อย่าหนี" หยุดทำงาน`);
@@ -359,6 +395,8 @@ module.exports = {
       if (owner && owner.danChaseTargetId === p.id) owner.danChaseTargetId = null;
       p.danChaseBy = null;
       p.danLoseStreak = 0;
+      p.danChaseHits = 0;
+      // อยู่ครบ CHASE_TURNS เทิร์นเต็ม = ไม่ใช่ "จบก่อนกำหนด" จึงไม่มีการคืนแต้มสกิล
       engine.log(`🚗 ${p.name} หลุดพ้นจาก "จงหลบแต่อย่าหนี" — หมดเวลาไล่ตาม`);
     } else if (key === "danDisciple") {
       p.danDiscipleBy = null;

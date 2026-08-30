@@ -1265,6 +1265,9 @@ function bustedOf(p) {
   // คอนเนอร์ RK800 (characters/conner.js): ระหว่างการไล่ล่า ผู้เล่นที่ไม่เกี่ยวข้องถูกบังคับให้ "ไพ่แตก" ทันที
   //  (ดาเมจไพ่แตก/ดาเมจแพ้ถูกระงับทั้งหมดในเทิร์นไล่ล่าอยู่แล้ว — ดู CHAR_HOOKS.conner.chaseResolveRound)
   if (p && p.connorFrozen) return true;
+  // มิซึซาว่า ฮารุกะ (characters/haruka.js): New Omega ระเบิดแต้มการ์ด — บังคับแตกทันทีต่อให้เปิดไพ่ไปแล้ว
+  //  ต้องอยู่ก่อน overloadForceActive เพราะเป็นการ "สั่งให้แตก" ตรงๆ ไม่ใช่ผลการคิดแต้มที่สนามปลดเพดานได้
+  if (CHAR_HOOKS.haruka.forcedBust(p)) return true;
   if (overloadForceActive) return false;
   if (p.statuses && (p.statuses.upg || p.statuses.fiber)) return false;
   return calculateScore(p.cards) + (p.cardBonus || 0) > 21;
@@ -2467,7 +2470,9 @@ function buildStateFor(viewerId) {
       };
     })(),
     yunaFieldFx: yunaBeatBarkActive() ? "beatbark" : null, // Break Beat Bark!: ออร่าขอบจอแดงทั้งสนาม (เกตเดียวกับผลจริง)
-    cutscene: gameState === "CUTSCENE" ? cutsceneInfo : null,
+    // onlyFor: คลิปที่เล่นให้เฉพาะบางคนดู — คนนอกลิสต์ได้ null (หน้าจอไม่เล่นวีดีโอ แต่ยังรอครบเวลาเท่ากัน)
+    cutscene: (gameState === "CUTSCENE" && cutsceneInfo && (!cutsceneInfo.onlyFor || cutsceneInfo.onlyFor.includes(viewerId)))
+      ? cutsceneInfo : null,
     attack: gameState === "ATTACKING" ? lastAttack : null,
     log: (gameState === "SUMMARY" || gameState === "TRANSITION" || gameState === "GAMEOVER") ? lastLog : [],
     shop: shopItems, // ร้านค้ามายา (patch 2.3): สินค้าส่วนกลางร้านเดียว เห็นเหมือนกันทุกคน
@@ -2782,7 +2787,10 @@ function triggerCutscene(p, key) {
   if (p.cutsceneShown[key]) notifyTransform(p, key);
   else { p.cutsceneShown[key] = true; queueCutscene(p, key); }
 }
-function queueCutscene(p, key) {
+// onlyFor (ไม่บังคับ): array ของ playerId ที่ "เห็นวีดีโอนี้" — คนอื่นยังหยุดรอตามจังหวะเดียวกัน
+//  แต่ buildStateFor จะไม่ส่ง cutscene ให้ (client จึงวาดกระดานตามปกติแทนที่จะเล่นคลิป)
+//  ใช้กับคลิปที่เป็นเรื่องส่วนตัวของผู้เล่นบางคน เช่น "ครูฝึกสุดเหี้ยม" ของดันที่ด่าเฉพาะคนที่ไพ่แตก
+function queueCutscene(p, key, onlyFor) {
   const t = TRANSFORMS[key];
   if (!t || !t.video) return;
   cutsceneQueue.push({
@@ -2792,6 +2800,7 @@ function queueCutscene(p, key) {
       img: t.img, color: POSITION_COLORS[p.position] || "#9B4F96",
       video: t.video, title: t.title, label: t.label, voice: t.voice || null,
       noIntro: !!t.noIntro, // true = ตัดการ์ดเปิดตัว 950ms ทิ้ง เข้าวีดีโอทันที (คลิปสั้นมาก)
+      onlyFor: Array.isArray(onlyFor) && onlyFor.length ? [...onlyFor] : null,
     },
   });
 }
@@ -3348,6 +3357,9 @@ function dealRound() {
     // ---------- บานาจ (patch 2.1.2, characters/banagher.js): Full Assault — ตีหมู่ทุกคนต่อเนื่องทุกต้นเทิร์นที่ผลยังอยู่ ----------
     CHAR_HOOKS.banagher.onRoundStartFullAssaultTick(engine, p);
     p.cards = [];
+    // New Omega (ฮารุกะ): ธงบังคับไพ่แตกมีผลแค่เทิร์นที่กด — กดใหม่ถึงจะระเบิดอีกครั้ง
+    //  ต้องล้าง "ก่อน" แจกไพ่ใบแรกด้านล่าง ไม่งั้น onCardDrawn/bustedOf ระหว่างแจกจะยังอ่านธงของเทิร์นที่แล้ว
+    CHAR_HOOKS.haruka.clearBurst(p);
     p.cardBonus = 0; // แต้มการ์ดโบนัส (Ashen Trail โอกูริ patch 2.1.1) — รีเซ็ตทุกเทิร์น
     p.colorTrigger = { red: 0, blue: 0, green: 0, yellow: 0 }; // นับจำนวนครั้งที่ทริกเกอร์สีนั้นทำงานไปแล้วในรอบนี้
     p.statusAmt.cardAtkBonus = 0; // พลังโจมตีจากการ์ดแดง — รีเซ็ตทุกรอบ
@@ -5013,6 +5025,13 @@ function resolveRound() {
         lastLog.push(`📗 ${l.name} หลักสูตร มาตราฐาน — ไม่รับความเสียหายจากการที่ไพ่แตก`);
         continue;
       }
+      if (bustedOf(l) && CHAR_HOOKS.haruka.bustDamageImmune(l)) {
+        // New Omega (ฮารุกะ): โดนบังคับให้ไพ่แตก จึงไม่รับความเสียหายจากการแตกครั้งนี้ (ยังได้แต้มสกิลปกติ)
+        addSkill(l, 1);
+        firePassive(l, "lose");
+        lastLog.push(`💥 ${l.name} โดน New Omega ระเบิดแต้มการ์ด — ไม่รับความเสียหายจากการที่ไพ่แตก`);
+        continue;
+      }
       if (bustedOf(l) && CHAR_HOOKS.escanor.bustDamageImmune(l)) {
         // เอสคานอร์ร่าง Last Stand: ไม่รับความเสียหายจากการที่ไพ่แตก (ยังได้แต้มสกิลจากการแพ้ตามปกติ)
         addSkill(l, 1);
@@ -5420,9 +5439,9 @@ function doAttack(byId, targetId) {
     }
   }
   attacker.didAttackRound = true;
-  // โมโรโบชิ ดัน (characters/dan.js): เป้าหมายที่ถูกขับรถตาม "ชนะการจั่วและได้โจมตี" จริง -> ปลดสถานะทันที
-  //  วางไว้ตรงนี้ (ก่อนคิดดาเมจ) เพราะเงื่อนไขคือ "ได้ตี" ไม่ใช่ "ตีโดน" — ต่อให้เป้าหมายหลบได้ก็ยังนับ
-  CHAR_HOOKS.dan.onChasedAttacked(engine, attacker);
+  // โมโรโบชิ ดัน (characters/dan.js): เป้าหมายที่ถูกขับรถตาม "หันมาตีดัน" -> นับหมัด ครบ 2 ครั้งถึงสลัดหลุด
+  //  วางไว้ตรงนี้ (ก่อนคิดดาเมจ) เพราะนับที่ "ได้ออกหมัด" ไม่ใช่ "ตีโดน" — ดันหลบได้ก็ยังนับให้
+  CHAR_HOOKS.dan.onChasedAttacked(engine, attacker, target);
   attacker.nanayaReattackReady = false; // หัวใจฆาตกร (นานายะ ชิกิ): กำลังใช้โอกาสโจมตีซ้ำนี้อยู่ (หรือไม่เกี่ยวข้องกับตัวละครนี้)
 
   let riddheTaunted = false;

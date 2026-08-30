@@ -14,10 +14,11 @@ const cutsceneFns = {
 };
 
 let queued = [];
+let onlyFor = {};
 
 test.before(() => {
   engine.triggerCutscene = () => {};
-  engine.queueCutscene = (p, key) => { queued.push(key); };
+  engine.queueCutscene = (p, key, only) => { queued.push(key); onlyFor[key] = only || null; };
   engine.runCutsceneQueue = (onDone) => { if (onDone) onDone(); };
   engine.startPhaseTimer = () => {};
   engine.endTurn = () => {};
@@ -36,7 +37,7 @@ function mk(id, characterId, position) {
     cards: [], skillPoints: 8, gold: 0, teamId: null, evadeStacks: [], inventory: [],
     dmgArmor: 0, dmgHp: 0, gainedSkill: 0, locked: false, result: null, connected: true,
     isLoser: false, isWinner: false, busted: false,
-    danChaseTargetId: null, danChaseBy: null, danDiscipleBy: null, danLoseStreak: 0,
+    danChaseTargetId: null, danChaseBy: null, danDiscipleBy: null, danLoseStreak: 0, danChaseHits: 0,
   };
 }
 
@@ -44,6 +45,7 @@ function mk(id, characterId, position) {
 function setup() {
   for (const k of Object.keys(engine.players)) delete engine.players[k];
   queued = [];
+  onlyFor = {};
   const d = mk('D', 'dan', 1);
   const a = mk('A', 'temari', 2);
   const b = mk('B', 'kuwagata', 3);
@@ -120,6 +122,10 @@ test('ศิษย์: ตีดัน -> เล่นวีดีโอแล�
   assert.equal(fx.dmg, dan.DISCIPLE_COUNTER_DMG);
   assert.equal(a.hp, 7 - dan.DISCIPLE_COUNTER_DMG);
   assert.deepEqual(queued, ['danDisciple'], 'คิววีดีโอ dan_skill2.mp4');
+  assert.equal(a.statuses.danDisciple, undefined, 'สวนไปแล้วสถานะ "ศิษย์" หลุดทันที');
+  assert.equal(a.danDiscipleBy, null);
+  assert.equal(dan.onAttackedNormally(engine, a, d), null, 'หมัดถัดไปไม่โดนสวนอีก');
+  assert.equal(a.hp, 7 - dan.DISCIPLE_COUNTER_DMG, 'ไม่มีดาเมจสวนซ้ำ');
 });
 
 test('ศิษย์: คนที่ไม่ใช่ศิษย์ตีดัน ไม่มีการสวนกลับ', () => {
@@ -164,23 +170,55 @@ test('จงหลบแต่อย่าหนี: เป้าหมายแ
   assert.equal(a.danLoseStreak, 0, 'ไพ่แตกไม่นับเป็นสตรีคแพ้แต้ม');
 });
 
-test('จงหลบแต่อย่าหนี: เป้าหมายชนะแล้วได้โจมตี -> หยุดก่อนเวลาปกติ', () => {
+test('จงหลบแต่อย่าหนี: ต้องตีดันครบ 2 ครั้งถึงจะสลัดหลุด + คืนแต้มสกิลให้ดัน 3', () => {
   const { d, a } = setup();
   dan.applyChase(engine, d, a);
-  assert.equal(dan.onChasedAttacked(engine, a), true);
+  d.skillPoints = 2;
+
+  assert.equal(dan.onChasedAttacked(engine, a, d), false, 'ครั้งแรกยังไม่หลุด');
+  assert.equal(a.statuses.danChase, dan.CHASE_TURNS);
+  assert.equal(a.danChaseHits, 1);
+  assert.equal(d.skillPoints, 2, 'ยังไม่คืนแต้ม');
+
+  assert.equal(dan.onChasedAttacked(engine, a, d), true, 'ครั้งที่ 2 หลุด');
   assert.equal(a.statuses.danChase, undefined);
   assert.equal(a.danChaseBy, null);
   assert.equal(d.danChaseTargetId, null);
+  assert.equal(d.skillPoints, 2 + dan.CHASE_EARLY_REFUND, 'จบก่อนกำหนด -> คืนแต้มสกิล 3');
 });
 
-test('จงหลบแต่อย่าหนี: เป้าหมายตกรอบ -> หยุดทำงาน', () => {
+test('จงหลบแต่อย่าหนี: ตีคนอื่นไม่นับเป็นการสู้กลับ', () => {
+  const { d, a, b } = setup();
+  dan.applyChase(engine, d, a);
+  assert.equal(dan.onChasedAttacked(engine, a, b), false);
+  assert.equal(dan.onChasedAttacked(engine, a, b), false);
+  assert.equal(a.statuses.danChase, dan.CHASE_TURNS, 'ยังถูกไล่ตามอยู่');
+  assert.equal(a.danChaseHits, 0);
+});
+
+test('จงหลบแต่อย่าหนี: หมดเวลาครบ 5 เทิร์นเอง -> ไม่คืนแต้มสกิล', () => {
   const { d, a } = setup();
   dan.applyChase(engine, d, a);
+  d.skillPoints = 2;
+  delete a.statuses.danChase;
+  dan.onStatusExpire(engine, a, 'danChase');
+  assert.equal(d.skillPoints, 2, 'อยู่ครบเทิร์น ไม่ใช่การจบก่อนกำหนด');
+  assert.equal(d.danChaseTargetId, null);
+});
+
+test('จงหลบแต่อย่าหนี: เป้าหมายตกรอบ -> หยุดทำงาน และคืนแต้มให้ดันแค่ครั้งเดียว', () => {
+  const { d, a } = setup();
+  dan.applyChase(engine, d, a);
+  d.skillPoints = 0;
   a.hp = 0;
   engine.instantDeath(a);
   assert.equal(a.alive, false);
   assert.equal(a.statuses.danChase, undefined);
   assert.equal(d.danChaseTargetId, null);
+  assert.equal(d.skillPoints, dan.CHASE_EARLY_REFUND, 'คืน 3 หน่วย ไม่ซ้ำซ้อน');
+  // เรียก stopChase ซ้ำต้องไม่คืนอีก (จุดที่เรียกตามหลัง instantDeath ในโค้ดจริง)
+  dan.onDeath(engine, a);
+  assert.equal(d.skillPoints, dan.CHASE_EARLY_REFUND);
 });
 
 test('จงหลบแต่อย่าหนี: ขับรถตามได้ทีละคน — เปลี่ยนเป้าแล้วคนเก่าหลุด', () => {
@@ -192,6 +230,14 @@ test('จงหลบแต่อย่าหนี: ขับรถตามไ
   assert.equal(d.danChaseTargetId, 'B');
 });
 
+test('จงหลบแต่อย่าหนี: ดันเปลี่ยนเป้าหมายเอง -> ไม่คืนแต้ม (กันกดวนรีดแต้ม)', () => {
+  const { d, a, b } = setup();
+  dan.applyChase(engine, d, a);
+  d.skillPoints = 1;
+  dan.applyChase(engine, d, b);
+  assert.equal(d.skillPoints, 1);
+});
+
 // ---------------------------------------------------------------- สกิลติดตัว 1 ครูฝึกสุดเหี้ยม
 test('ครูฝึกสุดเหี้ยม: ทุกคนที่ไพ่แตกโดนเพิ่ม 1 หน่วย ยกเว้นดันเอง — วีดีโอขึ้นครั้งเดียวต่อเทิร์น', () => {
   const { d, a, b } = setup();
@@ -201,6 +247,7 @@ test('ครูฝึกสุดเหี้ยม: ทุกคนที่ไ
   assert.equal(b.hp, 7 - dan.BUST_EXTRA_DMG);
   assert.equal(d.hp, 7, 'ดันไม่โดนสกิลติดตัวของตัวเอง');
   assert.deepEqual(queued.filter((k) => k === 'danScold'), ['danScold'], 'คลิปด่าขึ้นครั้งเดียวถึงจะแตกหลายคน');
+  assert.deepEqual(onlyFor.danScold.slice().sort(), ['A', 'B'], 'เล่นให้เฉพาะคนที่ไพ่แตกเห็น ไม่ใช่ทุกคน');
 });
 
 test('ครูฝึกสุดเหี้ยม: ดันตกรอบ/ถูกผนึกสกิลติดตัว -> ไม่มีผลบวกดาเมจไพ่แตก', () => {
@@ -241,7 +288,8 @@ test('อย่าให้ฉันต้องเฆี่ยนตี: ปล
 test('อย่าให้ฉันต้องเฆี่ยนตี: เป้าหมายหลุดสถานะไปแล้ว -> ไม่ลงดาเมจซ้ำ', () => {
   const { d, a } = setup();
   dan.applyChase(engine, d, a);
-  dan.onChasedAttacked(engine, a); // ปลดสถานะทิ้ง
+  dan.onChasedAttacked(engine, a, d);
+  dan.onChasedAttacked(engine, a, d); // ตีดันครบ 2 ครั้ง = ปลดสถานะทิ้ง
   const hpBefore = a.hp;
   dan.applyWhip(engine, d, a);
   assert.equal(a.hp, hpBefore);

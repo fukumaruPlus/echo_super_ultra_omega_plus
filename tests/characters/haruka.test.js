@@ -203,14 +203,33 @@ test('ไข่ต้ม และอาหารเสริม: สุ่ม�
 });
 
 // ---------------------------------------------------------------- ท่าไม้ตาย
-test('New Omega: ให้สถานะโอเมก้า 5 เทิร์น กดซ้ำไม่ได้ และเปลี่ยนภาพประจำตัว', () => {
+test('New Omega: ให้สถานะโอเมก้า 10 เทิร์น กดซ้ำได้ และเปลี่ยนภาพประจำตัว', () => {
   const { h } = setup();
   assert.equal(haruka.canUseSkill(engine, h, 'ultimate'), true);
   assert.equal(haruka.displayImg(h), null);
   haruka.applyInstantSkill(engine, h, 'ultimate');
-  assert.equal(h.statuses.harukaOmega, 5);
-  assert.equal(haruka.canUseSkill(engine, h, 'ultimate'), false);
+  assert.equal(h.statuses.harukaOmega, haruka.OMEGA_TURNS);
+  assert.equal(haruka.OMEGA_TURNS, 10);
+  assert.equal(haruka.canUseSkill(engine, h, 'ultimate'), true, 'กดซ้ำได้ เพื่อระเบิดแต้มการ์ดอีกครั้ง');
   assert.equal(haruka.displayImg(h), haruka.IMG.ult);
+});
+
+test('New Omega: ระเบิดแต้มการ์ด — ทุกคนยกเว้นฮารุกะไพ่แตก และไม่รับดาเมจจากการแตก', () => {
+  const { h, a } = setup();
+  a.cards = [{ value: 5 }];
+  a.locked = true; // เปิดไพ่ไปแล้วก็ยังโดนบังคับแตก
+
+  haruka.applyInstantSkill(engine, h, 'ultimate');
+  assert.equal(haruka.forcedBust(a), true);
+  assert.equal(engine.bustedOf(a), true, 'บังคับแตกทับผลการคิดแต้มจริง');
+  assert.equal(haruka.bustDamageImmune(a), true, 'ยกเว้นความเสียหายจากการไพ่แตก');
+  assert.equal(haruka.forcedBust(h), false, 'ฮารุกะไม่โดนของตัวเอง');
+  assert.equal(engine.bustedOf(h), false);
+
+  // ธงมีผลแค่เทิร์นที่กด — ต้นเทิร์นถัดไปถูกล้าง ต้องกดใหม่ถึงจะระเบิดอีกครั้ง
+  haruka.clearBurst(a);
+  assert.equal(haruka.forcedBust(a), false);
+  assert.equal(engine.bustedOf(a), false);
 });
 
 test('New Omega: การโจมตีปกติแปะเลือดไหล 3 หน่วย', () => {
@@ -254,17 +273,30 @@ test('amazon punish: เลือดไหลไม่ถึง 3 หน่ว�
   assert.equal(ctx.videoQueued, undefined);
 });
 
-test('amazon punish: เลือดไหล 3 หน่วยขึ้นไป = ระเบิดรวมกับหมัด ล้างเลือดไหล และใช้สถานะไป', () => {
+test('amazon punish: เลือดไหล 3 หน่วยขึ้นไป = ระเบิดรวมกับหมัด ล้างเลือดไหล แต่สถานะยังอยู่ครบ 3 เทิร์น', () => {
   const { h, a } = setup();
   h.statuses.harukaPunish = 3;
   universal.applyBleed(a, 4);
   const ctx = {};
   assert.equal(haruka.applyPunish(engine, h, a, 2, ctx), 6, 'โจมตีปกติ 2 + เลือดไหล 4');
-  assert.equal(h.statuses.harukaPunish, undefined, 'สถานะถูกใช้ไป');
+  assert.equal(h.statuses.harukaPunish, 3, 'สถานะไม่ถูกใช้หมด — จุดชนวนซ้ำได้ตลอด 3 เทิร์น');
   assert.equal(a.statuses.hbleed, undefined, 'เลือดไหลถูกล้างทั้งหมด');
   assert.equal(ctx.videoQueued, true);
   assert.equal(ctx.punishStacks, 4);
   assert.equal(queued.at(-1), 'harukaPunish', 'คิววีดีโอไว้เล่นก่อนสรุปความเสียหาย');
+});
+
+test('amazon punish: จุดชนวนได้หลายครั้งตลอด 3 เทิร์น (สะสมเลือดไหลใหม่ครบก็ระเบิดได้อีก)', () => {
+  const { h, a } = setup();
+  h.statuses.harukaPunish = 3;
+  universal.applyBleed(a, 3);
+  assert.equal(haruka.applyPunish(engine, h, a, 1, {}), 4, 'ระเบิดครั้งที่ 1');
+  assert.equal(a.statuses.hbleed, undefined);
+
+  universal.applyBleed(a, 5);
+  assert.equal(haruka.applyPunish(engine, h, a, 1, {}), 6, 'สะสมใหม่ครบแล้วระเบิดได้อีก');
+  assert.equal(a.statuses.hbleed, undefined);
+  assert.equal(h.statuses.harukaPunish, 3);
 });
 
 test('amazon punish: ไม่มีสถานะ = ไม่จุดชนวนแม้เป้าหมายเลือดไหลเต็ม', () => {

@@ -23,11 +23,15 @@ const BASIC_ROLL_HP = 35;        // % สะสม: 0-34 = เลือด · 35
 const BASIC_ROLL_ARMOR = 70;
 
 // ---------- amazon punish (สกิลรอง) ----------
-const PUNISH_TURNS = 3;          // "จงไปสู่สุขติ" ค้างรอจังหวะโจมตี 3 เทิร์น
+const PUNISH_TURNS = 3;          // "จงไปสู่สุขติ" ทำงานได้ตลอด 3 เทิร์น
+//  patch 2.8.1: เดิมระเบิดครั้งเดียวแล้วสถานะหาย — ตอนนี้อยู่ครบ 3 เทิร์น จุดชนวนได้ทุกหมัดที่เข้าเกณฑ์
 const PUNISH_BLEED_NEED = 3;     // เป้าหมายต้องมีเลือดไหลอย่างน้อย 3 หน่วยถึงจะระเบิด
 
 // ---------- New Omega (ท่าไม้ตาย) ----------
-const OMEGA_TURNS = 5;
+const OMEGA_TURNS = 10;          // patch 2.8.1: 5 -> 10 เทิร์น
+// "ระเบิดแต้มการ์ด" — ทำงาน 1 ครั้งต่อการกดท่าไม้ตาย 1 ครั้ง (กดใหม่ = ระเบิดใหม่ ไม่ใช่ทุกเทิร์นที่โอเมก้าติดอยู่)
+//  บังคับให้ผู้เล่นทุกคน "ยกเว้นฮารุกะ" ไพ่แตกทันทีในเทิร์นนั้น ต่อให้เปิดไพ่ไปแล้วก็ตาม
+//  แต่ยกเว้นความเสียหายจากการไพ่แตกให้ (เอฟเฟกต์ตัวละครอื่นที่เกาะกับ "คนไพ่แตก" ยังทำงานตามปกติ)
 const OMEGA_BLEED_ON_ATK = 3;    // ระหว่างโอเมก้า: โจมตีปกติแปะเลือดไหลให้เป้าหมาย 3 หน่วย
 //  หมายเหตุ: โอเมก้า "ไม่" เพิ่มพลังโจมตีปกติแล้ว (patch 2.5.1) — จุดแข็งทั้งหมดไปอยู่ที่การสะสมเลือดไหลแทน
 //  3 หน่วยต่อหมัดแปลว่าตีหมัดเดียวก็ถึงเกณฑ์ระเบิดของ amazon punish (PUNISH_BLEED_NEED) พอดี
@@ -57,6 +61,8 @@ module.exports = {
   id: ID,
   IMG,
   BASIC_USES_PER_TURN,
+  OMEGA_TURNS,
+  PUNISH_TURNS,
   PUNISH_BLEED_NEED,
   OMEGA_BLEED_ON_ATK,
 
@@ -78,7 +84,10 @@ module.exports = {
       if (punishOn(p)) return false;   // "จงไปสู่สุขติ" ยังค้างรอจังหวะอยู่ = กดซ้ำไม่ได้
       return omegaOn(p);               // ต้องมีสถานะ "โอเมก้า" เท่านั้น
     }
-    if (tier === "ultimate") return !omegaOn(p);
+    // patch 2.8.1: กดท่าไม้ตายซ้ำได้แม้ "โอเมก้า" ยังทำงานอยู่ — เพราะการระเบิดแต้มการ์ดผูกกับ
+    //  "การกด 1 ครั้ง" ไม่ใช่ "ระหว่างที่โอเมก้าติดอยู่" ถ้ายังล็อกไว้เหมือนเดิมจะระเบิดซ้ำไม่ได้เลยตลอด 10 เทิร์น
+    //  (กดซ้ำ = ต่ออายุโอเมก้าเป็น 10 เทิร์นใหม่ + ระเบิดแต้มการ์ดอีกครั้ง โดยจ่ายค่าสกิลเต็มทุกครั้ง)
+    if (tier === "ultimate") return true;
     return true;
   },
 
@@ -119,8 +128,10 @@ module.exports = {
     return " — จงไปสู่สุขติ";
   },
 
-  // New Omega: แปลงร่าง 5 เทิร์น — โจมตีปกติแปะเลือดไหล 3 หน่วย (ไม่มีโบนัสพลังโจมตีแล้ว)
+  // New Omega: แปลงร่าง 10 เทิร์น — โจมตีปกติแปะเลือดไหล 3 หน่วย (ไม่มีโบนัสพลังโจมตีแล้ว)
+  //  + ระเบิดแต้มการ์ด 1 ครั้งต่อการกด: ทุกคนยกเว้นฮารุกะไพ่แตกทันที (ไม่รับความเสียหายจากการแตก)
   applyOmega(engine, p) {
+    this.detonateCards(engine, p);
     p.statuses.harukaOmega = OMEGA_TURNS;
     p.transformAt = engine.nextTransformCounter();
     engine.triggerCutscene(p, "harukaOmega"); // haruka_skill3.mp4
@@ -198,8 +209,8 @@ module.exports = {
       engine.log(`⚖️ ${attacker.name} จงไปสู่สุขติ — ${target.name} มี "เลือดไหล" ${stacks}/${PUNISH_BLEED_NEED} หน่วย ยังไม่ถึงเกณฑ์ระเบิด (สถานะยังคงอยู่)`);
       return dmg;
     }
-    delete attacker.statuses.harukaPunish;
-    if (attacker.statusAmt) delete attacker.statusAmt.harukaPunish;
+    // patch 2.8.1: ไม่ลบ harukaPunish ทิ้งแล้ว — สถานะอยู่ครบ PUNISH_TURNS เทิร์น จุดชนวนซ้ำได้ทุกหมัดที่เข้าเกณฑ์
+    //  (เลือดไหลของเป้าหมายยังถูกล้างทุกครั้งที่ระเบิด จึงต้องสะสมใหม่ให้ครบ 3 หน่วยก่อนถึงจะระเบิดได้อีก)
     delete target.statuses.hbleed;
     if (target.statusAmt) delete target.statusAmt.hbleed;
     engine.queueCutscene(attacker, "harukaPunish"); // haruka_skill2.mp4 เล่นก่อนสรุปความเสียหาย
@@ -208,6 +219,33 @@ module.exports = {
     if (ctx) ctx.punishStacks = stacks;
     return dmg + stacks;
   },
+
+  // ---------- New Omega: ระเบิดแต้มการ์ด (1 ครั้งต่อการกดท่าไม้ตาย) ----------
+  //  ตั้งธง p.harukaBurst ให้ทุกคนยกเว้นฮารุกะ -> bustedOf() คืน true ทันทีต่อให้เปิดไพ่ไปแล้ว
+  //  ธงถูกล้างตอนเริ่มเทิร์นถัดไป (clearBurst) จึงมีผลแค่เทิร์นที่กด — กดใหม่ถึงจะระเบิดอีกครั้ง
+  //  โหมดทีม: ไม่ลงเพื่อนร่วมทีมตัวเอง (คอนเวนชันเดียวกับเอฟเฟกต์ด้านลบตัวอื่น)
+  detonateCards(engine, p) {
+    let n = 0;
+    for (const o of engine.alivePlayers()) {
+      if (o.id === p.id) continue;
+      if (engine.withEffectSource(p, () => engine.friendlyEffectBlocked(o))) continue;
+      o.harukaBurst = true;
+      o.busted = true;
+      n++;
+    }
+    if (n > 0) engine.log(`💥 ${p.name} New Omega — ระเบิดแต้มการ์ดของผู้เล่นอีก ${n} คนให้แตกทันที (ต่อให้เปิดไพ่ไปแล้ว) แต่ไม่มีใครรับความเสียหายจากการไพ่แตกครั้งนี้`);
+    return n;
+  },
+
+  // bustedOf() เรียกเช็คทุกครั้ง — ธงนี้ทับผลการคิดแต้มจริงทั้งหมด
+  forcedBust(p) { return !!(p && p.harukaBurst); },
+
+  // ยกเว้น "ความเสียหายจากการไพ่แตก" ให้คนที่โดนบังคับแตก — เรียกจาก resolveRound()
+  //  (เอฟเฟกต์ตัวละครอื่นที่เกาะกับคนไพ่แตก เช่น Ashen Trail / ครูฝึกสุดเหี้ยม ยังทำงานตามปกติ)
+  bustDamageImmune(p) { return !!(p && p.harukaBurst); },
+
+  // ล้างธงตอนเริ่มเทิร์นใหม่ — เรียกให้ผู้เล่น "ทุกคน" ในลูปต้นเทิร์นของ startRound()
+  clearBurst(p) { if (p) p.harukaBurst = false; },
 
   // ---------- โอเมก้า: การโจมตีปกติแปะเลือดไหลให้เป้าหมาย ----------
   //  เรียกจาก doAttack() "หลัง" ความเสียหายลงแล้ว (และหลัง applyPunish อ่านค่าไปแล้ว)
@@ -231,6 +269,7 @@ module.exports = {
 
   // ---------- ฟิลด์ที่ต้องรีเซ็ตทุกแมตช์ — เรียกจาก resetCombat() ----------
   resetCombat(p) {
+    p.harukaBurst = false;      // โดนระเบิดแต้มการ์ดของ New Omega ในเทิร์นนี้ (บังคับไพ่แตก ไม่รับดาเมจจากการแตก)
     p.harukaBasicUses = 0;      // ไข่ต้ม และอาหารเสริม: กดไปแล้วกี่ครั้งในเทิร์นนี้ (0-2)
     p.harukaBleedProcs = 0;     // อมาซอน: เลือดไหลตัวเองไปแล้วกี่ครั้งในเทิร์นนี้ (0-3)
     p.harukaStunPending = 0;    // อมาซอน (ตีคืน): จำนวนเทิร์นสตั้นที่จะลงในเทิร์นถัดไป (ของ "ผู้โจมตี" ไม่ใช่ของฮารุกะ)
