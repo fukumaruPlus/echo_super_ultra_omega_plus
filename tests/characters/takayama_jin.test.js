@@ -96,6 +96,15 @@ test('กระชาก: ดาเมจของคนอื่นที่ไ
   assert.equal(foe.hp, hpBefore - 1, 'ดาเมจที่ลงตัวเองไม่ถูกเบนไปหาจิน');
 });
 
+test('กระชาก: จินติดอมตะอยู่ = ไม่เบนดาเมจ (ไม่งั้นดาเมจหายวับ กลายเป็นเกราะกำบังให้เป้าเดิมฟรี)', () => {
+  const p = alpha(mkPlayer({ statuses: { jinAlpha: 5, seal: 2 } }));
+  const foe = mkFoe({ statuses: { hbleed: 3 } });
+  const bystander = mkFoe({ hp: 7, armor: 0 });
+  jin.applyGrab(engine, p, foe);
+  engine.withEffectSource(foe, () => engine.dealMixed(bystander, 3));
+  assert.equal(bystander.hp, 4, 'ดาเมจยังลงที่เป้าหมายเดิมตามปกติ ไม่ถูกกลืนหาย');
+});
+
 // ---------- ท่าไม้ตาย: Alpha ----------
 
 test('Alpha: เข้าร่าง 5 เทิร์น, พลังโจมตีพื้นฐาน +1, และกดซ้ำระหว่างอยู่ในร่างไม่ได้', () => {

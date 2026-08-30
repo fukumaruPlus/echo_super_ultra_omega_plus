@@ -1972,6 +1972,9 @@ function jinForcedRedirect(p) {
   if (!src || src.id === p.id || !((src.statuses.jinForced || 0) > 0) || !src.jinForcedById) return p;
   const forced = players[src.jinForcedById];
   if (!forced || !forced.alive || forced.id === p.id || sameTeam(src, forced)) return p;
+  // จินติดอมตะ/ถูกกันดาเมจอยู่ = เบนไปก็หายวับ กลายเป็นเกราะกำบังให้เป้าหมายเดิมฟรีๆ
+  //  (คอนเวนชันเดียวกับตัวล่อเป้าอื่นที่กรอง sealActive ออกจากรายชื่อผู้ล่อเป้า) -> ปล่อยดาเมจลงเป้าเดิมตามปกติ
+  if (sealActive(forced) || friendlyEffectBlocked(forced)) return p;
   return forced;
 }
 function dealDirect(p, n, isNormalAttack) {
@@ -3640,8 +3643,9 @@ function useSkill(id, tier, targets, item) {
     // คอนเนอร์ RK800 (สกิลติดตัว 1 สืบสวน): การเติมโน้ตคือ "การกดสกิล" ของคีตกวี (มีแค่พื้นฐาน/รอง)
     //  จึงนับความเครียด +1 ต่อครั้งเหมือนตัวละครอื่น — ช่องนี้ return ก่อนถึงจุดนับหลักของ useSkill()
     CHAR_HOOKS.conner.onSkillUsed(engine, p);
-    // วีดีโอสวนกลับที่ค้างคิว (Wonder of U ซาโตรุ — บทเพลงเล็งใส่ซาโตรุ) เล่นทันทีช่วงจั่วการ์ด
-    if (gameState === "PLAYING" && cutsceneQueue.length) pausePlayingForCutscene();
+    // วีดีโอสวนกลับที่ค้างคิว (Wonder of U ซาโตรุ — บทเพลงเล็งใส่ซาโตรุ · ฉันได้กลิ่นเลือดของจิน) เล่นทันทีช่วงจั่วการ์ด
+    if (gameState === "PLAYING" && cutsceneQueue.length) pausePlayingForCutscene(() => CHAR_HOOKS.jin.resolvePendingCounters(engine));
+    else CHAR_HOOKS.jin.resolvePendingCounters(engine);
     broadcastState();
     checkAllLocked();
     return;
@@ -4617,8 +4621,9 @@ function bardTarget(id, targets) {
   if (valid.length !== song.need) return;
   p.bardPending = null;
   bardPerform(p, song.pattern, valid, true);
-  // วีดีโอสวนกลับที่ค้างคิว (Wonder of U ซาโตรุ) — เล่นทันทีช่วงจั่วการ์ด
-  if (gameState === "PLAYING" && cutsceneQueue.length) pausePlayingForCutscene();
+  // วีดีโอสวนกลับที่ค้างคิว (Wonder of U ซาโตรุ · ฉันได้กลิ่นเลือดของจิน) — เล่นทันทีช่วงจั่วการ์ด
+  if (gameState === "PLAYING" && cutsceneQueue.length) pausePlayingForCutscene(() => CHAR_HOOKS.jin.resolvePendingCounters(engine));
+  else CHAR_HOOKS.jin.resolvePendingCounters(engine);
   broadcastState();
   checkAllLocked();
 }
