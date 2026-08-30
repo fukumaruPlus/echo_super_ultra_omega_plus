@@ -38,6 +38,7 @@ function mk(id, characterId, position) {
     dmgArmor: 0, dmgHp: 0, gainedSkill: 0, locked: false, result: null, connected: true,
     isLoser: false, isWinner: false, busted: false,
     danChaseTargetId: null, danChaseBy: null, danDiscipleBy: null, danLoseStreak: 0, danChaseHits: 0,
+    danWhipRound: 0, danWhipTargetId: null,
   };
 }
 
@@ -238,6 +239,25 @@ test('จงหลบแต่อย่าหนี: ดันเปลี่ย
   assert.equal(d.skillPoints, 1);
 });
 
+test('จงหลบแต่อย่าหนี: ระหว่างไล่ตามอยู่ ดันฟื้นแต้มสกิล +1 ต่อเทิร์น', () => {
+  const { d, a } = setup();
+  d.skillPoints = 2;
+  dan.onRoundStartTick(engine, d);
+  assert.equal(d.skillPoints, 2, 'ยังไม่ได้ไล่ตามใคร = ไม่ฟื้น');
+
+  dan.applyChase(engine, d, a);
+  dan.onRoundStartTick(engine, d);
+  assert.equal(d.skillPoints, 2 + dan.CHASE_SKILL_REGEN);
+  dan.onRoundStartTick(engine, d);
+  assert.equal(d.skillPoints, 2 + dan.CHASE_SKILL_REGEN * 2);
+
+  dan.onChasedAttacked(engine, a, d);
+  dan.onChasedAttacked(engine, a, d); // สลัดกับดักหลุด
+  const after = d.skillPoints;
+  dan.onRoundStartTick(engine, d);
+  assert.equal(d.skillPoints, after, 'กับดักหลุดแล้วหยุดฟื้น');
+});
+
 // ---------------------------------------------------------------- สกิลติดตัว 1 ครูฝึกสุดเหี้ยม
 test('ครูฝึกสุดเหี้ยม: ทุกคนที่ไพ่แตกโดนเพิ่ม 1 หน่วย ยกเว้นดันเอง — วีดีโอขึ้นครั้งเดียวต่อเทิร์น', () => {
   const { d, a, b } = setup();
@@ -260,13 +280,14 @@ test('ครูฝึกสุดเหี้ยม: ดันตกรอบ/�
 });
 
 // ---------------------------------------------------------------- ท่าไม้ตาย 2 อย่าให้ฉันต้องเฆี่ยนตี
-test('อย่าให้ฉันต้องเฆี่ยนตี: ปลดล็อกเมื่อเป้าหมายแพ้แต้มติดกัน 2 ครั้ง (ไม่นับไพ่แตก)', () => {
+test('อย่าให้ฉันต้องเฆี่ยนตี: ปลดล็อกเทิร์นถัดไปเมื่อเป้าหมายแพ้แต้มติดกัน 2 ครั้ง (ไม่นับไพ่แตก)', () => {
   const { d, a } = setup();
   const ch = CHARACTERS.CHAR_BY_ID.dan;
   dan.applyChase(engine, d, a);
   assert.equal(dan.whipReady(engine, d), false);
   assert.equal(dan.dynamicSkillFor(engine, d, ch, 'ultimate').name, ch.ultimate.name);
 
+  const r = engine.roundNumber;
   a.isLoser = true;
   dan.onAfterResolve(engine);
   assert.equal(a.danLoseStreak, 1);
@@ -274,22 +295,79 @@ test('อย่าให้ฉันต้องเฆี่ยนตี: ปล
 
   dan.onAfterResolve(engine);
   assert.equal(a.danLoseStreak, 2);
+  assert.equal(d.danWhipRound, r + 1, 'จองสิทธิ์ไว้ให้เทิร์นถัดไป');
+  assert.equal(dan.whipReady(engine, d), false, 'ยังไม่ถึงเทิร์นที่ใช้ได้');
+
+  engine.setRoundNumber(r + 1); // ขึ้นเทิร์นใหม่ = ช่วงที่กดได้จริง
   assert.equal(dan.whipReady(engine, d), true);
   assert.equal(dan.dynamicSkillFor(engine, d, ch, 'ultimate').name, 'อย่าให้ฉันต้องเฆี่ยนตี');
-
-  // เล็งเป้าเดิมอัตโนมัติ ไม่ต้องส่ง targets มา
-  assert.equal(dan.prepareTarget(engine, d, 'ultimate', []), a);
+  assert.equal(dan.prepareTarget(engine, d, 'ultimate', []), a, 'เล็งเป้าเดิมอัตโนมัติ');
 
   const hpBefore = a.hp;
   dan.applyWhip(engine, d, a);
   assert.equal(a.hp, hpBefore - dan.WHIP_DMG);
 });
 
-test('อย่าให้ฉันต้องเฆี่ยนตี: เป้าหมายหลุดสถานะไปแล้ว -> ไม่ลงดาเมจซ้ำ', () => {
+// ---- บั๊กที่เจอจริง: สตรีคครบพอดีในเทิร์นสุดท้ายของกับดัก ----
+//  เดิม whipReady ผูกกับ chaseOn(target) ตรงๆ พอ endTurn ลด danChase เป็น 0 -> onStatusExpire
+//  ล้าง danLoseStreak ทิ้ง ปุ่มจึงขึ้นแค่ตอนสรุปผลแล้วหายก่อนถึงเทิร์นที่กดได้จริง
+test('อย่าให้ฉันต้องเฆี่ยนตี: สตรีคครบตอนกับดักหมดอายุพอดี -> เทิร์นถัดไปยังต้องกดได้', () => {
+  const { d, a } = setup();
+  const ch = CHARACTERS.CHAR_BY_ID.dan;
+  dan.applyChase(engine, d, a);
+  const r = engine.roundNumber;
+
+  a.isLoser = true;
+  dan.onAfterResolve(engine);
+  dan.onAfterResolve(engine);
+  assert.equal(d.danWhipRound, r + 1);
+
+  // จำลอง endTurn: danChase หมดอายุพอดีเทิร์นเดียวกัน -> onStatusExpire ล้างสตรีคของเป้าหมาย
+  a.statuses.danChase = 1;
+  delete a.statuses.danChase;
+  dan.onStatusExpire(engine, a, 'danChase');
+  assert.equal(a.danLoseStreak, 0, 'สตรีคถูกล้างไปแล้วจริง');
+  assert.equal(d.danChaseTargetId, null, 'กับดักหมดอายุแล้วจริง');
+
+  engine.setRoundNumber(r + 1);
+  assert.equal(dan.whipReady(engine, d), true, 'สิทธิ์ที่จองไว้ต้องไม่หายไปกับกับดัก');
+  assert.equal(dan.dynamicSkillFor(engine, d, ch, 'ultimate').name, 'อย่าให้ฉันต้องเฆี่ยนตี');
+  const hpBefore = a.hp;
+  dan.applyWhip(engine, d, a);
+  assert.equal(a.hp, hpBefore - dan.WHIP_DMG, 'และต้องลงดาเมจได้จริง');
+});
+
+test('อย่าให้ฉันต้องเฆี่ยนตี: ใช้ได้เทิร์นเดียว — เลยไปแล้วกลับเป็นไม้ตาย 1', () => {
+  const { d, a } = setup();
+  const ch = CHARACTERS.CHAR_BY_ID.dan;
+  dan.applyChase(engine, d, a);
+  const r = engine.roundNumber;
+  a.isLoser = true;
+  dan.onAfterResolve(engine);
+  dan.onAfterResolve(engine);
+
+  engine.setRoundNumber(r + 2); // ปล่อยให้เลยเทิร์นที่ใช้ได้ไป
+  assert.equal(dan.whipReady(engine, d), false);
+  assert.equal(dan.dynamicSkillFor(engine, d, ch, 'ultimate').name, ch.ultimate.name);
+});
+
+test('อย่าให้ฉันต้องเฆี่ยนตี: เป้าหมายตกรอบ -> สิทธิ์ที่จองไว้ใช้ไม่ได้', () => {
   const { d, a } = setup();
   dan.applyChase(engine, d, a);
-  dan.onChasedAttacked(engine, a, d);
-  dan.onChasedAttacked(engine, a, d); // ตีดันครบ 2 ครั้ง = ปลดสถานะทิ้ง
+  const r = engine.roundNumber;
+  a.isLoser = true;
+  dan.onAfterResolve(engine);
+  dan.onAfterResolve(engine);
+
+  a.alive = false;
+  engine.setRoundNumber(r + 1);
+  assert.equal(dan.whipReady(engine, d), false);
+});
+
+test('อย่าให้ฉันต้องเฆี่ยนตี: เป้าหมายตกรอบระหว่างวีดีโอ -> ไม่ลงดาเมจซ้ำ', () => {
+  const { d, a } = setup();
+  dan.applyChase(engine, d, a);
+  a.alive = false;
   const hpBefore = a.hp;
   dan.applyWhip(engine, d, a);
   assert.equal(a.hp, hpBefore);

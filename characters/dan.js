@@ -13,6 +13,7 @@
 //    danCrutch   (ที่ตัวดัน)    3 เทิร์น — ฟื้นพลังชีวิต 1 หน่วยต่อเทิร์น · ระหว่างติดอยู่กดซ้ำไม่ได้
 //    danDisciple (ที่เป้าหมาย)  3 เทิร์น — เป้าหมายได้ ATK +1 แต่ถ้าตีดันจะโดนสวน + ดันรับดาเมจจากเขาน้อยลง 2
 //    danChase    (ที่เป้าหมาย)  5 เทิร์น — ลงโทษทุกเทิร์นที่แพ้/ไพ่แตก · ตีดันครบ 2 ครั้ง = สลัดหลุดก่อนกำหนด
+//                               · ระหว่างไล่ตามอยู่ ดันฟื้นแต้มสกิล +1 ต่อเทิร์น
 //
 //  วีดีโอทุกคลิปของตัวละครนี้เรียกผ่าน queueCutscene ตรงๆ = **เล่นทุกครั้ง** ไม่มีคลิปไหนเล่นครั้งเดียวต่อเกม
 //  (dan_passive.mp4 ตั้ง noIntro ใน TRANSFORMS ด้วย — ตัดการ์ดเปิดตัว 950ms ทิ้ง เข้าวีดีโอเลย)
@@ -36,6 +37,7 @@ const CHASE_LOSE_DMG = 1;           // เป้าหมายแต้มแ�
 const CHASE_BUST_DMG = 2;           // เป้าหมายไพ่แตก
 const CHASE_BREAK_HITS = 2;         // เป้าหมายต้องโจมตีปกติใส่ดันครบเท่านี้ครั้ง ถึงจะสลัดสถานะหลุด
 const CHASE_EARLY_REFUND = 3;       // จบก่อนครบ 5 เทิร์น -> คืนแต้มสกิลให้ดัน
+const CHASE_SKILL_REGEN = 1;        // ระหว่างไล่ตามอยู่: ฟื้นแต้มสกิลให้ดันเทิร์นละเท่านี้
 const WHIP_STREAK = 2;              // แพ้แต้มติดกันครบเท่านี้ (ไม่นับไพ่แตก) -> ท่าไม้ตายกลายเป็นไม้ตาย 2
 
 // ---------- ท่าไม้ตาย 2 อย่าให้ฉันต้องเฆี่ยนตี ----------
@@ -114,6 +116,7 @@ module.exports = {
   CHASE_BUST_DMG,
   CHASE_BREAK_HITS,
   CHASE_EARLY_REFUND,
+  CHASE_SKILL_REGEN,
   WHIP_STREAK,
   WHIP_DMG,
   BUST_EXTRA_DMG,
@@ -125,6 +128,8 @@ module.exports = {
     p.danDiscipleBy = null;    // ฝั่งศิษย์: id ดันที่มอบสถานะให้
     p.danLoseStreak = 0;       // ฝั่งเป้าหมาย: จำนวนครั้งที่แพ้แต้มติดกัน (ไม่นับไพ่แตก)
     p.danChaseHits = 0;        // ฝั่งเป้าหมาย: จำนวนครั้งที่โจมตีปกติใส่ดันระหว่างถูกไล่ตาม (ครบ 2 = หลุด)
+    p.danWhipRound = 0;        // ฝั่งดัน: รอบที่ใช้ "อย่าให้ฉันต้องเฆี่ยนตี" ได้ (0 = ยังไม่ปลดล็อก)
+    p.danWhipTargetId = null;  // ฝั่งดัน: เป้าหมายที่หน้าต่างนี้เล็งไว้
   },
 
   // ---------- สกิลติดตัว 2 อาการบาดเจ็บ: พลังโจมตีปกติฐาน 0 หน่วย ----------
@@ -147,9 +152,20 @@ module.exports = {
 
   // ---------- ต้นเทิร์น: ไม้ค้ำพยุงตัวเอง (เรียกในลูป onRoundStartTick ของ startRound) ----------
   onRoundStartTick(engine, p) {
-    if (!isDan(p) || !p.alive || !crutchOn(p)) return;
-    const healed = engine.healHp(p, CRUTCH_HEAL);
-    if (healed > 0) engine.log(`🦯 ${p.name} ไม้ค้ำพยุงร่าง — ฟื้นพลังชีวิต +${healed} (เหลือ ${p.statuses.danCrutch} เทิร์น)`);
+    if (!isDan(p) || !p.alive) return;
+    if (crutchOn(p)) {
+      const healed = engine.healHp(p, CRUTCH_HEAL);
+      if (healed > 0) engine.log(`🦯 ${p.name} ไม้ค้ำพยุงร่าง — ฟื้นพลังชีวิต +${healed} (เหลือ ${p.statuses.danCrutch} เทิร์น)`);
+    }
+    // "จงหลบแต่อย่าหนี" ยังไล่ตามอยู่ -> ฟื้นแต้มสกิลให้เทิร์นละ 1 หน่วย
+    //  src = "passive" เพราะเป็นช่องทางฟื้นพลังงานจริงของตัวละคร (ดีบัฟ "ดูดซับเวท" มีสิทธิ์โรลกัน)
+    const chased = this.chaseTargetOf(engine, p);
+    if (chased) {
+      const before = p.skillPoints;
+      engine.addSkill(p, CHASE_SKILL_REGEN, "passive");
+      const got = p.skillPoints - before;
+      if (got > 0) engine.log(`🚗 ${p.name} ฉันบอกว่าอย่าหนี — ฟื้นแต้มสกิล +${got} (ไล่ตาม ${chased.name} อยู่ อีก ${chased.statuses.danChase} เทิร์น)`);
+    }
   },
 
   // ---------- useSkill: ด่านเงื่อนไขก่อนหักแต้ม ----------
@@ -158,7 +174,7 @@ module.exports = {
     // ไม้ค้ำ: ระหว่างที่ยังมีผลอยู่ กดซ้ำไม่ได้
     if (tier === "basic" && crutchOn(p)) return false;
     // ท่าไม้ตาย 2 (อย่าให้ฉันต้องเฆี่ยนตี): ต้องมีเป้าหมาย "จงหลบแต่อย่าหนี" ที่ยังมีชีวิตอยู่
-    if (tier === "ultimate" && this.whipReady(engine, p)) return !!this.chaseTargetOf(engine, p);
+    if (tier === "ultimate" && this.whipReady(engine, p)) return !!this.whipTargetOf(engine, p);
     return true;
   },
 
@@ -169,11 +185,22 @@ module.exports = {
     return t && t.alive && chaseOn(t) ? t : null;
   },
 
-  // ท่าไม้ตายสลับเป็น "อย่าให้ฉันต้องเฆี่ยนตี" ไหม — เป้าหมายแพ้แต้มติดกันครบ WHIP_STREAK ครั้ง (ไม่นับไพ่แตก)
+  // เป้าหมายของ "อย่าให้ฉันต้องเฆี่ยนตี" — จำแยกจาก danChaseTargetId โดยตั้งใจ
+  //  เพราะหน้าต่างใช้งานถูกจองไว้ตั้งแต่ตอนสตรีคครบ ซึ่งอาจเป็นเทิร์นสุดท้ายของกับดักพอดี
+  //  ถ้าไปอ่าน chaseTargetOf() ตอนกด สถานะจะหมดอายุไปแล้วและปุ่มจะหายก่อนได้กดจริง (บั๊กเดิม)
+  whipTargetOf(engine, dan) {
+    if (!dan || !dan.danWhipTargetId) return null;
+    const t = engine.players[dan.danWhipTargetId];
+    return t && t.alive ? t : null;
+  },
+
+  // ท่าไม้ตายสลับเป็น "อย่าให้ฉันต้องเฆี่ยนตี" ไหม
+  //  ปลดล็อกเมื่อเป้าหมายแพ้แต้มติดกันครบ WHIP_STREAK ครั้ง (ไม่นับไพ่แตก) แล้วใช้ได้ "เทิร์นถัดไป 1 เทิร์น"
+  //  ผูกกับเลขรอบ ไม่ผูกกับอายุของ danChase — กับดักหมดอายุพร้อมกันก็ยังต้องได้ใช้ตามที่ประกาศไว้
   whipReady(engine, dan) {
     if (!isDan(dan) || engine.passiveSealed(dan)) return false;
-    const t = this.chaseTargetOf(engine, dan);
-    return !!t && (t.danLoseStreak || 0) >= WHIP_STREAK;
+    if (engine.roundNumber !== (dan.danWhipRound || 0)) return false;
+    return !!this.whipTargetOf(engine, dan);
   },
 
   // ---------- useSkill/publicState: เลือก object สกิลที่ใช้จริงของช่องนั้น ----------
@@ -186,7 +213,7 @@ module.exports = {
   prepareTarget(engine, p, tier, targets) {
     if (!isDan(p)) return null;
     // ท่าไม้ตาย 2 เล็งเป้าเดิมอัตโนมัติ ไม่ต้องให้ผู้เล่นเลือก
-    if (tier === "ultimate" && this.whipReady(engine, p)) return this.chaseTargetOf(engine, p);
+    if (tier === "ultimate" && this.whipReady(engine, p)) return this.whipTargetOf(engine, p);
     const id = Array.isArray(targets) ? targets[0] : targets;
     const t = id && engine.players[id];
     if (!t || !t.alive || t.id === p.id) return null;
@@ -251,8 +278,8 @@ module.exports = {
 
   // ---------- ท่าไม้ตาย 2 อย่าให้ฉันต้องเฆี่ยนตี: ลงดาเมจหลังวีดีโอจบ ----------
   applyWhip(engine, p, t) {
-    if (!isDan(p) || !t || !t.alive) return;
-    if (!chaseOn(t)) return; // สถานะหลุดไประหว่างวีดีโอ (เป้าหมายตาย/ถูกล้าง) -> ไม่ต้องลงดาเมจ
+    if (!isDan(p) || !t || !t.alive) return; // เป้าหมายตายระหว่างวีดีโอ -> ไม่ต้องลงดาเมจ
+    p.danWhipRound = 0; // ใช้หน้าต่างนี้ไปแล้ว
     engine.withEffectSource(p, () => {
       engine.dealMixed(t, WHIP_DMG);
       t.wasAttacked = true;
@@ -328,6 +355,12 @@ module.exports = {
         const dmg = busted ? CHASE_BUST_DMG : CHASE_LOSE_DMG;
         // แพ้แต้มติดกัน (ไม่นับไพ่แตก) = เชื้อเพลิงของ "อย่าให้ฉันต้องเฆี่ยนตี"
         chased.danLoseStreak = lost ? (chased.danLoseStreak || 0) + 1 : 0;
+        // สตรีคครบ -> จองสิทธิ์ใช้ "อย่าให้ฉันต้องเฆี่ยนตี" ไว้สำหรับเทิร์นถัดไปทันที
+        //  จองที่ตัวดัน + จำ id เป้าหมายไว้เอง เพื่อให้รอดแม้ danChase จะหมดอายุใน endTurn เทิร์นเดียวกัน
+        if (lost && chased.danLoseStreak >= WHIP_STREAK) {
+          dan.danWhipRound = engine.roundNumber + 1;
+          dan.danWhipTargetId = chased.id;
+        }
         engine.queueCutscene(dan, busted ? "danChaseBust" : "danChaseLose");
         engine.withEffectSource(dan, () => {
           engine.dealMixed(chased, dmg);
