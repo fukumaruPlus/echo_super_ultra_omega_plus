@@ -406,9 +406,6 @@ function maxHpOf(p) {
 // เชื่อมผล (patch 2.0.8): การเพิ่ม HP ถูกแชร์ให้คู่เชื่อมเท่ากันด้วย
 // ผกผัน (patch 2.2.1): การฟื้นเลือดกลับกลายเป็นเสียเลือดแทน (ไม่สนเกราะ)
 function healHp(p, amount) {
-  // ทาคายามะ จิน (สกิลติดตัว "ความบ้าคลั่ง", characters/takayama_jin.js): ระหว่างติดหนี้เลือดสำรอง
-  //  ฮีลทุกแหล่งไปลดหนี้ก่อนเสมอ ไม่ขึ้น p.hp ตรงๆ (p.hp ถูกตรึงไว้ที่ 1 จนกว่าหนี้จะหมด)
-  if (p.characterId === "jin" && CHAR_HOOKS.jin.debtActive(p)) return CHAR_HOOKS.jin.healIntoDebt(engine, p, amount);
   if (invertActive(p)) {
     dealDirect(p, amount);
     lastLog.push(`🔄 ${p.name} ผกผัน — พลังชีวิตที่ควรฟื้น +${amount} กลับกลายเป็นเสียพลังชีวิต -${amount} แทน (ไม่สนเกราะ)`);
@@ -675,8 +672,7 @@ const SHIKI_CANCELABLE_ULTS = ["gingastrium", "rachan", "paradise", "golden", "f
   "phenexNtd", "phenexTaunt", // patch 2.1.6: ท่าไม้ตายริต้า เบอร์นัล ทั้งสองท่า
   "batTaunt",                 // patch 2.2.7: เข้ามาเลย (แบทแมน)
   "pshikiUlt",                // patch 2.2.7: ทุกอย่างจะต้องราบรื่น (เจ้าหญิงราก)
-  "harukaOmega",              // patch 2.5: New Omega (มิซึซาว่า ฮารุกะ) — สถานะล้วน ลบทิ้งได้ตรงๆ ไม่มี mirror ต้องเก็บกวาด
-  "jinAlpha"];                // Alpha (ทาคายามะ จิน) — สถานะล้วนเช่นกัน (หนี้เลือดสำรองที่ค้างอยู่ยังตัดสินต้นเทิร์นถัดไปตามปกติ)
+  "harukaOmega"];             // patch 2.5: New Omega (มิซึซาว่า ฮารุกะ) — สถานะล้วน ลบทิ้งได้ตรงๆ ไม่มี mirror ต้องเก็บกวาด
 // ชื่อท่าไม้ตายจาก status (ใช้ตอนยกเลิกย้อนหลัง — บางท่าไม่มีใน TRANSFORMS/ข้อมูลสกิล)
 function shikiUltNameOf(p, key) {
   if (key === "shradecharge") return "แด่เพื่อนรักของฉัน";
@@ -1503,8 +1499,6 @@ function instantDeath(p) {
   if (p.characterId === "phenex" && CHAR_HOOKS.phenex.tryRebirth(engine, p)) return;
   // อาจารย์ ไบเลธ (สกิลติดตัว 2 sothis, characters/byleth.js): ตายครั้งแรก -> ย้อนเวลากลับมาด้วยเลือด 1 เกราะ 0 (ครั้งเดียวต่อเกม)
   if (p.characterId === "byleth" && CHAR_HOOKS.byleth.tryRevive(engine, p)) return;
-  // ทาคายามะ จิน (สกิลติดตัว "ความบ้าคลั่ง", characters/takayama_jin.js): ตายขณะอยู่ในอัลฟา -> ใช้เลือดสำรองแทน (ตรวจจริงต้นเทิร์นถัดไป)
-  if (p.characterId === "jin" && CHAR_HOOKS.jin.tryFakeDeath(engine, p)) return;
   // ริต้า เบอร์นัล (สกิลติดตัว 2 patch 2.1.7, characters/phenex.js): ตกรอบจริงขณะท่าไม้ตาย 2 ยังทำงานอยู่ -> ปลดปล่อยความเจ็บปวดที่สะสมทั้งหมดก่อนตาย
   if (p.characterId === "phenex") CHAR_HOOKS.phenex.maybeReleasePainOnDeath(engine, p);
   p.hp = 0; p.alive = false; p.result = "dead"; p.locked = true;
@@ -1597,8 +1591,6 @@ function displayImg(p) {
   if (p.characterId === "eiji") { const eimg = CHAR_HOOKS.eiji.displayImg(p); if (eimg) return eimg; }
   // ฮารุกะ: ระหว่างสถานะ "โอเมก้า" จากท่าไม้ตาย New Omega = ภาพ new_omega.jpg (null = ใช้ภาพปกติ)
   if (p.characterId === "haruka") { const himg = CHAR_HOOKS.haruka.displayImg(p); if (himg) return himg; }
-  // ทาคายามะ จิน: ระหว่างสถานะ "อัลฟา" จากท่าไม้ตาย Alpha = ภาพ jin_alpha.webp (null = ใช้ภาพปกติ)
-  if (p.characterId === "jin") { const jimg = CHAR_HOOKS.jin.displayImg(p); if (jimg) return jimg; }
   // โอเบรอน: ร่างสลับตามช่วงเวลากลางวัน/กลางคืนเสมอ
   if (p.characterId === "oberon") return isNightRound(roundNumber) ? OBERON_NIGHT_IMG : OBERON_MORNING_IMG;
   // ชเรด เอลัน: รวมร่างทำนองเพลงแล้ว = ร่างอควาเรียน สปาด้า ถาวร
@@ -1863,8 +1855,6 @@ function loseHp(p) {
 function applyOverloadOverdrawPenalty(p) {
   if (!overloadForceActive || !p || !p.alive || !p.overloadDrawReady) return;
   if (isYuuki(p)) return; // บอสยูกิได้รับการยกเว้นโทษ HP -1 จาก Overload Force
-  // ทาคายามะ จิน (สกิลติดตัว "มนุษย์ธรรมดา", characters/takayama_jin.js): ในร่างปกติ ไม่รับความเสียหายจากการ์ดเกินแต้มแตก
-  if (p.characterId === "jin" && !CHAR_HOOKS.jin.alphaActive(p)) return;
   if (calculateScore(p.cards) <= 21) return;
   p.overloadExtraDraws = (p.overloadExtraDraws || 0) + 1;
   if (p.overloadExtraDraws % 5 !== 0) return;
@@ -1909,9 +1899,6 @@ function damageSoft(p) {
   // อมาซอน (ฮารุกะ, characters/haruka.js): ไม่มีเกราะแล้วโดนดาเมจ = เลือดไหลตัวเอง — damageSoft ไม่ผ่าน
   //  adjustIncomingDamage() จึงต้องเรียกฮุคเองที่นี่ ไม่งั้นดาเมจแพ้จั่วจะไม่นับเป็น "ความเสียหายทางใดก็ตาม"
   if (p.characterId === "haruka") CHAR_HOOKS.haruka.onDamaged(engine, p);
-  // ความบ้าคลั่ง (ทาคายามะ จิน, characters/takayama_jin.js): เหตุผลเดียวกับฮารุกะ — ดาเมจแพ้จั่วต้องนับเป็น
-  //  "ได้รับความเสียหายไม่ว่าทางใด" ด้วย ไม่งั้นเลือดไหลของตัวเองจะไม่ติดตอนแพ้จั่ว
-  if (p.characterId === "jin") CHAR_HOOKS.jin.onDamaged(engine, p);
   if (p.shield > 0) { p.shield--; hisakawaSyncOut(p); return; }
   if (p.armor > 0) loseArmor(p);
   else loseHp(p);
@@ -1948,10 +1935,7 @@ function adjustIncomingDamage(p, n, isNormalAttack) {
   //  ตรรกะจริงอยู่ characters/_universal_status.js (coolReduction)
   if (n > 0) n = Math.max(0, n - coolReduction(p, isNormalAttack));
   const hook = CHAR_HOOKS[p && p.characterId];
-  // src = ต้นตอของดาเมจนี้ (ถ้ามี) — ทาคายามะ จิน (characters/takayama_jin.js) ใช้ระบุ "ใครโจมตี" เพื่อสวนกลับ
-  //  (ตัวละครอื่นไม่ได้ใช้ arg นี้ — เพิ่มพารามิเตอร์ต่อท้ายแบบไม่กระทบ hook เดิม)
-  const src = effectSourceId && players[effectSourceId];
-  return hook && hook.adjustIncomingDamage ? hook.adjustIncomingDamage(engine, p, n, isNormalAttack, src) : n;
+  return hook && hook.adjustIncomingDamage ? hook.adjustIncomingDamage(engine, p, n, isNormalAttack) : n;
 }
 function tryYunaLongingForTwin(p) {
   if (!p || p.characterId !== "hisakawa_sister" || yunaLongingUsed || roundNumber < 1 || roundNumber > 10) return false;
@@ -1965,20 +1949,7 @@ function resolveHisakawaTwinDeath(p) {
   if (survived) tryYunaLongingForTwin(p);
   return survived;
 }
-// กระชาก (ทาคายามะ จิน, characters/takayama_jin.js): ผู้ที่ติด "jinForced" ให้ดาเมจทุกชนิด (โจมตี/สกิล) ที่ตัวเอง
-//  เป็นต้นตอ (effectSourceId) ไหลไปลงที่จินแทนเป้าหมายเดิมเสมอ — เช็คจากท่อดาเมจกลางทั้ง 3 ตัว (ครอบคลุมทุกช่องทาง)
-function jinForcedRedirect(p) {
-  const src = effectSourceId && players[effectSourceId];
-  if (!src || src.id === p.id || !((src.statuses.jinForced || 0) > 0) || !src.jinForcedById) return p;
-  const forced = players[src.jinForcedById];
-  if (!forced || !forced.alive || forced.id === p.id || sameTeam(src, forced)) return p;
-  // จินติดอมตะ/ถูกกันดาเมจอยู่ = เบนไปก็หายวับ กลายเป็นเกราะกำบังให้เป้าหมายเดิมฟรีๆ
-  //  (คอนเวนชันเดียวกับตัวล่อเป้าอื่นที่กรอง sealActive ออกจากรายชื่อผู้ล่อเป้า) -> ปล่อยดาเมจลงเป้าเดิมตามปกติ
-  if (sealActive(forced) || friendlyEffectBlocked(forced)) return p;
-  return forced;
-}
 function dealDirect(p, n, isNormalAttack) {
-  p = jinForcedRedirect(p);
   if (sealActive(p) || friendlyEffectBlocked(p)) return;
   n = adjustIncomingDamage(p, n, isNormalAttack);
   if (n <= 0) return;
@@ -1992,12 +1963,9 @@ function dealDirect(p, n, isNormalAttack) {
   mageslayerMarkSteal(p, n);
   resolveHisakawaTwinDeath(p);
   // sothis ต้องฟื้นทันทีเมื่อเลือดหมด ไม่รอ sweep ตอนจบเทิร์น
-  // ทาคายามะ จิน: ดาเมจที่ถูก jinForcedRedirect เบนมาลงที่จินอาจไม่มีผู้เรียกภายนอกคนไหนเช็ค hp ของจินต่อ (เช็คแต่ target เดิม) — เช็คให้ที่นี่เสมอ
-  //  ปลอดภัยจากการเรียกซ้ำ: tryFakeDeath ทำให้ p.hp กลับเป็นบวก และ real death ทำให้ p.alive=false ก่อนผู้เรียกภายนอกจะเช็คซ้ำ
-  if (p.alive && p.hp <= 0 && (p.characterId === "byleth" || p.characterId === "jin")) instantDeath(p);
+  if (p.alive && p.hp <= 0 && p.characterId === "byleth") instantDeath(p);
 }
 function dealArmorOnly(p, n, isNormalAttack) {
-  p = jinForcedRedirect(p);
   if (sealActive(p) || friendlyEffectBlocked(p)) return;
   n = adjustIncomingDamage(p, n, isNormalAttack);
   if (n <= 0) return;
@@ -2008,7 +1976,6 @@ function dealArmorOnly(p, n, isNormalAttack) {
   mageslayerMarkSteal(p, n);
 }
 function dealMixed(p, n, isNormalAttack) { // เกราะก่อนแล้วเลือด (สำหรับ NT-D)
-  p = jinForcedRedirect(p);
   if (sealActive(p) || friendlyEffectBlocked(p)) return;
   n = adjustIncomingDamage(p, n, isNormalAttack);
   if (n <= 0) return;
@@ -2023,8 +1990,7 @@ function dealMixed(p, n, isNormalAttack) { // เกราะก่อนแล�
   mageslayerMarkSteal(p, n);
   resolveHisakawaTwinDeath(p);
   // sothis ต้องฟื้นทันทีเมื่อเลือดหมด ไม่รอ sweep ตอนจบเทิร์น
-  // ทาคายามะ จิน: ดาเมจที่ jinForcedRedirect เบนมาลงที่จิน ผู้เรียกภายนอกจะเช็ค hp ของ "เป้าหมายเดิม" เท่านั้น — เช็คให้ที่นี่
-  if (p.alive && p.hp <= 0 && (p.characterId === "byleth" || p.characterId === "jin")) instantDeath(p);
+  if (p.alive && p.hp <= 0 && p.characterId === "byleth") instantDeath(p);
 }
 // src = แหล่งที่มาของการฟื้นพลังงาน ("item" / "passive" / "card") — ใส่เฉพาะช่องทาง "ฟื้นฟู" จริงๆ
 //  ที่ [ดูดซับเวท] (ผู้สังหารเมจ) ต้องตอบสนอง ไม่ใส่ให้แต้มพื้นฐานจบเทิร์น/ค่าชดเชยการแพ้/การโอนแต้มระหว่างผู้เล่น
@@ -2207,7 +2173,6 @@ function resetCombat(p) {
   CHAR_HOOKS.conner.resetCombat(p); // คอนเนอร์: ความเครียดของทุกคน + คำขาดจับกุม/สถานะไล่ล่า/โควตาฟื้นคืนชีพ
   CHAR_HOOKS.byleth.resetCombat(p); // ความรู้/หลักสูตร/ผลทบทวนบทเรียนที่ค้าง + ธงสตั้น-ห้ามสกิลพื้นฐานที่หลักสูตรของไบเลธตั้งไว้ให้คนอื่น
   CHAR_HOOKS.haruka.resetCombat(p); // harukaBasicUses / harukaBleedProcs (โควตารายเทิร์น) + harukaStunPending (สตั้นค้างจากการสวนกลับ)
-  CHAR_HOOKS.jin.resetCombat(p); // jinBasicUses (โควตารายเทิร์น) + jinShadowHp (หนี้เลือดสำรอง) + jinForcedById/jinNoDrawPending/jinNoSkillPending
   CHAR_HOOKS.eiji.resetCombat(p); // eijiOrdinal (สแตค Ordinal Scale ของเทิร์นนี้) + eijiDodgeUsedRound (โควตาหลบ 1 ครั้ง/เทิร์น)
   // ---------- เจ้าแห่งเน็ตบ้าน (patch 1.9) ----------
   p.contractPartner = null; // เจ้าแห่งเน็ตบ้าน: id คู่สัญญาปัจจุบัน (มีได้ 1 คน)
@@ -2708,10 +2673,6 @@ function buildStateFor(viewerId) {
         connorScanned: (connorScan && !mine) ? true : undefined, // แต้มของคนนี้ถูกเปิดให้เราเห็นจาก "วิเคราะห์สถานการณ์"
         harukaBasicUses: p.characterId === "haruka" ? (p.harukaBasicUses || 0) : undefined,
         harukaBasicMax: p.characterId === "haruka" ? CHAR_HOOKS.haruka.BASIC_USES_PER_TURN : undefined,
-        jinBasicUses: p.characterId === "jin" ? (p.jinBasicUses || 0) : undefined,
-        jinBasicMax: p.characterId === "jin" ? CHAR_HOOKS.jin.BASIC_USES_PER_TURN : undefined,
-        jinAlphaOn: p.characterId === "jin" ? CHAR_HOOKS.jin.alphaActive(p) : undefined,
-        jinDebt: p.characterId === "jin" && CHAR_HOOKS.jin.debtActive(p) ? Math.max(0, 1 - p.jinShadowHp) : undefined,
         shradeForm: !!p.shradeForm,        // ชเรด เอลัน: รวมร่างทำนองเพลงแล้ว (อควาเรียน สปาด้า — ถาวร)
         bardNotes: p.bardNotes || [],      // Bard: โน้ตในช่องประพันธ์เพลง (ทุกคนเห็นได้)
         bardNotesUsed: p.bardNotesUsed || 0, // Bard: โน้ตที่เติมไปแล้วเทิร์นนี้ (จำกัด 2)
@@ -3415,9 +3376,6 @@ function dealRound() {
     if (p.characterId === "eiji") CHAR_HOOKS.eiji.onRoundStartTick(engine, p);
     // ---------- มิซึซาว่า ฮารุกะ (characters/haruka.js): รีเซ็ตโควตาสกิลพื้นฐาน 2 ครั้ง + โควตาเลือดไหลของสกิลติดตัว ----------
     if (p.characterId === "haruka") CHAR_HOOKS.haruka.onRoundStartTick(engine, p);
-    // ---------- ทาคายามะ จิน (characters/takayama_jin.js): รีเซ็ตโควตาไข่ต้ม + ตัดสินหนี้เลือดสำรองที่ค้างจากเทิร์นก่อน ----------
-    //  เรียกกับทุกคน (ไม่ใช่แค่จิน) เพราะ nodraw/noskill จากการสวนกลับ "ฉันได้กลิ่นเลือด" อยู่บนตัวผู้โจมตี
-    CHAR_HOOKS.jin.onRoundStartTick(engine, p);
     // ---------- คอนเนอร์ RK800 (characters/conner.js): รีเซ็ตโควตา "จั่วไพ่ = เครียด +1 ต่อเทิร์น" + ธงวิเคราะห์สถานการณ์ ----------
     CHAR_HOOKS.conner.onRoundStartTick(engine, p);
     // ---------- อาจารย์ ไบเลธ (characters/byleth.js): รีเซ็ตโควตาสกิล 5 ครั้ง + หลักสูตรกินความรู้เทิร์นละ 1 ----------
@@ -3643,9 +3601,8 @@ function useSkill(id, tier, targets, item) {
     // คอนเนอร์ RK800 (สกิลติดตัว 1 สืบสวน): การเติมโน้ตคือ "การกดสกิล" ของคีตกวี (มีแค่พื้นฐาน/รอง)
     //  จึงนับความเครียด +1 ต่อครั้งเหมือนตัวละครอื่น — ช่องนี้ return ก่อนถึงจุดนับหลักของ useSkill()
     CHAR_HOOKS.conner.onSkillUsed(engine, p);
-    // วีดีโอสวนกลับที่ค้างคิว (Wonder of U ซาโตรุ — บทเพลงเล็งใส่ซาโตรุ · ฉันได้กลิ่นเลือดของจิน) เล่นทันทีช่วงจั่วการ์ด
-    if (gameState === "PLAYING" && cutsceneQueue.length) pausePlayingForCutscene(() => CHAR_HOOKS.jin.resolvePendingCounters(engine));
-    else CHAR_HOOKS.jin.resolvePendingCounters(engine);
+    // วีดีโอสวนกลับที่ค้างคิว (Wonder of U ซาโตรุ — บทเพลงเล็งใส่ซาโตรุ) เล่นทันทีช่วงจั่วการ์ด
+    if (gameState === "PLAYING" && cutsceneQueue.length) pausePlayingForCutscene();
     broadcastState();
     checkAllLocked();
     return;
@@ -3818,14 +3775,11 @@ function useSkill(id, tier, targets, item) {
   //  กดได้ 2 ครั้งต่อเทิร์นตามโควตา harukaBasicUses แล้วยังเหลือสิทธิ์ใช้สกิลอื่นอีก 1 ครั้งตามปกติ
   const isHarukaBasic = p.characterId === "haruka" && tier === "basic";
   if (isHarukaBasic && (p.harukaBasicUses || 0) >= CHAR_HOOKS.haruka.BASIC_USES_PER_TURN) return;
-  // ทาคายามะ จิน: ไข่ต้ม — ไม่นับเป็นการใช้สกิลของเทิร์น (แพทเทิร์นเดียวกับไข่ต้มของฮารุกะ) กดได้ 2 ครั้งต่อเทิร์นตามโควตา jinBasicUses
-  const isJinBasic = p.characterId === "jin" && tier === "basic";
-  if (isJinBasic && (p.jinBasicUses || 0) >= CHAR_HOOKS.jin.BASIC_USES_PER_TURN) return;
   // อาจารย์ ไบเลธ: สกิลติดตัว "ภูมิปัญญา" — ทุกช่องไม่นับเป็นการใช้สกิลของเทิร์น แต่รวมกันได้ 5 ครั้งต่อเทิร์น
   //  (แพทเทิร์นเดียวกับทาคุมิ กว้างขึ้นครอบคลุมทั้ง 3 ช่อง — เงื่อนไขเฉพาะท่าอยู่ที่ CHAR_HOOKS.byleth.canUseSkill)
   const isBylethPick = p.characterId === "byleth";
   if (isBylethPick && (p.bylethSkillUsesRound || 0) >= CHAR_HOOKS.byleth.SKILL_USES_PER_TURN) return;
-  if (p.skillUsedRound && !gambleRepeat && !isBylethPick && !isHarukaBasic && !isJinBasic && !isApplePick && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHisakawaFreeAction) return; // ใช้สกิลได้เพียง 1 อันต่อเทิร์น (ซ้ำ/ซ้อนไม่ได้)
+  if (p.skillUsedRound && !gambleRepeat && !isBylethPick && !isHarukaBasic && !isApplePick && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHisakawaFreeAction) return; // ใช้สกิลได้เพียง 1 อันต่อเทิร์น (ซ้ำ/ซ้อนไม่ได้)
   // MOON*CELL (คิชินามิ ฮาคุโนะ): ต้องมีแต้มคำสาปแห่งดวงจันทร์ครบ 3 เท่านั้น
   if (st === "moonCell" && (p.hakunoMoonPoints || 0) < HAKUNO_MOONCELL_NEED) return;
   // ข้าขอบัญชา (ชาย/หญิง คิชินามิ ฮาคุโนะ): กดซ้ำไม่ได้จนกว่าผลเดิมจะหมด
@@ -3895,17 +3849,6 @@ function useSkill(id, tier, targets, item) {
   //  พื้นฐาน: โควตา 2 ครั้ง/เทิร์น · รอง: ต้องมี "โอเมก้า" และ "จงไปสู่สุขติ" ต้องไม่ค้างอยู่ · ท่าไม้ตาย: กดซ้ำไม่ได้ระหว่างโอเมก้า
   const isHaruka = p.characterId === "haruka";
   if (isHaruka && !CHAR_HOOKS.haruka.canUseSkill(engine, p, tier)) return;
-  // ---------- ทาคายามะ จิน (characters/takayama_jin.js) ----------
-  //  พื้นฐาน: โควตา 2 ครั้ง/เทิร์น · รอง: ต้องอยู่ในอัลฟาเท่านั้น + ต้องเลือกเป้าหมายที่มีเลือดไหลอยู่แล้ว · ท่าไม้ตาย: กดซ้ำไม่ได้ระหว่างอัลฟา
-  const isJinPick = p.characterId === "jin";
-  let jinGrabTarget = null;
-  if (isJinPick) {
-    if (!CHAR_HOOKS.jin.canUseSkill(engine, p, tier)) return;
-    if (tier === "secondary") {
-      jinGrabTarget = CHAR_HOOKS.jin.prepareGrabTarget(engine, p, targets);
-      if (!jinGrabTarget) return;
-    }
-  }
   // ---------- อาจารย์ ไบเลธ (characters/byleth.js) ----------
   //  พื้นฐาน: กดไม่ได้ระหว่างหลักสูตรเปิดอยู่ · รอง: ต้องเลือกแบบ (strike/buff) และมีความรู้พอ · ท่าไม้ตาย: ต้องเลือกหลักสูตร/กดปิด
   let bylethStrikeTarget = null;
@@ -4084,7 +4027,7 @@ function useSkill(id, tier, targets, item) {
     if (p.statuses.freecast <= 0) delete p.statuses.freecast;
     lastLog.push(`👸 ${p.name} การ์ดราชินี — ใช้สกิลนี้โดยไม่เสียแต้มสกิล`);
   }
-  if (!isApplePick && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHarukaBasic && !isJinBasic && !isBylethPick && !isHisakawaFreeAction) p.skillUsedRound = true; // สลับ/ชุบแฝด, เอาแบบนี้ได้ไหม, มีดพับ, สลับเพศ, Quick Swap-Weapon, รังสรรค์-ลงทัณฑ์, ขึ้น-ลงเกียร์ และไข่ต้ม-อาหารเสริม/ไข่ต้ม ไม่นับโควตาสกิลหลัก
+  if (!isApplePick && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHarukaBasic && !isBylethPick && !isHisakawaFreeAction) p.skillUsedRound = true; // สลับ/ชุบแฝด, เอาแบบนี้ได้ไหม, มีดพับ, สลับเพศ, Quick Swap-Weapon, รังสรรค์-ลงทัณฑ์, ขึ้น-ลงเกียร์ และไข่ต้ม-อาหารเสริม ไม่นับโควตาสกิลหลัก
   if (isKaiPick) p.kaiSkillUsesRound = (p.kaiSkillUsesRound || 0) + 1;
   if (isTakumiPick) p.takumiSkillUsesRound = (p.takumiSkillUsesRound || 0) + 1;
 
@@ -4142,8 +4085,6 @@ function useSkill(id, tier, targets, item) {
   if (isEiji) flashSuffix = CHAR_HOOKS.eiji.applyInstantSkill(engine, p, tier) || flashSuffix;
   // ---------- มิซึซาว่า ฮารุกะ (characters/haruka.js): ไข่ต้ม และอาหารเสริม / amazon punish / New Omega ----------
   if (isHaruka) flashSuffix = CHAR_HOOKS.haruka.applyInstantSkill(engine, p, tier) || flashSuffix;
-  // ---------- ทาคายามะ จิน (characters/takayama_jin.js): ไข่ต้ม / กระชาก / Alpha ----------
-  if (isJinPick) flashSuffix = CHAR_HOOKS.jin.applyInstantSkill(engine, p, tier, jinGrabTarget) || flashSuffix;
   // ---------- คอนเนอร์ RK800 (characters/conner.js): วิเคราะห์สถานการณ์ / ข่มขวัญ-จับกุม / จัดการปิดคดี ----------
   if (isConnerPick) {
     flashSuffix = CHAR_HOOKS.conner.applyInstantSkill(engine, p, tier, connerTarget) || flashSuffix;
@@ -4351,23 +4292,15 @@ function useSkill(id, tier, targets, item) {
   if (p.busted) { voidUltimateOnBust(p); maybeMoonBurst(p); CHAR_HOOKS.mageslayer.onBustOrLoseRoll(engine, p); }
   // ไพ่แตก/ถึงเพดานพอดี: ไม่ล็อกอัตโนมัติ — ยังกดสกิล/ใช้ไอเทมได้ต่อไป จนกว่าจะกดเปิดไพ่เอง หรือทุกคนเปิดไพ่ครบ
 
-  // วีดีโอสวนกลับที่ค้างคิว (Wonder of U ซาโตรุ · ฉันได้กลิ่นเลือดของจิน) — เล่นทันทีช่วงจั่วการ์ด
-  //  ⚠️ pausePlayingForCutscene() ไม่ได้บล็อก (ตั้ง timer แล้ว return ทันที) — ห้ามวางตาข่ายสำรองต่อท้ายแบบตรงๆ
-  //     ไม่งั้นผลสวนกลับจะลงทันทีตั้งแต่ก่อนวีดีโอจบ (ผิดสเปค "วีดีโอต้องขึ้นก่อนสรุปความเสียหายเสมอ")
-  let jinCounterDeferred = false;
+  // วีดีโอสวนกลับที่ค้างคิว (Wonder of U ซาโตรุ) — เล่นทันทีช่วงจั่วการ์ด
   if (gameState === "PLAYING" && cutsceneQueue.length) {
-    jinCounterDeferred = true;
-    if (isIgnisImpact) {
-      pausePlayingForCutscene(() => { CHAR_HOOKS.ignis.applyImpact(engine, p, ignisImpactTarget); CHAR_HOOKS.jin.resolvePendingCounters(engine); });
-    } else if (connerCloseCase) {
+    if (isIgnisImpact) pausePlayingForCutscene(() => CHAR_HOOKS.ignis.applyImpact(engine, p, ignisImpactTarget));
+    else if (connerCloseCase) {
       const t = connerCloseCase;
       connerCloseCase = null;
-      pausePlayingForCutscene(() => { CHAR_HOOKS.conner.applyCloseCase(engine, p, t); CHAR_HOOKS.jin.resolvePendingCounters(engine); });
-    // ทาคายามะ จิน: โดนดาเมจจากสกิลแล้วสวนกลับ — วีดีโอเล่นก่อน แล้วผลสวนกลับจึงลงหลังวีดีโอจบ
-    } else pausePlayingForCutscene(() => CHAR_HOOKS.jin.resolvePendingCounters(engine));
+      pausePlayingForCutscene(() => CHAR_HOOKS.conner.applyCloseCase(engine, p, t));
+    } else pausePlayingForCutscene();
   }
-  // ตาข่ายสำรอง (ทาคายามะ จิน): ไม่ได้เข้าเส้นทางคัตซีนเลย (เช่นอยู่นอกเฟส PLAYING) -> ลงผลทันที ไม่ให้ค้างข้ามเทิร์น
-  if (!jinCounterDeferred) CHAR_HOOKS.jin.resolvePendingCounters(engine);
   // ตาข่ายสำรอง (คอนเนอร์ "จัดการปิดคดี"): ไม่ได้เข้าเส้นทางคัตซีนด้วยเหตุใดก็ตาม -> ลงดาเมจทันที
   //  ไม่งั้นแต้มสกิล 8 หน่วยหายไปเปล่าๆ โดยเป้าหมายไม่โดนอะไรเลย
   if (connerCloseCase) CHAR_HOOKS.conner.applyCloseCase(engine, p, connerCloseCase);
@@ -4626,9 +4559,8 @@ function bardTarget(id, targets) {
   if (valid.length !== song.need) return;
   p.bardPending = null;
   bardPerform(p, song.pattern, valid, true);
-  // วีดีโอสวนกลับที่ค้างคิว (Wonder of U ซาโตรุ · ฉันได้กลิ่นเลือดของจิน) — เล่นทันทีช่วงจั่วการ์ด
-  if (gameState === "PLAYING" && cutsceneQueue.length) pausePlayingForCutscene(() => CHAR_HOOKS.jin.resolvePendingCounters(engine));
-  else CHAR_HOOKS.jin.resolvePendingCounters(engine);
+  // วีดีโอสวนกลับที่ค้างคิว (Wonder of U ซาโตรุ) — เล่นทันทีช่วงจั่วการ์ด
+  if (gameState === "PLAYING" && cutsceneQueue.length) pausePlayingForCutscene();
   broadcastState();
   checkAllLocked();
 }
@@ -5168,8 +5100,7 @@ function afterResolve() {
   for (const p of alivePlayers()) maybeBeatMode(p);
   // สกิลติดตัว 3 เอวา 13: เลือดตกถึง <= 3 -> อย่าให้ฉันทำแแบบนี้เลย
   for (const p of alivePlayers()) maybeEva3(p);
-  // ทาคายามะ จิน (สกิลติดตัว 2): วีดีโอสวนกลับที่ค้างคิวมาจากช่วงเปิดไพ่ ต้องเล่นให้จบก่อน แล้วผลจึงลงก่อนขึ้นสรุปผล
-  runCutsceneQueue(() => { CHAR_HOOKS.jin.resolvePendingCounters(engine); goSummary(); });
+  runCutsceneQueue(goSummary);
 }
 
 function goSummary() {
@@ -5261,12 +5192,6 @@ function afterSummary() {
     if (targets.length > 0) {
       attackerId = winner.id;
       gameState = "ATTACK";
-      // ---------- ความบ้าคลั่ง (ทาคายามะ จิน): ร่างอัลฟาสุ่มเป้าหมายอยู่แล้ว -> ตีทันที ไม่ต้องให้ผู้เล่นเลือก ----------
-      //  (ร่างปกติยังเลือกเป้าหมายเองได้ตามปกติ — doAttack จะสุ่มทับให้อีกชั้นถ้าอยู่ในอัลฟา)
-      if (CHAR_HOOKS.jin.alphaActive(winner)) {
-        doAttack(winner.id, targets[Math.floor(Math.random() * targets.length)].id);
-        return;
-      }
       startPhaseTimer(ATTACK_TIME, () => {
         const t = attackableTargets(attackerId);
         if (t.length) doAttack(attackerId, t[Math.floor(Math.random() * t.length)].id);
@@ -5286,8 +5211,6 @@ function postAttackFollowup(attacker) {
   // คอนเนอร์ RK800 (สกิลติดตัว 4 การป้องกันตัว): วีดีโอ connor_passive4 เล่นจบแล้ว -> ค่อยลงดาเมจสวนกลับ
   //  (จุดนี้อยู่หลัง runCutsceneQueue ของ doAttack เสมอ จึงได้ลำดับ "วีดีโอก่อน แล้วจึงเกิดความเสียหาย" ตามสเปค)
   CHAR_HOOKS.conner.resolvePendingCounter(engine);
-  // ทาคายามะ จิน (สกิลติดตัว 2 ฉันได้กลิ่นเลือด): วีดีโอสวนกลับเล่นจบแล้ว -> ค่อยลงดาเมจ/สถานะสวนกลับ
-  CHAR_HOOKS.jin.resolvePendingCounters(engine);
   if (isYuuki(attacker)) {
     const next = yuukiAttackTargets.shift();
     if (next && attacker.alive && players[next]?.alive) {
@@ -5370,7 +5293,6 @@ function attackSoundOf(attacker) {
   if (!attacker) return undefined;
   if (attacker.characterId === "mageslayer") return "mageslayer_attack";           // BA.mp3
   if (CHAR_HOOKS.haruka.omegaActive(attacker)) return "haruka_attack";             // hit_haruka.mp3
-  if (CHAR_HOOKS.jin.alphaActive(attacker)) return "haruka_attack";                // ร่างอัลฟา: ใช้เสียงโจมตีเดียวกับโอเมก้าของฮารุกะ
   if (CHAR_HOOKS.byleth.swordActive(attacker)) return "byleth_hit";                // hit_sound.mp3 (ดาบต้องสาป)
   return undefined;
 }
@@ -5427,15 +5349,6 @@ function doAttack(byId, targetId) {
     if (isYuuki(attacker)) postAttackFollowup(attacker);
     return;
   }
-  // กระชาก (ทาคายามะ จิน, characters/takayama_jin.js): ผู้ที่ติด "jinForced" ถูกบังคับให้โจมตีปกติลงที่จินแทนเสมอ
-  //  ไม่ว่าจะเลือกเป้าหมายอะไรมา (ท่อดาเมจกลาง jinForcedRedirect ครอบคลุมสกิลไปแล้ว — ตรงนี้แค่ทำให้ UI/log แสดงเป้าหมายถูกต้อง)
-  if ((attacker.statuses.jinForced || 0) > 0 && attacker.jinForcedById) {
-    const jinForced = players[attacker.jinForcedById];
-    if (jinForced && jinForced.alive && jinForced.id !== target.id && jinForced.id !== attacker.id && !sameTeam(attacker, jinForced)) {
-      lastLog.push(`🫀 กระชาก — ${attacker.name} ถูกบังคับให้โจมตี ${jinForced.name} แทน ${target.name}!`);
-      target = jinForced;
-    }
-  }
   if (CHAR_HOOKS.bat_ben.cannotAttack(attacker)) return;              // แบทแมน (patch 2.2.7): ระหว่างเร้นเงา โจมตีไม่ได้
   if (CHAR_HOOKS.princess_shiki.cannotAttack(attacker)) return;       // เจ้าหญิงราก (patch 2.2.7): โจมตีไม่ได้ เว้นแต่ติดชักดาบ
   // ไค ชิซากิ: โทสะระงับด้วยโทสะ — มีคู่ปรับ (kaiRival1/kaiRival2 ยังไม่หมด) บังคับเป้าหมายมีแค่คู่ปรับเท่านั้น
@@ -5454,11 +5367,6 @@ function doAttack(byId, targetId) {
   }
   attacker.didAttackRound = true;
   attacker.nanayaReattackReady = false; // หัวใจฆาตกร (นานายะ ชิกิ): กำลังใช้โอกาสโจมตีซ้ำนี้อยู่ (หรือไม่เกี่ยวข้องกับตัวละครนี้)
-
-  // ---------- ความบ้าคลั่ง (ทาคายามะ จิน, characters/takayama_jin.js): ร่างอัลฟา + มีเป้าหมายมากกว่า 1 คน -> สุ่มเป้าหมายเสมอ ----------
-  //  ต้องอยู่ "ก่อน" ระบบล่อเป้าด้านล่าง เพื่อให้ตัวล่อเป้า (ริดดี้/ฟีนิกซ์/แบทแมน) ยังดึงหมัดมาที่ตัวเองได้ตามปกติ
-  const jinRandomTarget = CHAR_HOOKS.jin.maybeRandomTarget(engine, attacker, target);
-  if (jinRandomTarget) target = jinRandomTarget;
 
   let riddheTaunted = false;
   let phenexTaunted = false;
@@ -5715,10 +5623,6 @@ function doAttack(byId, targetId) {
   const hisakawaDreamAtk = CHAR_HOOKS.hisakawa_sister.isDreamAttack(attacker);
   if (hisakawaDreamAtk) dmg = CHAR_HOOKS.hisakawa_sister.DREAM_FOLLOWUP_DMG;
 
-  // ---------- ความบ้าคลั่ง (ทาคายามะ จิน, characters/takayama_jin.js): ร่างอัลฟา — ชนะโจมตีปกติแล้วมีโอกาส 50% ตีพลาด ----------
-  const jinMissed = CHAR_HOOKS.jin.tryMiss(engine, attacker);
-  if (jinMissed) dmg = 0;
-
   // ---------- ริต้า เบอร์นัล (characters/phenex.js): ฝันไปเถอะ — ตั้งรับ สะท้อนความเสียหายทั้งหมดกลับผู้โจมตีแทนที่จะรับเอง ----------
   if (CHAR_HOOKS.phenex.tryReflectHit(engine, attacker, target, dmg)) return;
 
@@ -5778,12 +5682,6 @@ function doAttack(byId, targetId) {
   CHAR_HOOKS.eiji.onAttackLanded(engine, attacker, target);
   // ฮารุกะ (characters/haruka.js): โอเมก้า — การโจมตีปกติแปะ "เลือดไหล" ให้เป้าหมาย 2 หน่วย
   const harukaBleedApplied = CHAR_HOOKS.haruka.onAttackLanded(engine, attacker, target);
-  // ทาคายามะ จิน (characters/takayama_jin.js): อัลฟา — การโจมตีปกติแปะ "เลือดไหล" ให้เป้าหมาย 3 หน่วย
-  //  ตีพลาดจาก "ความบ้าคลั่ง" = ไม่โดนตัว จึงไม่แปะเลือดไหลด้วย
-  const jinBleedApplied = jinMissed ? 0 : CHAR_HOOKS.jin.onAttackLanded(engine, attacker, target);
-  // ทาคายามะ จิน (characters/takayama_jin.js): ฉันได้กลิ่นเลือด — จินถูกโจมตีปกติใส่ (จองการสวนกลับ + คิววีดีโอ)
-  //  ผลจริงลงหลังวีดีโอจบที่ postAttackFollowup() -> resolvePendingCounters() ตามสเปค "วีดีโอขึ้นก่อนสรุปความเสียหายเสมอ"
-  const jinCounterQueued = jinMissed ? false : CHAR_HOOKS.jin.queueSmellBlood(engine, target, attacker, true);
   // อาจารย์ ไบเลธ (characters/byleth.js): ดาบต้องสาปใช้ได้ครั้งเดียว -> สลายหลังหมัดนี้ · และถ้าเป้าหมายคือไบเลธที่แต้มน้อยสุด เตรียมโจมตีตอบ
   const bylethSwordUsed = CHAR_HOOKS.byleth.onAttackLanded(engine, attacker);
   CHAR_HOOKS.byleth.onAttacked(engine, attacker, target);
@@ -6073,9 +5971,6 @@ function doAttack(byId, targetId) {
   if (connerCounterFired) addFx({ name: "การป้องกันตัว — สวนกลับผู้โจมตีทั้งสองคน", img: CHAR_HOOKS.conner.IMG.base, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (bylethSwordUsed > 0) addFx({ name: `ดาบต้องสาป +${bylethSwordUsed}`, img: CHAR_HOOKS.byleth.IMG.skill2, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
   if (harukaBleedApplied > 0) addFx({ name: `โอเมก้า — เลือดไหล +${harukaBleedApplied}`, img: CHAR_HOOKS.haruka.IMG.ult, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
-  if (jinMissed) addFx({ name: "ความบ้าคลั่ง — ตีพลาด!", img: CHAR_HOOKS.jin.IMG.alpha, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
-  if (jinBleedApplied > 0) addFx({ name: `อัลฟา — เลือดไหล +${jinBleedApplied}`, img: CHAR_HOOKS.jin.IMG.alpha, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
-  if (jinCounterQueued) addFx({ name: "ฉันได้กลิ่นเลือด — สวนกลับ!", img: CHAR_HOOKS.jin.IMG.alpha, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (harukaCounterFx) addFx({ name: `อมาซอน — สวนกลับ -${harukaCounterFx.dmg}${harukaCounterFx.bled > 0 ? ` + เลือดไหล ${harukaCounterFx.bled}` : ""}${harukaCounterFx.stunned ? " + สตั้นเทิร์นหน้า" : ""}`, img: CHAR_HOOKS.haruka.IMG.base, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (pshikiBladeHeal > 0) addFx({ name: `อืม ฉันเข้าใจแล้ว (ฟื้นเลือด +${pshikiBladeHeal})`, img: "/characters/princess_shiki/p_shiki_skill1.jpg", by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
 
@@ -6100,7 +5995,7 @@ function doAttack(byId, targetId) {
   //  / อย่าอยู่เลย แกน่ะ! (ริต้า เบอร์นัล patch 2.1.6) / ฉันยัง...มองเห็นอยู่!!! กันตาย + อย่างนายน่ะ จะไปเข้าใจอะไร (สึงาชิ ทาคุโตะ patch 2.2.4):
   //  เล่นวีดีโอที่ค้างคิวก่อน แล้วค่อยขึ้นสรุปความเสียหาย
   //  (ปกติทุกท่าอื่นจะขึ้นสรุปความเสียหายก่อนแล้วค่อยเล่นวีดีโอค้างคิวตอนจบ — ท่าเหล่านี้กลับลำดับเฉพาะตัว)
-  if ((yuukiAttackVideoQueued || isYuuki(target) || beamPlusAtk || (beam && attacker.characterId === "banagher") || unibeam2Atk || storiumAtk || phenexPurgeAtk || miyakoUltAtk || triggerMultiAtk || triggerZeperionAtk || escanorAttackVideoQueued || (beatSaveFired && target.characterId === "takuto") || takutoUlt2VideoQueued || eijiSwordFx.videoQueued || harukaPunishFx.videoQueued || (harukaCounterFx && harukaCounterFx.videoQueued) || jinCounterQueued) && cutsceneQueue.length) runCutsceneQueue(showAttackFx);
+  if ((yuukiAttackVideoQueued || isYuuki(target) || beamPlusAtk || (beam && attacker.characterId === "banagher") || unibeam2Atk || storiumAtk || phenexPurgeAtk || miyakoUltAtk || triggerMultiAtk || triggerZeperionAtk || escanorAttackVideoQueued || (beatSaveFired && target.characterId === "takuto") || takutoUlt2VideoQueued || eijiSwordFx.videoQueued || harukaPunishFx.videoQueued || (harukaCounterFx && harukaCounterFx.videoQueued)) && cutsceneQueue.length) runCutsceneQueue(showAttackFx);
   else showAttackFx();
 }
 
@@ -7113,8 +7008,6 @@ const engine = {
   queueTransformAnnounce,
   runCutsceneQueue,
   pausePlayingForCutscene,
-  // จำนวนวีดีโอที่รออยู่ในคิว (อ่านอย่างเดียว — ใช้ยืนยันลำดับ "วีดีโอก่อน แล้วค่อยลงผล" ในเทสต์)
-  cutsceneQueueLength: () => cutsceneQueue.length,
   startPhaseTimer,
   clearPhaseTimer,
   reduceCardTimer, // เอจิ สกิลติดตัว 1: บีบเวลาที่เหลือของเฟสจั่วการ์ด
