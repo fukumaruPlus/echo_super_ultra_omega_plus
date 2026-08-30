@@ -11,7 +11,7 @@
 server.js (6.3k บรรทัด)          เอนจินกลางทั้งหมด: state, เฟส, การ์ด, ดาเมจ, สกิล, socket handler
 characters.js (1.7k)             DATA ล้วน — roster/ชื่อสกิล/desc/cost/img + POSITION_COLORS + publicRoster()
 characters/index.js              มัดรวม CHAR_HOOKS = { [characterId]: module } — ตัวละครใหม่ต้อง require+push ที่นี่
-characters/<id>.js               LOGIC ของตัวละครนั้น (38 ตัว) — export { id, ...methods(engine, ...) }
+characters/<id>.js               LOGIC ของตัวละครนั้น (39 ตัว) — export { id, ...methods(engine, ...) }
 characters/_universal_status.js  บัฟ/ดีบัฟกลาง (pure function ไม่พึ่ง engine)
 characters/_transforms.js        ตาราง metadata คัตซีน (TRANSFORMS) — data ล้วน
 characters/yuna.js               "ไอดอลประจำสนาม" ไม่ใช่ตัวละครที่เล่นได้ (ไม่อยู่ใน CHAR_HOOKS, require ตรง)
@@ -255,6 +255,30 @@ yuuki · nanaya · miyako (คอมโบ) · takuto (คอมโบ + คร�
   (สกิลติดตัว 1) ตั้ง `noIntro: true` ใน `TRANSFORMS` -> client ข้ามการ์ดเปิดตัว 950ms เข้าวีดีโอเลย
   และคลิปนี้ขึ้น **ครั้งเดียวต่อเทิร์น** ถึงจะมีคนไพ่แตกพร้อมกันหลายคน
 เทสต์: [tests/characters/dan.test.js](tests/characters/dan.test.js)
+
+**อิสึกะ ชิโด (patch 2.9)** — ตัวอย่างของ "สกิลที่ต้องไม่มีใครรู้ว่าถูกกด"
+- **`p.shidoRecorded`** (สกิลติดตัว) บันทึกที่ **`adjustIncomingDamage`** เพราะเป็นจุดเดียวที่เห็น
+  *ขนาดของก้อนดาเมจ* ก่อนถูกหั่นเข้าเกราะ/เลือด และทุกท่อ (`dealMixed`/`dealDirect`/`dealArmorOnly`)
+  วิ่งผ่านที่นี่หมด · ฮุคนี้ **ไม่แก้ค่า n** แค่จดไว้ · `damageSoft` ไม่ผ่านจุดนี้ = ดาเมจแพ้จั่ว/ไพ่แตก
+  ไม่มีสิทธิ์ดีดค่าที่บันทึกไว้ (ตั้งใจ — สเปคระบุว่านับเฉพาะ "ความเสียหายจากผู้เล่นอื่น")
+  - กติกาค่า: พื้น 3 · โดน**แรงกว่า**ที่บันทึก = บันทึกทับ · โดน**เบากว่า** = ร่วงกลับ 3 · เท่ากันพอดี = คงเดิม
+- **Sandalphon** ใช้ `attackBaseOverride` = **แทนที่** พลังโจมตีปกติ (ไม่ใช่ `damageBonus` ที่บวกทับ)
+  · ค่าที่ใช้จริงอ่านจาก **`statusAmt.shidoSword`** ซึ่งล็อกไว้ตอนกด ไม่ใช่ `p.shidoRecorded` ที่ยังขยับได้
+- **ท่าไม้ตาย "ฝากด้วยนะตัวฉัน" ห้ามรั่วทุกช่องทาง** — ปิดไว้ 4 ชั้น:
+  1. **ไม่ใช้ `p.statuses`** เลย (สถานะทุกตัวถูกเปิดให้ทุกคนเห็นตอน SUMMARY/ATTACK ผ่าน `revealAll`)
+     เก็บที่ `p.shidoGuardTurns` ซึ่ง `buildStateFor` ส่งให้ **เจ้าของคนเดียว** (`mine`)
+     -> ไม่อยู่ในลูปลดเทิร์นของ `endTurn()` ต้องลดเองผ่าน `CHAR_HOOKS.shido.onEndTurn()`
+  2. **`silentSkill()`** ทำให้ `useSkill()` ข้าม `io.emit("skillFlash")`
+  3. **ไม่เข้า `roundSkills`** — รายการนี้ถูกอ่านโดยหลักสูตร "พิเศษ" ของไบเลธที่ลงโทษ "คนที่กดสกิลเทิร์นนี้"
+     ซึ่งจะกลายเป็นเบาะแสทันที
+  4. **แต้มสกิลหลอก** — `buildStateFor` ส่ง `maxSkillOf(p)` ให้คนอื่นเห็นแทนค่าจริงตลอดที่กับดักเปิดอยู่
+     (ไม่งั้นแต้มที่หายไป 8 หน่วยเป็นเบาะแสชัดๆ)
+- **การเกิดใหม่ต่างจากคอนเนอร์ RK800**: ของคอนเนอร์ "เกมจบก่อนครบกำหนดก็อดฟื้น" แต่ของชิโด
+  `CHAR_HOOKS.shido.blocksGameOver()` **ระงับเงื่อนไขจบเกมทั้งสองสาย** (ทีม + FFA) ไว้จนกว่าเขาจะกลับมา
+  และ `maybeRevive()` เร่งให้ฟื้นเทิร์นถัดไปทันทีเมื่อเหลือผู้เล่นอื่น <= 1 คน ไม่งั้นเกมจะค้างรอครบ 5 เทิร์นเปล่าๆ
+- **วีดีโอคิวที่ `endTurn()` ไม่ใช่ตอนตาย** (`flushDeathVideo`) — ถ้าคิวตอนตาย `runCutsceneQueue` ของ
+  `doAttack` จะกินคลิปไปเล่นกลางฉากโจมตี ผิดจากสเปคที่ต้องการให้เป็น "รอยต่อหลังหน้าจอโจมตี"
+เทสต์: [tests/characters/shido.test.js](tests/characters/shido.test.js)
 
 ---
 

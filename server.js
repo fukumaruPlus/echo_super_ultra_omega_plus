@@ -1509,6 +1509,8 @@ function instantDeath(p) {
   // คอนเนอร์ RK800 (สกิลติดตัว 3 ปัญญาประดิษฐ์): จองคิวฟื้นคืนชีพอีก 10 เทิร์น (ไม่ใช่การกันตาย — ตกรอบจริงก่อน)
   CHAR_HOOKS.conner.onDeath(engine, p);
   // โมโรโบชิ ดัน (characters/dan.js): เป้าหมาย "จงหลบแต่อย่าหนี"/ศิษย์ตกรอบ (หรือดันเองตกรอบ) -> ปลดสถานะทั้งสองฝั่ง
+  // อิสึกะ ชิโด (characters/shido.js): ตายระหว่างกับดักเปิดอยู่ -> จองคิวเกิดใหม่ + คิววีดีโอรอยต่อ
+  CHAR_HOOKS.shido.onDeath(engine, p);
   CHAR_HOOKS.dan.onDeath(engine, p);
   CHAR_HOOKS.kai.pruneOverhaulSlots(engine); // ไค ชิซากิ: ผู้ถือรังสรรค์/ลงทัณฑ์ตกรอบ -> ลบออกจาก Overhaul tracker
   // ยูนะ: เป้าหมายที่ได้รับพร (Delete/Smile for You/Longing) ตาย/หมดสภาพ -> เพลง+บัฟยูนะปิดลงทันที
@@ -1722,6 +1724,9 @@ function activeSkillMusic() {
   //  (ฝั่ง client เล่นไฟล์ใหม่ต่อจากตำแหน่งเดิมผ่าน MUSIC_POSITION_GROUPS จึงไม่มีรอยสะดุดตอนสลับช่วงเวลา)
   const bestByleth = CHAR_HOOKS.byleth.activeMusic(engine, isNightRound(roundNumber));
   if (bestByleth) return bestByleth;
+  // อิสึกะ ชิโด (characters/shido.js): เพลง shido_theme เล่นค้างตลอดที่ Sandalphon ยังอยู่
+  const bestShido = CHAR_HOOKS.shido.activeMusic(engine);
+  if (bestShido) return bestShido;
   // เข้ามาเลย (แบทแมน patch 2.2.7): เพลง bat_ben_theme เล่นค้างตลอดที่ล่อเป้าอยู่
   let bestBat = null;
   for (const p of alivePlayers()) {
@@ -2179,6 +2184,7 @@ function resetCombat(p) {
   CHAR_HOOKS.conner.resetCombat(p); // คอนเนอร์: ความเครียดของทุกคน + คำขาดจับกุม/สถานะไล่ล่า/โควตาฟื้นคืนชีพ
   CHAR_HOOKS.byleth.resetCombat(p); // ความรู้/หลักสูตร/ผลทบทวนบทเรียนที่ค้าง + ธงสตั้น-ห้ามสกิลพื้นฐานที่หลักสูตรของไบเลธตั้งไว้ให้คนอื่น
   CHAR_HOOKS.haruka.resetCombat(p); // harukaBasicUses / harukaBleedProcs (โควตารายเทิร์น) + harukaStunPending (สตั้นค้างจากการสวนกลับ)
+  CHAR_HOOKS.shido.resetCombat(p); // อิสึกะ ชิโด: ดาเมจที่บันทึกไว้ / กับดักฝากด้วยนะตัวฉัน / คิวเกิดใหม่
   CHAR_HOOKS.dan.resetCombat(p); // โมโรโบชิ ดัน: เป้าหมาย "จงหลบแต่อย่าหนี" / ศิษย์ / สตรีคแพ้แต้มติดกัน
   CHAR_HOOKS.eiji.resetCombat(p); // eijiOrdinal (สแตค Ordinal Scale ของเทิร์นนี้) + eijiDodgeUsedRound (โควตาหลบ 1 ครั้ง/เทิร์น)
   // ---------- เจ้าแห่งเน็ตบ้าน (patch 1.9) ----------
@@ -2626,7 +2632,14 @@ function buildStateFor(viewerId) {
         fieldAura: (p.id === yunaTargetId && roundNumber <= yunaWindowEnd) ? yunaEffect : null,
         hisakawa: p.characterId === "hisakawa_sister" ? CHAR_HOOKS.hisakawa_sister.publicState(p, roundNumber) : undefined,
         // ซาโตรุ (patch 2.0.8.2): แต้มสกิลถูกซ่อนจากผู้เล่นอื่นเสมอ (-1 = ซ่อน) / ทาคุมิ: บังตาแต้มสกิลของทุกคนยกเว้นตัวเองระหว่างท่าไม้ตายทำงาน (sentinel -1 แบบเดียวกัน กลับด้าน)
-        skillPoints: (takumiBlackout && !mine) ? -1 : ((p.characterId === "satoru" && !mine && !passiveSealed(p)) ? -1 : p.skillPoints),
+        // อิสึกะ ชิโด (patch 2.9): ระหว่าง "ฝากด้วยนะตัวฉัน" เปิดอยู่ คนอื่นเห็นแต้มสกิลเต็มหลอดเหมือนเดิม
+        //  (ไม่งั้นแต้มที่หายไป 8 หน่วยจะเป็นเบาะแสว่าเขากดท่าไม้ตายไปแล้ว — ทั้งท่านี้ต้องไม่มีใครรู้)
+        skillPoints: (takumiBlackout && !mine) ? -1 : ((p.characterId === "satoru" && !mine && !passiveSealed(p)) ? -1
+          : ((!mine && CHAR_HOOKS.shido.guardActive(p)) ? maxSkillOf(p) : p.skillPoints)),
+        // ตัวนับถอยหลังกับดักของชิโด — ส่งให้เจ้าของคนเดียว ไม่ใช่สถานะจึงไม่โผล่ตอน revealAll
+        shidoGuard: mine && p.characterId === "shido" ? (p.shidoGuardTurns || 0) : undefined,
+        // ความเสียหายล่าสุดที่ "ขอพลังให้ฉันด้วย" บันทึกไว้ (UI ป้ายเล็กบนแผงตัวเอง)
+        shidoRecorded: mine && p.characterId === "shido" ? (p.shidoRecorded || 0) : undefined,
         maxSkill: maxSkillOf(p), // Bard: เพดานพลังงาน 9
         beamAmmo: p.beamAmmo,
         puddingCount: p.puddingCount || 0,
@@ -3234,6 +3247,8 @@ function dealRound() {
     // คอนเนอร์ RK800 (สกิลติดตัว 3 ปัญญาประดิษฐ์): ครบ 10 เทิร์นหลังตาย -> กลับเข้าสนามด้วยเลือด 3 เกราะ 2
     //  ต้องอยู่ "ก่อน" บล็อกข้ามผู้เล่นที่ตายแล้ว ไม่งั้นเทิร์นที่ฟื้นจะไม่ได้รับไพ่ใบแรก
     if (!p.alive) CHAR_HOOKS.conner.maybeRevive(engine, p);
+    // อิสึกะ ชิโด (สกิลไม้ตาย ฝากด้วยนะตัวฉัน): กลับมาหลังครบกำหนด (หรือทันทีถ้าเหลือคู่ต่อสู้คนสุดท้าย)
+    if (!p.alive) CHAR_HOOKS.shido.maybeRevive(engine, p);
     if (!p.alive) { p.cards = []; p.locked = true; p.busted = false; p.overloadDrawReady = false; continue; }
 
     if (isYuuki(p) && p.hp <= 4) {
@@ -3401,6 +3416,8 @@ function dealRound() {
     if (p.characterId === "eiji") CHAR_HOOKS.eiji.onRoundStartTick(engine, p);
     // ---------- มิซึซาว่า ฮารุกะ (characters/haruka.js): รีเซ็ตโควตาสกิลพื้นฐาน 2 ครั้ง + โควตาเลือดไหลของสกิลติดตัว ----------
     if (p.characterId === "haruka") CHAR_HOOKS.haruka.onRoundStartTick(engine, p);
+    // ---------- อิสึกะ ชิโด (characters/shido.js): ภูติ — ฟื้นพลังชีวิตต่อเทิร์น ----------
+    if (p.characterId === "shido") CHAR_HOOKS.shido.onRoundStartTick(engine, p);
     // ---------- โมโรโบชิ ดัน (characters/dan.js): ไม้ค้ำพยุงร่าง — ฟื้นพลังชีวิตต่อเทิร์น ----------
     if (p.characterId === "dan") CHAR_HOOKS.dan.onRoundStartTick(engine, p);
     // ---------- คอนเนอร์ RK800 (characters/conner.js): รีเซ็ตโควตา "จั่วไพ่ = เครียด +1 ต่อเทิร์น" + ธงวิเคราะห์สถานการณ์ ----------
@@ -3902,6 +3919,11 @@ function useSkill(id, tier, targets, item) {
       if (!connerTarget) return;
     }
   }
+  // ---------- อิสึกะ ชิโด (characters/shido.js) ----------
+  //  พื้นฐาน: กดซ้ำระหว่าง "ภูติ" มีผลไม่ได้ · สกิลรอง: ต้องมีดาเมจที่บันทึกไว้ >= 3 ก่อนถึงชักดาบได้
+  //  ท่าไม้ตาย: กดซ้ำระหว่างกับดักเปิดอยู่ไม่ได้ (และเป็นสกิลเงียบ — ไม่มีแบนเนอร์/ไม่เข้า roundSkills)
+  const isShidoPick = p.characterId === "shido";
+  if (isShidoPick && !CHAR_HOOKS.shido.canUseSkill(engine, p, tier)) return;
   // ---------- โมโรโบชิ ดัน (characters/dan.js) ----------
   //  พื้นฐาน: กดซ้ำไม่ได้ระหว่างไม้ค้ำยังมีผล · สกิลรอง/ท่าไม้ตาย 1: ต้องเลือกเป้าหมาย 1 คน
   //  ท่าไม้ตาย 2 (อย่าให้ฉันต้องเฆี่ยนตี): เล็งเป้าหมายเดิมอัตโนมัติ ไม่ต้องให้ผู้เล่นส่ง targets มา
@@ -4128,6 +4150,8 @@ function useSkill(id, tier, targets, item) {
   if (isEiji) flashSuffix = CHAR_HOOKS.eiji.applyInstantSkill(engine, p, tier) || flashSuffix;
   // ---------- มิซึซาว่า ฮารุกะ (characters/haruka.js): ไข่ต้ม และอาหารเสริม / amazon punish / New Omega ----------
   if (isHaruka) flashSuffix = CHAR_HOOKS.haruka.applyInstantSkill(engine, p, tier) || flashSuffix;
+  // ---------- อิสึกะ ชิโด (characters/shido.js): ภูติ / Sandalphon / ฝากด้วยนะตัวฉัน ----------
+  if (isShidoPick) flashSuffix = CHAR_HOOKS.shido.applyInstantSkill(engine, p, tier) || flashSuffix;
   // ---------- โมโรโบชิ ดัน (characters/dan.js): ไม้ค้ำ / นายทำให้ฉันผิดหวัง / ฉันบอกว่าอย่าหนี ----------
   if (isDanPick) {
     flashSuffix = CHAR_HOOKS.dan.applyInstantSkill(engine, p, tier, danTarget) || flashSuffix;
@@ -4334,12 +4358,17 @@ function useSkill(id, tier, targets, item) {
       : (skill.img || null);
     // เทเปา (ชิกิ): กดสกิลพื้นฐาน/สกิลรอง ให้เล่นเสียง tepeu_skill1_2 ก่อนเสมอ
     const flashSound = (isTepeuCook || isTepeuPonder) ? "tepeu_skill1_2" : isHisakawaSkill ? CHAR_HOOKS.hisakawa_sister.skillVoice(p, tier, skill) : null;
-    io.emit("skillFlash", { name: skill.name + flashSuffix, img: flashImg, by: p.name, color: POSITION_COLORS[p.position] || "#9B4F96", sound: flashSound });
+    // อิสึกะ ชิโด "ฝากด้วยนะตัวฉัน": สกิลเงียบ — ห้ามมีแบนเนอร์ให้ใครเห็นว่าเขากดอะไรไป
+    if (!CHAR_HOOKS.shido.silentSkill(p, tier)) {
+      io.emit("skillFlash", { name: skill.name + flashSuffix, img: flashImg, by: p.name, color: POSITION_COLORS[p.position] || "#9B4F96", sound: flashSound });
+    }
   }
   // จำสกิลที่ใช้ในรอบ (ท่าไม้ตายมี cutscene ของตัวเอง / สกิลหลังเปิดไพ่ไปโชว์ตอนโจมตี)
   // คอนเนอร์ RK800 (สกิลติดตัว 1 สืบสวน): การกดสกิล 1 ครั้ง = ความเครียด +1 (ไม่ลงที่ตัวคอนเนอร์เอง)
   CHAR_HOOKS.conner.onSkillUsed(engine, p);
-  roundSkills.push({ playerId: id, tier, name: skill.name, img: skill.img || null, status: st }); // tier: หลักสูตร "พิเศษ" ของไบเลธอ่านว่าใครกดสกิลระดับไหนในเทิร์นนี้
+  //  สกิลเงียบของชิโดไม่เข้า roundSkills ด้วย — รายการนี้ถูกอ่านโดยหลักสูตร "พิเศษ" ของไบเลธ
+  //  ซึ่งจะลงโทษ "คนที่กดสกิลในเทิร์นนี้" = เป็นเบาะแสว่าชิโดกดอะไรไป
+  if (!CHAR_HOOKS.shido.silentSkill(p, tier)) roundSkills.push({ playerId: id, tier, name: skill.name, img: skill.img || null, status: st }); // tier: หลักสูตร "พิเศษ" ของไบเลธอ่านว่าใครกดสกิลระดับไหนในเทิร์นนี้
 
   p.busted = bustedOf(p);
   if (p.busted) { voidUltimateOnBust(p); maybeMoonBurst(p); CHAR_HOOKS.mageslayer.onBustOrLoseRoll(engine, p); }
@@ -5756,6 +5785,8 @@ function doAttack(byId, targetId) {
   CHAR_HOOKS.kotone.onAttackConsumeLove(engine, attacker);
   // เอจิ (characters/eiji.js): Smile for You ลงตัวเอง -> ฟื้นเลือด · Delete ลงเป้าหมาย -> มอบ "ผุพัง"
   CHAR_HOOKS.eiji.onAttackLanded(engine, attacker, target);
+  // อิสึกะ ชิโด (characters/shido.js): ภูติ — การโจมตีปกติดูดพลังชีวิตกลับมา 1 หน่วย
+  const shidoLifesteal = CHAR_HOOKS.shido.onAttackLanded(engine, attacker);
   // ฮารุกะ (characters/haruka.js): โอเมก้า — การโจมตีปกติแปะ "เลือดไหล" ให้เป้าหมาย 2 หน่วย
   const harukaBleedApplied = CHAR_HOOKS.haruka.onAttackLanded(engine, attacker, target);
   // อาจารย์ ไบเลธ (characters/byleth.js): ดาบต้องสาปใช้ได้ครั้งเดียว -> สลายหลังหมัดนี้ · และถ้าเป้าหมายคือไบเลธที่แต้มน้อยสุด เตรียมโจมตีตอบ
@@ -6046,6 +6077,7 @@ function doAttack(byId, targetId) {
   if (batReflectDmg > 0) addFx({ name: `เข้ามาเลย — ความเสียหายเกิดกับผู้โจมตีด้วย -${batReflectDmg}`, img: BAT_SKILL3_IMG, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   // ---------- มิซึซาว่า ฮารุกะ (characters/haruka.js) ----------
   if (harukaPunishFx.punishStacks > 0) addFx({ name: `จงไปสู่สุขติ — ระเบิดเลือดไหล +${harukaPunishFx.punishStacks}`, img: CHAR_HOOKS.haruka.IMG.skill2, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
+  if (shidoLifesteal > 0) addFx({ name: `ภูติ — ดูดพลังชีวิต +${shidoLifesteal}`, img: CHAR_HOOKS.shido.IMG.skill1, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
   if (danCounterFx) addFx({ name: `นายทำให้ฉันผิดหวัง — สวนกลับศิษย์ -${danCounterFx.dmg}`, img: CHAR_HOOKS.dan.IMG.skill2, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (connerCounterFired) addFx({ name: "การป้องกันตัว — สวนกลับผู้โจมตีทั้งสองคน", img: CHAR_HOOKS.conner.IMG.base, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (bylethSwordUsed > 0) addFx({ name: `ดาบต้องสาป +${bylethSwordUsed}`, img: CHAR_HOOKS.byleth.IMG.skill2, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
@@ -6450,6 +6482,10 @@ function endTurn() {
     runCutsceneQueue(finishYuukiVictory);
     return;
   }
+  // อิสึกะ ชิโด (characters/shido.js): นับถอยหลังกับดัก "ฝากด้วยนะตัวฉัน" (ไม่ได้อยู่ใน p.statuses
+  //  จึงไม่เข้าลูปลดเทิร์นด้านบน) แล้วคิว shido_skill3.mp4 เป็นรอยต่อก่อนขึ้นเทิร์นถัดไปถ้ากับดักเพิ่งทำงาน
+  for (const p of Object.values(players)) CHAR_HOOKS.shido.onEndTurn(engine, p);
+  CHAR_HOOKS.shido.flushDeathVideo(engine);
   // เล่นฉากระเบิด/ยูนะ/ชัยชนะยูกิ (ถ้ามี) ให้จบก่อน แล้วค่อยสรุปจบเกม/ขึ้นรอบถัดไป
   runCutsceneQueue(() => {
     const stillAlive = alivePlayers();
@@ -6467,8 +6503,12 @@ function endTurn() {
     // สกิลติดตัว 2 ริดดี้ (characters/riddhe.js): เหลือแค่คู่พันธมิตรบันชี × ยูนิคอร์นบนสนาม -> ถามจะคงพันธมิตรจนจบเกมไหม
     CHAR_HOOKS.riddhe.maybeAskFinalAlliance(engine, stillAlive);
 
+    // อิสึกะ ชิโด: กำลังรอเกิดใหม่จาก "ฝากด้วยนะตัวฉัน" -> เกมยังจบไม่ได้ ต้องรอเขากลับมาก่อน
+    //  (ต่างจากคอนเนอร์ RK800 ที่เกมจบก่อนครบกำหนดแล้วอดฟื้น — สเปคของชิโดระบุให้ฟื้นทันทีในกรณีนี้)
+    const shidoPending = CHAR_HOOKS.shido.blocksGameOver(engine);
+
     const teamWin = remainingTeamWinInfo(stillAlive, total);
-    if (teamWin.over) {
+    if (!shidoPending && teamWin.over) {
       winningTeamId = teamWin.teamId;
       if (winningTeamId) {
         const winners = stillAlive.filter((p) => p.teamId === winningTeamId).map((p) => p.name).join(" & ");
@@ -6479,7 +6519,7 @@ function endTurn() {
       gameState = "GAMEOVER";
       timeLeft = 0;
       broadcastState();
-    } else if (!teamModeActive() && total >= 2 && stillAlive.length <= 1) {
+    } else if (!shidoPending && !teamModeActive() && total >= 2 && stillAlive.length <= 1) {
       winningTeamId = null;
       if (stillAlive.length === 1) lastLog.push(`🏆 ${stillAlive[0].name} คือผู้ชนะคนสุดท้าย!`);
       else lastLog.push("ไม่มีผู้รอด — เสมอ");

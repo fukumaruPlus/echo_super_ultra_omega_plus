@@ -43,6 +43,7 @@ const haruka = require("./haruka");
 const byleth = require("./byleth");
 const conner = require("./conner");
 const dan = require("./dan");
+const shido = require("./shido");
 
 const CHARACTER_MODULES = [
   tohno,
@@ -84,6 +85,7 @@ const CHARACTER_MODULES = [
   byleth,
   conner,
   dan,
+  shido,
 ];
 
 const CHAR_HOOKS = {};
