@@ -1279,6 +1279,9 @@ function statusEntries(p, full) {
   if ((p.shidoGuard || 0) > 0) {
     out.push({ key: "shidoGuardCd", v: p.shidoGuard, icon: "🕰️", label: `ฝากด้วยนะตัวฉัน ${p.shidoGuard} เทิร์น`, cls: "bg-echo-cyan text-gray-900", desc: "ฝากด้วยนะตัวฉัน: กับดักเปิดอยู่ — คุณเห็นตัวนับนี้อยู่คนเดียว ผู้เล่นคนอื่นไม่รู้เลยว่าคุณกดท่าไม้ตายไปแล้ว (พวกเขายังเห็นแต้มสกิลของคุณเต็มหลอด) · ถ้าตกรอบระหว่างนี้ เวลาทั้งสนามจะย้อนกลับไป 5 เทิร์นก่อนหน้า ทุกอย่างกลับเป็นเหมือนเดิม รวมทั้งคนที่ตกรอบไปแล้ว" });
   }
+  if ((p.shidoCd || 0) > 0) {
+    out.push({ key: "shidoRewindCd", v: p.shidoCd, icon: "⏳", label: `กดท่าไม้ตายได้อีกใน ${p.shidoCd} เทิร์น`, cls: "bg-white/20", desc: "เพิ่งย้อนเวลาไป — กดท่าไม้ตายซ้ำไม่ได้จนกว่าจะเดินหน้าครบ 5 เทิร์น (ตัวเลขนี้ขึ้นทับบนการ์ดสกิลด้วย) · คุณเห็นอยู่คนเดียว" });
+  }
   if (p.character?.id === "hakuno") out.push({ key: "hakunoMoon", v: 1, icon: "🌙", label: `คำสาปแห่งดวงจันทร์ ${p.hakunoMoonPoints || 0}/3`, cls: "bg-echo-magenta", desc: "แต้มคำสาปแห่งดวงจันทร์: สะสมจากข้าขอบัญชา (ทั้งสองร่าง) ครั้งละ +1 — ครบ 3 หน่วยเปิดใช้ท่าไม้ตาย MOON*CELL ได้ (ใช้หมดตอนกด)" });
   if ((p.phenexPain || 0) > 0) out.push({ key: "phenexPain", v: p.phenexPain, icon: "💔", label: "ความเจ็บปวด", cls: "bg-echo-hp", desc: "ความเจ็บปวดสะสม (ไม่อยากให้ใครต้องเจ็บปวด) — ปลดปล่อยเป็นความเสียหายใส่เป้าหมายที่เลือกตอนตกรอบจริง (ไม่สนการหลบหลีก)" });
   // Bard: ท่อนทำนองสะสม + โน้ตในช่องประพันธ์เพลง (ทุกคนเห็นได้)
@@ -2954,6 +2957,12 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
   const useEijiOrdinal = () => { socket.emit("eijiOrdinalScale"); };
   // ---------- มิซึซาว่า ฮารุกะ (patch 2.5 new) ----------
   const isHaruka = ch?.id === "haruka";
+  // อิสึกะ ชิโด: ตัวเลขที่โชว์ทับบนการ์ดท่าไม้ตาย (เจ้าของเห็นคนเดียว — server ส่งสองค่านี้ให้เฉพาะ mine)
+  //  กับดักเปิดอยู่ = นับถอยหลังของกับดัก · เพิ่งย้อนเวลาไป = นับถอยหลังคูลดาวน์ห้ามกดซ้ำ
+  //  ทั้งสองกรณีปุ่มถูกล็อกอยู่แล้ว ตัวเลขจึงอธิบายให้ว่า "ทำไมกดไม่ได้" และ "อีกกี่เทิร์นถึงกดได้"
+  const isShido = ch?.id === "shido";
+  const shidoUltCd = isShido ? ((me?.shidoGuard || 0) > 0 ? me.shidoGuard : (me?.shidoCd || 0)) : 0;
+  const shidoUltLocked = isShido && shidoUltCd > 0;
   //  ไข่ต้ม และอาหารเสริม: ไม่นับเป็นการใช้สกิลของเทิร์น — กดได้ 2 ครั้ง/เทิร์น แล้วยังใช้สกิลอื่นได้อีก 1 ครั้ง
   const harukaBasicLocked = isHaruka && (me?.harukaBasicUses || 0) >= (me?.harukaBasicMax || 2);
   //  amazon punish: ต้องมี "โอเมก้า" อยู่ และ "จงไปสู่สุขติ" ต้องไม่ค้างอยู่
@@ -3769,7 +3778,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
                   <SkillSlot label="สกิลรอง" tier="secondary" skill={ch?.secondary} points={me.skillPoints} disabled={done || phase !== "PLAYING" || noSkill || moonCellOn || miyakoComboPending || hakunoSecondaryPending || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || (me.skillUsed && !isByleth && !isBard && !isDoomguy && !isKai && !isTakumi) || bylethSecLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || ohgerLocked || lanLocked || ktSecLocked || skSecLocked || banagherAssaultLocked || doomNoEffectLocked || takutoSecPending || takutoNotApprivoiseLocked || monsterMe || tepeuPonderLocked || tepeuCookLocked || batKarmaLocked || psSealLocked || harukaSecLocked || burdenCooldown} onUse={requestSkillUse} cooldown={burdenCd} ammo={isApple ? me.appleGiveUses : me.beamAmmo} cost={isGambler && goldenOn ? halfCost(ch?.secondary) : undefined} />
                 </div>
                 <div className="translate-y-1.5">
-                  {isBard ? <BardComposeSlot me={me} /> : isKai ? <KaiOverhaulSlot me={me} /> : <SkillSlot label="ท่าไม้ตาย" tier="ultimate" skill={ch?.ultimate} points={me.skillPoints} disabled={(done || phase !== "PLAYING" || noSkill || moonCellOn || beatMe || (me.skillUsed && !isByleth) || bylethUltLocked || bylethBudgetLocked || ultimateActive || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || takumiBudgetLocked || fourthLocked || doomUltLocked || takutoUltLockedNow || tepeuCookLocked || tepeuPonderLocked || offerLocked || ktUltLocked || shUltLocked || shCharging || rgCharging || phenexTaunting || hikaruUltLocked)} onUse={requestSkillUse} cost={undefined} />}
+                  {isBard ? <BardComposeSlot me={me} /> : isKai ? <KaiOverhaulSlot me={me} /> : <SkillSlot label="ท่าไม้ตาย" tier="ultimate" skill={ch?.ultimate} points={me.skillPoints} disabled={(done || phase !== "PLAYING" || noSkill || moonCellOn || beatMe || (me.skillUsed && !isByleth) || bylethUltLocked || bylethBudgetLocked || ultimateActive || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || takumiBudgetLocked || fourthLocked || doomUltLocked || takutoUltLockedNow || tepeuCookLocked || tepeuPonderLocked || offerLocked || ktUltLocked || shUltLocked || shCharging || rgCharging || phenexTaunting || hikaruUltLocked || shidoUltLocked)} onUse={requestSkillUse} cooldown={shidoUltCd} cost={undefined} />}
                 </div>
               </div>
               {noSkill && phase === "PLAYING" && !done && (
@@ -4334,7 +4343,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
                     <SkillSlot size="lg" label="รอง" tier="secondary" skill={ch?.secondary} points={me.skillPoints} disabled={done || phase !== "PLAYING" || noSkill || moonCellOn || miyakoComboPending || hakunoSecondaryPending || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || (me.skillUsed && !isByleth && !isBard && !isDoomguy && !isKai && !isTakumi) || bylethSecLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || ohgerLocked || lanLocked || ktSecLocked || skSecLocked || banagherAssaultLocked || doomNoEffectLocked || takutoSecPending || takutoNotApprivoiseLocked || monsterMe || tepeuPonderLocked || tepeuCookLocked || batKarmaLocked || psSealLocked || harukaSecLocked || burdenCooldown} onUse={requestSkillUse} cooldown={burdenCd} ammo={isApple ? me.appleGiveUses : me.beamAmmo} cost={isGambler && goldenOn ? halfCost(ch?.secondary) : undefined} />
                   </div>
                   <div className="w-40 sm:w-48">
-                    {isBard ? <BardComposeSlot me={me} /> : isKai ? <KaiOverhaulSlot me={me} /> : <SkillSlot size="lg" label="ท่าไม้ตาย" tier="ultimate" skill={ch?.ultimate} points={me.skillPoints} disabled={(done || phase !== "PLAYING" || noSkill || moonCellOn || beatMe || (me.skillUsed && !isByleth) || bylethUltLocked || bylethBudgetLocked || ultimateActive || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || takumiBudgetLocked || monsterMe || fourthLocked || doomUltLocked || takutoUltLockedNow || tepeuCookLocked || tepeuPonderLocked || offerLocked || ktUltLocked || shUltLocked || shCharging || rgCharging || phenexTaunting)} onUse={requestSkillUse} cost={undefined} />}
+                    {isBard ? <BardComposeSlot me={me} /> : isKai ? <KaiOverhaulSlot me={me} /> : <SkillSlot size="lg" label="ท่าไม้ตาย" tier="ultimate" skill={ch?.ultimate} points={me.skillPoints} disabled={(done || phase !== "PLAYING" || noSkill || moonCellOn || beatMe || (me.skillUsed && !isByleth) || bylethUltLocked || bylethBudgetLocked || ultimateActive || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || takumiBudgetLocked || monsterMe || fourthLocked || doomUltLocked || takutoUltLockedNow || tepeuCookLocked || tepeuPonderLocked || offerLocked || ktUltLocked || shUltLocked || shCharging || rgCharging || phenexTaunting || shidoUltLocked)} onUse={requestSkillUse} cooldown={shidoUltCd} cost={undefined} />}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

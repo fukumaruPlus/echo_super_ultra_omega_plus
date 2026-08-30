@@ -2640,6 +2640,10 @@ function buildStateFor(viewerId) {
         shidoGuard: mine && p.characterId === "shido" ? (p.shidoGuardTurns || 0) : undefined,
         // ความเสียหายล่าสุดที่ "ขอพลังให้ฉันด้วย" บันทึกไว้ (UI ป้ายเล็กบนแผงตัวเอง)
         shidoRecorded: mine && p.characterId === "shido" ? (p.shidoRecorded || 0) : undefined,
+        // คูลดาวน์ห้ามกดท่าไม้ตายหลังย้อนเวลา (เทิร์นที่เหลือ) — ส่งให้เจ้าของคนเดียวเช่นกัน
+        //  ใช้โชว์เป็นตัวเลขทับบนการ์ดสกิล คู่กับ shidoGuard (ตัวนับกับดักที่กำลังเปิดอยู่)
+        shidoCd: mine && p.characterId === "shido"
+          ? Math.max(0, (p.shidoRewindLock || 0) - roundNumber) : undefined,
         maxSkill: maxSkillOf(p), // Bard: เพดานพลังงาน 9
         beamAmmo: p.beamAmmo,
         puddingCount: p.puddingCount || 0,
