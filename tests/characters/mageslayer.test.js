@@ -1,10 +1,11 @@
 // Direct unit tests for characters/mageslayer.js (ผู้สังหารเมจ / Mage Slayer 25/8/69 rework) —
 // Song's Curse (addSkill gate + damage bonus + Fury), Witch Mark energy-steal math / over-steal weaken /
-// every-2-turn tick / mark move, ดูดซับเวท (manaLeech) 35% drain, Mana Rupture damage+seal tiers,
+// every-2-turn tick / mark move, ดูดซับเวท (manaLeech) 35%/60% drain, Mana Rupture damage+seal tiers,
 // and Mana Burden hitting everyone EXCEPT the caster.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { engine } = require('../../server.js');
+const { engine, computeAttackBase } = require('../../server.js');
+const { NO_TICK_STATUS } = require('../../characters/_universal_status.js');
 const mageslayer = require('../../characters/mageslayer.js');
 
 test.beforeEach(() => {
@@ -63,37 +64,65 @@ test('onBustOrLoseRoll: 35% roll grants 1 Fury stack, capped at 3 stages', () =>
   assert.equal(other.statuses.mageslayerFury || 0, 0, 'no-op for non-mageslayer');
 });
 
-test('onBustOrLoseRoll: at 3 Fury stacks the effect switches to granting โชคลาภ +1 instead', () => {
-  const ms = mkPlayer({ statuses: { mageslayerFury: 3 } });
+test('onBustOrLoseRoll: at 3 Fury stacks the effect switches to granting a ยาโชคลาภ item instead', () => {
+  const ms = mkPlayer({ statuses: { mageslayerFury: 3 }, inventory: [] });
   withRandom(0, () => mageslayer.onBustOrLoseRoll(engine, ms));
   assert.equal(ms.statuses.mageslayerFury, 3, 'Fury stays capped');
-  assert.equal(ms.statuses.fortune, 1, 'gains fortune instead');
+  assert.equal(ms.statuses.fortune || 0, 0, 'no longer the โชคลาภ status');
+  assert.equal(ms.inventory.length, 1, 'one item lands in the inventory');
+  assert.equal(ms.inventory[0].type, 'fortune', 'น้ำยาบัฟโชคลาภ');
+  withRandom(0, () => mageslayer.onBustOrLoseRoll(engine, ms));
+  assert.equal(ms.inventory.length, 2, 'stacks up — one item per successful roll');
 });
 
 test('onBustOrLoseRoll: a failed 35% roll grants nothing at all', () => {
-  const ms = mkPlayer();
+  const ms = mkPlayer({ inventory: [] });
   withRandom(0.9, () => mageslayer.onBustOrLoseRoll(engine, ms));
   assert.equal(ms.statuses.mageslayerFury || 0, 0);
-  assert.equal(ms.statuses.fortune || 0, 0);
+  assert.equal(ms.inventory.length, 0);
 });
 
-test('onAttackPostDamage: Fury is spent all at once — heals by the stage and applies ดูดซับเวท for 1/3/5 turns', () => {
-  for (const [stage, turns] of [[1, 1], [2, 3], [3, 5]]) {
+test('onAttackPostDamage: Fury is spent all at once — lifesteal 2/3/3 and ดูดซับเวท for 2/4/5 turns', () => {
+  for (const [stage, heal, turns] of [[1, 2, 2], [2, 3, 4], [3, 3, 5]]) {
     const ms = mkPlayer({ hp: 1, statuses: { mageslayerFury: stage } });
     const target = mkPlayer({ characterId: 'tohno', skillPoints: 10 });
     mageslayer.onAttackPostDamage(engine, ms, target, 2);
-    assert.equal(ms.hp, 1 + stage, `stage ${stage} lifesteal heals ${stage}`);
+    assert.equal(ms.hp, 1 + heal, `stage ${stage} lifesteal heals ${heal}`);
     assert.equal(ms.statuses.mageslayerFury || 0, 0, 'stack fully cleared, not decremented by 1');
     assert.equal(target.statuses.manaLeech, turns, `stage ${stage} grants ${turns} turns of ดูดซับเวท`);
   }
 });
 
-test('onAttackPostDamage: with no Fury stacks nothing happens (no heal, no ดูดซับเวท)', () => {
+test('onAttackPostDamage: only Fury stage 3 also grants เสริมพลัง +1 (empower) to the mageslayer', () => {
+  for (const stage of [1, 2]) {
+    const ms = mkPlayer({ hp: 1, statuses: { mageslayerFury: stage } });
+    mageslayer.onAttackPostDamage(engine, ms, mkPlayer({ characterId: 'tohno' }), 2);
+    assert.equal(ms.statuses.empower || 0, 0, `stage ${stage} grants no เสริมพลัง`);
+  }
+  const ms3 = mkPlayer({ hp: 1, statuses: { mageslayerFury: 3 } });
+  mageslayer.onAttackPostDamage(engine, ms3, mkPlayer({ characterId: 'tohno' }), 2);
+  assert.equal(ms3.statuses.empower, 1, 'empower: +1 damage on the next attack');
+});
+
+test('the Fury stage-3 เสริมพลัง runs on empower — +1 damage, no turn decay, spent on attack', () => {
+  const ms = mkPlayer({ hp: 1, statuses: { mageslayerFury: 3 } });
+  const target = mkPlayer({ characterId: 'nanaya', skillPoints: 0 });
+  mageslayer.onAttackPostDamage(engine, ms, target, 2);
+  // ไม่อยู่ในตารางลดเทิร์น — คงอยู่ข้ามเทิร์นจนกว่าจะได้โจมตี (doAttack ลบให้เองที่ server.js)
+  assert.ok(NO_TICK_STATUS.has('empower'), 'empower ไม่ลดเทิร์นเอง');
+  const withBuff = computeAttackBase(engine, ms, target).base;
+  delete ms.statuses.empower;
+  const withoutBuff = computeAttackBase(engine, ms, target).base;
+  assert.equal(withBuff - withoutBuff, 1, 'บัฟให้ดาเมจ +1 ตอนที่ยังติดอยู่');
+});
+
+test('onAttackPostDamage: with no Fury stacks nothing happens (no heal, no ดูดซับเวท, no เสริมพลัง)', () => {
   const ms = mkPlayer({ hp: 3 });
   const target = mkPlayer({ characterId: 'tohno' });
   mageslayer.onAttackPostDamage(engine, ms, target, 4);
   assert.equal(ms.hp, 3);
   assert.equal(target.statuses.manaLeech || 0, 0);
+  assert.equal(ms.statuses.empower || 0, 0);
 });
 
 // ---------- ตราล่าเวท (Witch Mark) ----------
@@ -222,6 +251,31 @@ test('onEnergyAction: a manaLeech target has a 35% chance to be drained 1 energy
   withRandom(0, () => mageslayer.onEnergyAction(engine, t));
   assert.equal(t.skillPoints, 2);
   assert.equal(ms.skillPoints, 1);
+});
+
+test('leechChanceFor / onEnergyAction: a ตราล่าเวท target is drained at 60% instead of 35%', () => {
+  assert.equal(mageslayer.leechChanceFor({ statuses: { manaLeech: 5 } }), 0.35, 'plain ดูดซับเวท stays at 35%');
+  assert.equal(mageslayer.leechChanceFor({ statuses: { manaLeech: 5, mageslayerMark: 999 } }), 0.6, 'marked target rolls at 60%');
+
+  // roll 0.5: misses the 35% window, lands inside the 60% one
+  const msA = mkPlayer({ skillPoints: 0 });
+  const unmarked = mkPlayer({ characterId: 'tohno', skillPoints: 3, statuses: { manaLeech: 5 } });
+  withRandom(0.5, () => mageslayer.onEnergyAction(engine, unmarked));
+  assert.equal(unmarked.skillPoints, 3, '0.5 fails the base 35% roll');
+  assert.equal(msA.skillPoints, 0);
+
+  const marked = mkPlayer({ characterId: 'riddhe', skillPoints: 3, statuses: { manaLeech: 5, mageslayerMark: 999 } });
+  withRandom(0.5, () => mageslayer.onEnergyAction(engine, marked));
+  assert.equal(marked.skillPoints, 2, '0.5 passes the boosted 60% roll');
+  assert.equal(msA.skillPoints, 1);
+});
+
+test('onEnergyAction: ตราล่าเวท alone (no ดูดซับเวท) still drains nothing', () => {
+  const ms = mkPlayer({ skillPoints: 0 });
+  const markedOnly = mkPlayer({ characterId: 'tohno', skillPoints: 3, statuses: { mageslayerMark: 999 } });
+  withRandom(0, () => mageslayer.onEnergyAction(engine, markedOnly));
+  assert.equal(markedOnly.skillPoints, 3);
+  assert.equal(ms.skillPoints, 0);
 });
 
 test('onEnergyAction: no manaLeech status = no drain, and a failed roll drains nothing', () => {

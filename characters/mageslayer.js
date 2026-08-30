@@ -12,12 +12,16 @@
 //   - mageslayerMark (ตราล่าเวท): ดาเมจทุกประเภทจากผู้สังหารเมจใส่เป้าหมายนี้ = ขโมยพลังงานเท่าดาเมจ (min 1 / max 5)
 //     + ทุก 2 เทิร์นขโมยอัตโนมัติ 1 หน่วย — ถาวรจนกว่าจะย้ายมาร์ก/ถูกต้านสถานะผิดปกติล้าง
 //   - manaLeech (ดูดซับเวท): เป้าหมายกดสกิล/ฟื้นพลังงาน (ไอเทม/พาสซีฟ/การ์ดรังสรร) → 35% ถูกขโมย 1 หน่วย
+//     (ถ้าเป้าหมายติด mageslayerMark อยู่ด้วย โอกาสเพิ่มเป็น 60%)
 // ============================================================
 
 const MS_FURY_MAX = 3;             // Fury: สะสมสูงสุด 3 ขั้น
 const MS_FURY_CHANCE = 0.35;       // Fury: โอกาสสะสมเมื่อแตก/แต้มต่ำสุด
-const MS_FURY_LEECH_TURNS = [0, 1, 3, 5]; // index = ขั้น Fury → จำนวนเทิร์นของ [ดูดซับเวท] ที่มอบให้เป้าหมาย
+const MS_FURY_HEAL = [0, 2, 3, 3];        // index = ขั้น Fury → "สูบพลังชีวิต" (ฟื้นเลือด) ที่ได้รับ (buff)
+const MS_FURY_LEECH_TURNS = [0, 2, 4, 5]; // index = ขั้น Fury → จำนวนเทิร์นของ [ดูดซับเวท] ที่มอบให้เป้าหมาย (buff)
+const MS_FURY_EMPOWER_TIER = 3;    // Fury ขั้นนี้ขึ้นไปได้ [เสริมพลัง] (empower) เพิ่มด้วย
 const MS_LEECH_CHANCE = 0.35;      // ดูดซับเวท: โอกาสขโมยพลังงานเมื่อเป้าหมายกดสกิล/ฟื้นพลังงาน
+const MS_LEECH_CHANCE_MARKED = 0.6; // ดูดซับเวท: โอกาสเพิ่มเป็น 60% ถ้าเป้าหมายติด [ตราล่าเวท] ด้วย
 const MS_MARK_STEAL_MIN = 1;       // ตราล่าเวท: ขโมยพลังงานอย่างน้อย 1 หน่วย
 const MS_MARK_STEAL_MAX = 5;       // ตราล่าเวท: ขโมยพลังงานอย่างมาก 5 หน่วย
 const MS_MARK_TICK_TURNS = 2;      // ตราล่าเวท: ทุก 2 เทิร์นขโมยพลังงานเป้าหมาย 1 หน่วย
@@ -31,6 +35,10 @@ module.exports = {
   id: "mageslayer",
 
   MS_FURY_MAX,
+  MS_FURY_HEAL,
+  MS_FURY_LEECH_TURNS,
+  MS_LEECH_CHANCE,
+  MS_LEECH_CHANCE_MARKED,
   MS_MARK_TICK_TURNS,
   MS_BURDEN_COOLDOWN,
 
@@ -153,27 +161,43 @@ module.exports = {
   // ---------- ดูดซับเวท (manaLeech) ----------
   // เรียกจาก useSkill() (กดสกิลสำเร็จ) และ addSkill() ที่ระบุแหล่งที่มา (ไอเทม/พาสซีฟ/การ์ดรังสรร)
   //  เป้าหมายที่ติด [ดูดซับเวท] มีโอกาส 35% ถูกขโมยพลังงาน 1 หน่วยให้ผู้สังหารเมจ
+  //  (buff) ถ้าเป้าหมายติด [ตราล่าเวท] อยู่ด้วย โอกาสเพิ่มเป็น 60%
+  leechChanceFor(target) {
+    return (((target && target.statuses && target.statuses.mageslayerMark) || 0) > 0)
+      ? MS_LEECH_CHANCE_MARKED
+      : MS_LEECH_CHANCE;
+  },
+
   onEnergyAction(engine, p) {
     if (!p || !p.alive || !(((p.statuses && p.statuses.manaLeech) || 0) > 0)) return;
+    const chance = this.leechChanceFor(p);
     for (const ms of engine.alivePlayers()) {
       if (ms.characterId !== "mageslayer" || ms.id === p.id) continue;
-      if (Math.random() >= MS_LEECH_CHANCE) continue;
+      if (Math.random() >= chance) continue;
       const stolen = this.stealEnergy(engine, ms, p, 1);
-      if (stolen > 0) engine.log(`🩸 ${ms.name} ดูดซับเวท (35%) — ${p.name} ถูกขโมยพลังงาน ${stolen} หน่วย`);
+      if (stolen > 0) engine.log(`🩸 ${ms.name} ดูดซับเวท (${Math.round(chance * 100)}%) — ${p.name} ถูกขโมยพลังงาน ${stolen} หน่วย`);
     }
   },
 
   // ---------- Fury ----------
   // เรียกจาก doAttack() หลังคำนวณดาเมจ — Fury ใช้หมดพร้อมกันในการโจมตีปกติครั้งเดียว
-  //  สูบพลังชีวิต +N = ฟื้นเลือด +N และมอบ [ดูดซับเวท] ตามขั้น — **ไม่บวกดาเมจแล้ว** (nerf)
+  //  (buff) สูบพลังชีวิตตามตาราง MS_FURY_HEAL (ขั้น 1/2/3 = +2/+3/+3) และมอบ [ดูดซับเวท]
+  //  ตาม MS_FURY_LEECH_TURNS (2/4/5 เทิร์น) — ขั้น 3 ได้ [เสริมพลัง] +1 เพิ่มด้วย
+  //  **ไม่บวกดาเมจของการโจมตีครั้งนี้** (nerf เดิม) — เสริมพลังไปมีผลกับการโจมตีครั้งถัดไป
+  //  ใช้สถานะ `empower` (ไม่ใช่ `might`): ไม่ลดเทิร์น คงอยู่จนกว่าจะได้โจมตี แล้วหมดไปทันที
   onAttackPostDamage(engine, attacker, target, dmg) {
     if (attacker.characterId !== "mageslayer") return;
     const fury = Math.min(MS_FURY_MAX, attacker.statuses.mageslayerFury || 0);
     if (fury <= 0) return;
-    const heal = engine.healHp(attacker, fury);
+    const drain = MS_FURY_HEAL[fury] || 0;
+    const heal = engine.healHp(attacker, drain);
     delete attacker.statuses.mageslayerFury;
     if (attacker.statusAmt) delete attacker.statusAmt.mageslayerFury;
-    engine.log(`😤 ${attacker.name} Fury ขั้น ${fury} — สูบพลังชีวิต +${fury} (ฟื้นเลือด +${heal}) แล้วเคลียร์สต็อก`);
+    engine.log(`😤 ${attacker.name} Fury ขั้น ${fury} — สูบพลังชีวิต +${drain} (ฟื้นเลือด +${heal}) แล้วเคลียร์สต็อก`);
+    if (fury >= MS_FURY_EMPOWER_TIER) {
+      attacker.statuses.empower = 1; // ไม่ซ้อนทับ — หมดไปทันทีเมื่อได้โจมตีครั้งถัดไป
+      engine.log(`💪 ${attacker.name} Fury ขั้น ${fury} — ได้รับ [เสริมพลัง] +1 (การโจมตีครั้งถัดไป แล้วหมดไป)`);
+    }
     const turns = MS_FURY_LEECH_TURNS[fury] || 0;
     if (turns > 0 && target && target.alive) {
       if (engine.applyDebuff(target, "manaLeech", null, turns)) {
@@ -185,13 +209,14 @@ module.exports = {
   },
 
   // เรียกจาก server.js's bust/แต้มต่ำสุด trigger
-  //  ปกติ: 35% สะสม Fury +1 (สูงสุด 3 ขั้น) — ถ้า Fury เต็ม 3 ขั้นแล้ว เอฟเฟกต์เปลี่ยนเป็น 35% ได้ [โชคลาภ] +1
+  //  ปกติ: 35% สะสม Fury +1 (สูงสุด 3 ขั้น) — ถ้า Fury เต็ม 3 ขั้นแล้ว เอฟเฟกต์เปลี่ยนเป็น
+  //  35% ได้ไอเทม "ยาโชคลาภ" +1 ชิ้นเข้าคลังแทน (buff: เดิมได้ [โชคลาภ] +1 เป็นสถานะ)
   onBustOrLoseRoll(engine, p) {
     if (p.characterId !== "mageslayer") return;
     if (Math.random() >= MS_FURY_CHANCE) return;
     if ((p.statuses.mageslayerFury || 0) >= MS_FURY_MAX) {
-      p.statuses.fortune = Math.min(engine.BARD_FORTUNE_MAX, (p.statuses.fortune || 0) + 1);
-      engine.log(`🍀 ${p.name} Fury เต็ม ${MS_FURY_MAX} ขั้น — ได้รับ [โชคลาภ] +1 (${p.statuses.fortune}/${engine.BARD_FORTUNE_MAX}) แทน`);
+      engine.grantInventoryItem(p, { type: "fortune" });
+      engine.log(`🍀 ${p.name} Fury เต็ม ${MS_FURY_MAX} ขั้น — ได้รับไอเทม [น้ำยาบัฟโชคลาภ] +1 ชิ้นเข้าคลังแทน`);
       return;
     }
     p.statuses.mageslayerFury = Math.min(MS_FURY_MAX, (p.statuses.mageslayerFury || 0) + 1);

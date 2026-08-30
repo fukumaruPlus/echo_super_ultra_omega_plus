@@ -1,4 +1,4 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 const { engine } = require('../server.js');
 
@@ -76,8 +76,8 @@ test('reviving a twin does not consume the regular once-per-turn skill action', 
   p.skillPoints = 4;
   engine.setGameState('PLAYING');
   engine.useSkill(p.id, 'secondary');
-  assert.equal(p.skillUsedRound, false); // สกิลรองคืนสิทธิ์ใช้สกิลอีก 1 ครั้ง
   assert.equal(p.skillPoints, 0);
+  assert.equal(p.skillUsedRound, true); // โบนัสของเทิร์นนี้ถูกใช้ไปกับการชุบแล้ว
 });
 
 test('Hisakawa skill costs use the rebalanced values', () => {
@@ -210,7 +210,7 @@ test('ปกสกิลสลับตัวโชว์ภาพแฝดอ�
   assert.equal(h.dynamicSkillFor(p, ch, 'basic').img, h.PATHS.switchToNagi);
 });
 
-test('Miracle Live / Miracle Dance กินโควตาสกิลของเทิร์นตามปกติ', () => {
+test('Miracle Live คืนสิทธิ์ใช้สกิลอีก 1 ครั้งเหมือนสกิลอื่นของแฝด', () => {
   const p = mkHisakawa();
   engine.setGameState('PLAYING');
   p.skillPoints = 8;
@@ -218,11 +218,12 @@ test('Miracle Live / Miracle Dance กินโควตาสกิลของ
   engine.useSkill(p.id, 'ultimate'); // Miracle Live (นากิ) 4 แต้ม
   assert.equal(p.statuses.hisakawaStage, 5);
   assert.equal(p.skillPoints, 4);
-  assert.equal(p.skillUsedRound, true); // ไม่ให้สิทธิ์เพิ่มอีกแล้ว
+  assert.equal(p.skillUsedRound, false); // ทุกสกิลของแฝดคืนสิทธิ์ให้อีก 1 ครั้ง
 
-  engine.useSkill(p.id, 'secondary'); // กดต่อไม่ได้
-  assert.equal(p.statuses.hisakawaLimit, undefined);
-  assert.equal(p.skillPoints, 4);
+  engine.useSkill(p.id, 'secondary'); // กดต่อได้ด้วยสิทธิ์ที่ได้คืนมา
+  assert.equal(p.statuses.hisakawaLimit, 3);
+  assert.equal(p.skillPoints, 0);
+  assert.equal(p.skillUsedRound, true); // โบนัสมีได้ครั้งเดียวต่อเทิร์น
 });
 
 test('สกิลรองทั้งสอง: กดแล้วยังใช้สกิลได้อีก 1 ครั้ง', () => {
@@ -245,9 +246,11 @@ test('สลับตัวรีเซ็ตจำนวนครั้งใ�
   engine.setGameState('PLAYING');
   p.skillPoints = 8;
 
-  engine.useSkill(p.id, 'ultimate');  // Miracle Live กินโควตาของเทิร์นไปแล้ว
+  engine.useSkill(p.id, 'ultimate');  // Miracle Live 4 แต้ม (คืนสิทธิ์ให้ 1 ครั้ง = โบนัสของเทิร์นนี้)
+  engine.useSkill(p.id, 'secondary'); // ใช้สิทธิ์ที่ได้คืนมาจนหมดโควตาของเทิร์น
   assert.equal(p.skillUsedRound, true);
 
+  p.skillPoints = 8;
   engine.useSkill(p.id, 'basic');     // สลับตัว 1 แต้ม
   assert.equal(p.hisakawa.active, 'hayate');
   assert.equal(p.skillUsedRound, false); // ฮายาเตะได้สิทธิ์ใช้สกิลของตัวเอง
@@ -285,7 +288,7 @@ test('ฝันของเหล่าฝาแฝด: หมัดที่ 2 
   engine.setAttackerId(p.id);
 
   const rnd = Math.random;
-  Math.random = () => 0.1; // ทอยผ่านเกณฑ์ 70%
+  Math.random = () => 0.1; // หมัดที่ 2 การันตี 100% อยู่แล้ว
   try {
     const hpBefore = foe.hp + foe.armor;
     engine.doAttack(p.id, foe.id);

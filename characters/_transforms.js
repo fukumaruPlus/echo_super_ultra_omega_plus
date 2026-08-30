@@ -254,5 +254,14 @@ module.exports = function buildTransforms(img) {
     harukaOmega:   { img: "/characters/haruka/new_omega.jpg", video: "/characters/haruka/skill3/haruka_skill3.mp4", title: "NEW OMEGA", label: "ปล่อยท่าไม้ตาย", seconds: 21, music: null, afterReveal: false },
     harukaPunish:  { img: "/characters/haruka/skill2/haruka_skill2.jpg", video: "/characters/haruka/skill2/haruka_skill2.mp4", title: "จงไปสู่สุขติ", label: "จุดชนวนเลือดไหล", seconds: 10, music: null, afterReveal: false },
     harukaCounter: { img: "/characters/haruka/haruka.webp", video: "/characters/haruka/haruka_passive.mp4", title: "อมาซอน", label: "สวนกลับ + สตั้น", seconds: 5, music: null, afterReveal: false },
+    // ---------- ทาคายามะ จิน ----------
+    //  seconds วัดจาก mvhd atom จริง (+buffer ~1 วิ กันตัดก่อนจบ):
+    //  jin_skill3 19.69 / jin_passive 12.12 / jin_passive2 4.67 / jin_passvie3 18.78 วิ
+    //  jinAlpha: ท่าไม้ตาย Alpha — เล่นทันทีตอนกด (ก่อนเปิดการ์ด) | jinCaptured/jinArm/jinThisIsMe: สกิลติดตัว 2 เล่นก่อนสวนกลับทุกครั้ง (queueCutscene ตรงๆ)
+    jinAlpha:     { img: "/characters/jin/skill3/jin_skill3.jpg", video: "/characters/jin/skill3/jin_skill3.mp4", title: "Alpha", label: "ปล่อยท่าไม้ตาย", seconds: 21, music: null, afterReveal: false },
+    jinCaptured:  { img: "/characters/jin/jin.webp", video: "/characters/jin/passive/jin_passive.mp4", title: "จับตัวได้แล้ว", label: "สวนกลับ", seconds: 13, music: null, afterReveal: false },
+    jinArm:       { img: "/characters/jin/jin.webp", video: "/characters/jin/passive/jin_passive2.mp4", title: "แขนข้างนี่ใช่ไหม ที่สร้างปัญหา", label: "สวนกลับ", seconds: 6, music: null, afterReveal: false },
+    // หมายเหตุ: ชื่อไฟล์จริงสะกด "passvie3" (ไม่ใช่ "passive3") — คงชื่อไฟล์ตามที่อัปโหลดจริงไว้
+    jinThisIsMe:  { img: "/characters/jin/jin.webp", video: "/characters/jin/passive/jin_passvie3.mp4", title: "นี่แหละตัวฉัน", label: "สวนกลับ", seconds: 20, music: null, afterReveal: false },
   };
 };

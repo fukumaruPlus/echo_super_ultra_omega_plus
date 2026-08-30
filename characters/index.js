@@ -42,6 +42,7 @@ const eiji = require("./eiji");
 const haruka = require("./haruka");
 const byleth = require("./byleth");
 const conner = require("./conner");
+const jin = require("./takayama_jin");
 
 const CHARACTER_MODULES = [
   tohno,
@@ -82,6 +83,7 @@ const CHARACTER_MODULES = [
   haruka,
   byleth,
   conner,
+  jin,
 ];
 
 const CHAR_HOOKS = {};

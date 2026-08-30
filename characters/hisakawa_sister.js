@@ -14,9 +14,8 @@ const LIMIT_TURNS = 3;
 const REVIVE_COST = 6;
 const SWITCH_COST = 1;
 const TWIN_KEYS = ["nagi", "hayate"];
-const DREAM_FOLLOWUP_CHANCE = 0.7;   // โอกาสที่แฝดอีกคนจะออกมาโจมตีรอบ 2
+// แฝดอีกคนออกมาโจมตีรอบ 2 ทุกครั้งที่โจมตีโดน (การันตี 100% — ทั้งจากการชนะและจาก "จังหวะนี้แหละ")
 const DREAM_FOLLOWUP_DMG = 2;        // ดาเมจคงที่ของหมัดที่ 2
-const BONUS_ACTION_STATUS = ["hisakawaLimit", "hisakawaTempo", "hisakawaDream"];
 const COUPLE_BUFF_KEYS = ["hisakawaStage", "hisakawaTalent", "hisakawaDream"];
 
 const PATHS = {
@@ -240,7 +239,6 @@ module.exports = {
   TWIN_MAX_ARMOR,
   REVIVE_COST,
   SWITCH_COST,
-  DREAM_FOLLOWUP_CHANCE,
   DREAM_FOLLOWUP_DMG,
 
   init(p) {
@@ -431,9 +429,9 @@ module.exports = {
       engine.queueCutscene(p, "hisakawaSunday");
       engine.log(`🎁 ${p.name} O-KU-RI-MO-NO-Sunday — รวมเวทีและพรสวรรค์เป็นฝันของเหล่าฝาแฝด`);
     }
-    // สกิลรองทั้งสอง + O-KU-RI-MO-NO-Sunday: กดแล้วยังใช้สกิลอื่นได้อีก 1 ครั้งในเทิร์นเดียวกัน
-    //  (ให้โบนัสครั้งเดียวต่อเทิร์น — Miracle Live / Miracle Dance กินโควตาตามปกติ)
-    if (BONUS_ACTION_STATUS.includes(skillStatus(skill)) && p.hisakawaBonusRound !== engine.roundNumber) {
+    // ทุกสกิลของแฝด (ยกเว้นสลับตัวที่รีเซ็ตโควตาให้เต็มอยู่แล้ว): กดแล้วยังใช้สกิลอื่นได้อีก 1 ครั้งในเทิร์นเดียวกัน
+    //  (ให้โบนัสครั้งเดียวต่อเทิร์น — สลับตัวจะล้าง hisakawaBonusRound ให้แฝดที่ออกมาใหม่ได้โบนัสของตัวเองอีกครั้ง)
+    if (skillStatus(skill) !== "hisakawaSwitch" && p.hisakawaBonusRound !== engine.roundNumber) {
       p.hisakawaBonusRound = engine.roundNumber;
       p.skillUsedRound = false;
       engine.log(`👭 ${p.name} ยังไม่หมดแรง — ใช้สกิลได้อีก 1 ครั้งในเทิร์นนี้`);
@@ -471,7 +469,7 @@ module.exports = {
     return skills;
   },
 
-  // ท่าไม้ตาย 3: โจมตีโดนแล้วทอย 70% เพื่อ "จอง" การโจมตีรอบ 2 ของแฝดอีกคน
+  // ท่าไม้ตาย 3: โจมตีโดนแล้ว "จอง" การโจมตีรอบ 2 ของแฝดอีกคนทุกครั้ง (100%)
   //  ไม่ลงดาเมจตรงนี้ — เปิดเป็นเฟสโจมตีจริงอีกรอบใน startDreamFollowupAttack() ให้เลือกเป้าหมายเองได้
   maybeDreamFollowup(engine, attacker, target) {
     const h = ensure(attacker);
@@ -480,10 +478,6 @@ module.exports = {
     const active = h.twins[h.active];
     const other = h.twins[otherKey(h.active)];
     if (!statusOn(active, "hisakawaDream")) return null;
-    if (Math.random() >= DREAM_FOLLOWUP_CHANCE) {
-      engine.log(`🎁 ฝันของเหล่าฝาแฝด — ${other.name} ไม่ได้ออกมาโจมตีต่อ (${Math.round((1 - DREAM_FOLLOWUP_CHANCE) * 100)}%)`);
-      return null;
-    }
     attacker.hisakawaDreamPending = true;
     engine.log(`🎁 ฝันของเหล่าฝาแฝด — ${other.name} เตรียมออกมาโจมตีต่อ`);
     return null;
