@@ -193,10 +193,11 @@ test('ฝากด้วยนะตัวฉัน: เป็นสกิลเ
   assert.equal(shido.guardActive(s), true, 'ใช้บังแต้มสกิลให้คนอื่นเห็นเต็มหลอด');
   assert.equal(shido.canUseSkill(engine, s, 'ultimate'), false);
 
-  shido.onEndTurn(engine, s);
-  assert.equal(s.shidoGuardTurns, 1, 'นับถอยหลังเองท้ายเทิร์น (ไม่ได้อยู่ในลูป statuses)');
-  shido.onEndTurn(engine, s);
-  assert.equal(s.shidoGuardTurns, 0);
+  // นับถอยหลังเองท้ายเทิร์น (ไม่ได้อยู่ในลูปลดเทิร์นของ statuses)
+  for (let left = shido.GUARD_TURNS - 1; left >= 0; left--) {
+    shido.onEndTurn(engine, s);
+    assert.equal(s.shidoGuardTurns, left);
+  }
   assert.equal(shido.guardActive(s), false);
   assert.equal(shido.canUseSkill(engine, s, 'ultimate'), true);
 });

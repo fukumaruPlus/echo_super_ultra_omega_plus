@@ -16,7 +16,7 @@ module.exports = function buildTransforms(img) {
     //  คลิปเดียวของตัวละครนี้ และโผล่เฉพาะตอนกับดัก "ฝากด้วยนะตัวฉัน" ทำงานจริง (ชิโดตกรอบ)
     //  คิวที่ endTurn() = เล่นเป็นรอยต่อหลังหน้าจอโจมตี ก่อนขึ้นเทิร์นถัดไป · seconds วัดจาก mvhd จริง 23.08 -> 24
     //  เรียกผ่าน queueCutscene ตรงๆ จึงเล่นทุกครั้งที่กับดักทำงาน (ไม่ใช่ครั้งเดียวต่อเกม)
-    shidoGuard: { img: shidoImg.skill3, video: "/characters/shido/shido_skill3.mp4", title: "ฝากด้วยนะตัวฉัน", label: "ท่าไม้ตายทำงาน", seconds: 24, music: null, afterReveal: false },
+    shidoGuard: { img: shidoImg.skill3, video: "/characters/shido/shido_skill3.mp4", title: "ฉันคงต้องกลับไปแก้ไขสิ่งที่ผิดพลาด", label: "ท่าไม้ตายทำงาน", seconds: 24, music: null, afterReveal: false },
     // ---------- โมโรโบชิ ดัน (patch 2.8 new) ----------
     //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก (สกิลรอง 5.27 -> 7 · ไล่ตาม 7.67 -> 9
     //  · เฆี่ยนตี 8.75 -> 10 · ชนตอนแพ้แต้ม 6.14 -> 8 · ชนตอนไพ่แตก 8.73 -> 10)
