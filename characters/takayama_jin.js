@@ -14,7 +14,8 @@
 //
 //  "ฉันได้กลิ่นเลือด" ทำงานเฉพาะในอัลฟาเช่นกัน — ทุกครั้งที่โดนดาเมจ (ไม่ว่าทางใด) จะแปะเลือดไหลให้ผู้โจมตี
 //  + ฟื้นแต้มสกิลให้จิน แล้วมีโอกาสสวนกลับ 3 แบบ (ดู onSmellBlood/adjustIncomingDamage) เพิ่มโอกาสได้ด้วยสถานะ
-//  "เครื่องใน" จากสกิลรอง "กระชาก" (ใช้ได้เฉพาะในอัลฟา — บังคับเป้าหมายที่มีเลือดไหลอยู่แล้วให้โจมตี/ใช้สกิลใส่จิน
+//  "เครื่องใน" จากสกิลรอง "กระชาก" ซึ่งดันอัตราสวนกลับ "ทั้ง 3 แบบ" ขึ้นเป็น 50% เท่ากันหมด
+//  (ใช้ได้เฉพาะในอัลฟา — บังคับเป้าหมายที่มีเลือดไหลอยู่แล้วให้โจมตี/ใช้สกิลใส่จิน
 //  แทนที่จะเลือกเป้าหมายเองได้ 1 เทิร์น — ตัวบังคับจริงอยู่ที่ server.js's doAttack()/dealMixed()/dealDirect()/dealArmorOnly())
 // ============================================================
 
@@ -41,11 +42,11 @@ const FAKE_HP_RESERVE = 7; // ค่าอ้างอิงเชิงฟั�
 // ---------- ฉันได้กลิ่นเลือด (สกิลติดตัว 2) ----------
 const SMELL_BLEED_ON_HIT = 2;
 const CAPTURED_CHANCE = 0.15;
-const CAPTURED_CHANCE_ORGANS = 0.20;
+const CAPTURED_CHANCE_ORGANS = 0.50;
 const CAPTURED_NODRAW_TURNS = 1;
 const CAPTURED_HEAL = 2;
 const ARM_CHANCE = 0.10;
-const ARM_CHANCE_ORGANS = 0.20;
+const ARM_CHANCE_ORGANS = 0.50;
 const ARM_NOSKILL_TURNS = 1;
 const ARM_HEAL = 1;
 const THIS_IS_ME_CHANCE = 0.30;

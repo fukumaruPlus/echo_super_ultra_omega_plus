@@ -308,25 +308,44 @@ test('"แขนข้างนี่ใช่ไหม": ดาเมจจา�
   assert.equal(p.hp, 5, 'จินฟื้นพลังชีวิต 1 หน่วย');
 });
 
-test('"แขนข้างนี่ใช่ไหม": โอกาส 10% ปกติ -> 20% เมื่อมี "เครื่องใน"', () => {
-  const foe1 = mkFoe();
+test('"แขนข้างนี่ใช่ไหม": โอกาส 10% ปกติ -> 50% เมื่อมี "เครื่องใน"', () => {
   const p1 = alpha(mkPlayer());
-  withRandom(0.15, () => jin.queueSmellBlood(engine, p1, foe1, false));
-  assert.deepEqual(p1.jinCounterPending || [], [], 'โรล 0.15 ไม่ติดที่อัตรา 10%');
+  withRandom(0.45, () => jin.queueSmellBlood(engine, p1, mkFoe(), false));
+  assert.deepEqual(p1.jinCounterPending || [], [], 'โรล 0.45 ไม่ติดที่อัตรา 10%');
 
-  const foe2 = mkFoe();
   const p2 = alpha(mkPlayer({ statuses: { jinAlpha: 5, jinOrgans: 1 } }));
-  withRandom(0.15, () => jin.queueSmellBlood(engine, p2, foe2, false));
-  assert.equal((p2.jinCounterPending || []).length, 1, 'เครื่องในดันอัตราเป็น 20% -> โรลเดิมติด');
+  withRandom(0.45, () => jin.queueSmellBlood(engine, p2, mkFoe(), false));
+  assert.equal((p2.jinCounterPending || []).length, 1, 'เครื่องในดันอัตราเป็น 50% -> โรลเดิมติด');
 });
 
-test('"จับตัวได้แล้ว": โอกาส 15% ปกติ -> 20% เมื่อมี "เครื่องใน"', () => {
+test('"จับตัวได้แล้ว": โอกาส 15% ปกติ -> 50% เมื่อมี "เครื่องใน"', () => {
   const p1 = alpha(mkPlayer());
-  withRandom(0.17, () => jin.queueSmellBlood(engine, p1, mkFoe(), true));
-  assert.deepEqual(p1.jinCounterPending || [], [], 'โรล 0.17 ไม่ติดที่อัตรา 15%');
+  withRandom(0.45, () => jin.queueSmellBlood(engine, p1, mkFoe(), true));
+  assert.deepEqual(p1.jinCounterPending || [], [], 'โรล 0.45 ไม่ติดที่อัตรา 15%');
   const p2 = alpha(mkPlayer({ statuses: { jinAlpha: 5, jinOrgans: 1 } }));
-  withRandom(0.17, () => jin.queueSmellBlood(engine, p2, mkFoe(), true));
-  assert.equal((p2.jinCounterPending || []).length, 1, 'เครื่องในดันอัตราเป็น 20%');
+  withRandom(0.45, () => jin.queueSmellBlood(engine, p2, mkFoe(), true));
+  assert.equal((p2.jinCounterPending || []).length, 1, 'เครื่องในดันอัตราเป็น 50%');
+});
+
+test('เครื่องใน: ดันการสวนกลับทั้ง 3 แบบเป็น 50% เท่ากันหมด (โรล 0.49 ติดทุกแบบ)', () => {
+  // จับตัวได้แล้ว (โจมตีปกติ) + นี่แหละตัวฉัน (เลือดไหล >= 5) ติดพร้อมกันได้ในก้อนเดียว
+  const pn = alpha(mkPlayer({ statuses: { jinAlpha: 5, jinOrgans: 1 } }));
+  withRandom(0.49, () => jin.queueSmellBlood(engine, pn, mkFoe({ statuses: { hbleed: 5 } }), true));
+  const kinds = (pn.jinCounterPending || []).map((c) => c.kind).sort();
+  assert.deepEqual(kinds, ['captured', 'thisIsMe'], 'ทั้งสองแบบของเส้นทางโจมตีปกติติดที่ 50%');
+
+  // แขนข้างนี่ใช่ไหม (ดาเมจจากสกิล)
+  const ps = alpha(mkPlayer({ statuses: { jinAlpha: 5, jinOrgans: 1 } }));
+  withRandom(0.49, () => jin.queueSmellBlood(engine, ps, mkFoe(), false));
+  assert.deepEqual((ps.jinCounterPending || []).map((c) => c.kind), ['arm'], 'เส้นทางสกิลก็ติดที่ 50%');
+});
+
+test('ราคาสกิล: กระชาก 2 แต้ม · Alpha 4 แต้ม', () => {
+  const { CHAR_BY_ID } = require('../../characters.js');
+  const ch = CHAR_BY_ID.jin;
+  assert.equal(ch.basic.cost, 2, 'ไข่ต้ม 2 แต้ม');
+  assert.equal(ch.secondary.cost, 2, 'กระชาก 2 แต้ม');
+  assert.equal(ch.ultimate.cost, 4, 'Alpha 4 แต้ม');
 });
 
 test('"นี่แหละตัวฉัน": ต้องมีเลือดไหล >= 5 · สวนกลับเท่าเลือดไหลที่มี แล้วล้างทิ้ง', () => {
@@ -349,7 +368,7 @@ test('"นี่แหละตัวฉัน": โอกาส 30% ปกต�
   assert.deepEqual(p1.jinCounterPending || [], [], 'โรล 0.4 ไม่ติดที่อัตรา 30%');
   const p2 = alpha(mkPlayer({ statuses: { jinAlpha: 5, jinOrgans: 1 } }));
   withRandom(0.4, () => jin.queueSmellBlood(engine, p2, mkFoe({ statuses: { hbleed: 5 } }), false));
-  assert.equal((p2.jinCounterPending || []).length, 1, 'เครื่องในดันอัตราเป็น 50%');
+  assert.equal((p2.jinCounterPending || []).length, 2, 'เครื่องในดันเป็น 50% ทั้งแขนข้างนี่ฯ และนี่แหละตัวฉัน');
 });
 
 test('สวนกลับ: วีดีโอเข้าคิวก่อนเสมอ และ resolve ซ้ำไม่ทำผลซ้ำ', () => {
@@ -362,6 +381,38 @@ test('สวนกลับ: วีดีโอเข้าคิวก่อน
   jin.resolvePendingCounters(engine);
   assert.equal(foe.hp, hpAfter, 'เรียกซ้ำแล้วผลไม่ลงซ้ำ (ตาข่ายสำรองปลอดภัย)');
   assert.equal(jin.hasPendingCounter(engine), false);
+});
+
+test('สวนกลับ: วีดีโอทั้ง 3 แบบมีอยู่จริงใน TRANSFORMS และชี้ไฟล์ที่ถูกต้อง', () => {
+  const T = require('../../characters/_transforms.js')({});
+  const expect = {
+    jinCaptured: '/characters/jin/passive/jin_passive.mp4',
+    jinArm: '/characters/jin/passive/jin_passive2.mp4',
+    jinThisIsMe: '/characters/jin/passive/jin_passive3.mp4',
+  };
+  for (const [key, video] of Object.entries(expect)) {
+    assert.ok(T[key], `${key} ต้องมีใน TRANSFORMS ไม่งั้น queueCutscene จะเงียบ`);
+    assert.equal(T[key].video, video, `${key} ต้องชี้ไฟล์ให้ถูก`);
+    assert.ok(T[key].seconds > 0, `${key} ต้องมีความยาว ไม่งั้นวีดีโอถูกตัดทันที`);
+  }
+});
+
+test('สวนกลับ: คีย์วีดีโอที่คิวตรงกับชนิดการสวนกลับที่จองไว้', () => {
+  const cases = [
+    { kind: 'captured', isNormal: true, roll: 0.01, key: 'jinCaptured', bleed: 0 },
+    { kind: 'arm', isNormal: false, roll: 0.05, key: 'jinArm', bleed: 0 },
+    { kind: 'thisIsMe', isNormal: false, roll: 0.05, key: 'jinThisIsMe', bleed: 5 },
+  ];
+  for (const c of cases) {
+    const p = alpha(mkPlayer());
+    const foe = mkFoe({ statuses: c.bleed ? { hbleed: c.bleed } : {} });
+    const queued = [];
+    const orig = engine.queueCutscene;
+    engine.queueCutscene = (pl, key) => queued.push(key);
+    try { withRandom(c.roll, () => jin.queueSmellBlood(engine, p, foe, c.isNormal)); }
+    finally { engine.queueCutscene = orig; }
+    assert.ok(queued.includes(c.key), `${c.kind} ต้องคิววีดีโอ ${c.key} (ได้ ${JSON.stringify(queued)})`);
+  }
 });
 
 test('สวนกลับ: ผู้โจมตีตกรอบไปก่อน resolve -> ข้ามไปเฉยๆ ไม่ crash', () => {

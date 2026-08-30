@@ -4351,18 +4351,23 @@ function useSkill(id, tier, targets, item) {
   if (p.busted) { voidUltimateOnBust(p); maybeMoonBurst(p); CHAR_HOOKS.mageslayer.onBustOrLoseRoll(engine, p); }
   // ไพ่แตก/ถึงเพดานพอดี: ไม่ล็อกอัตโนมัติ — ยังกดสกิล/ใช้ไอเทมได้ต่อไป จนกว่าจะกดเปิดไพ่เอง หรือทุกคนเปิดไพ่ครบ
 
-  // วีดีโอสวนกลับที่ค้างคิว (Wonder of U ซาโตรุ) — เล่นทันทีช่วงจั่วการ์ด
+  // วีดีโอสวนกลับที่ค้างคิว (Wonder of U ซาโตรุ · ฉันได้กลิ่นเลือดของจิน) — เล่นทันทีช่วงจั่วการ์ด
+  //  ⚠️ pausePlayingForCutscene() ไม่ได้บล็อก (ตั้ง timer แล้ว return ทันที) — ห้ามวางตาข่ายสำรองต่อท้ายแบบตรงๆ
+  //     ไม่งั้นผลสวนกลับจะลงทันทีตั้งแต่ก่อนวีดีโอจบ (ผิดสเปค "วีดีโอต้องขึ้นก่อนสรุปความเสียหายเสมอ")
+  let jinCounterDeferred = false;
   if (gameState === "PLAYING" && cutsceneQueue.length) {
-    if (isIgnisImpact) pausePlayingForCutscene(() => CHAR_HOOKS.ignis.applyImpact(engine, p, ignisImpactTarget));
-    else if (connerCloseCase) {
+    jinCounterDeferred = true;
+    if (isIgnisImpact) {
+      pausePlayingForCutscene(() => { CHAR_HOOKS.ignis.applyImpact(engine, p, ignisImpactTarget); CHAR_HOOKS.jin.resolvePendingCounters(engine); });
+    } else if (connerCloseCase) {
       const t = connerCloseCase;
       connerCloseCase = null;
-      pausePlayingForCutscene(() => CHAR_HOOKS.conner.applyCloseCase(engine, p, t));
+      pausePlayingForCutscene(() => { CHAR_HOOKS.conner.applyCloseCase(engine, p, t); CHAR_HOOKS.jin.resolvePendingCounters(engine); });
     // ทาคายามะ จิน: โดนดาเมจจากสกิลแล้วสวนกลับ — วีดีโอเล่นก่อน แล้วผลสวนกลับจึงลงหลังวีดีโอจบ
     } else pausePlayingForCutscene(() => CHAR_HOOKS.jin.resolvePendingCounters(engine));
   }
-  // ตาข่ายสำรอง (ทาคายามะ จิน): ไม่ได้เข้าเส้นทางคัตซีน (เช่นอยู่นอกเฟส PLAYING) -> ลงผลสวนกลับทันที ไม่ให้ค้างข้ามเทิร์น
-  CHAR_HOOKS.jin.resolvePendingCounters(engine);
+  // ตาข่ายสำรอง (ทาคายามะ จิน): ไม่ได้เข้าเส้นทางคัตซีนเลย (เช่นอยู่นอกเฟส PLAYING) -> ลงผลทันที ไม่ให้ค้างข้ามเทิร์น
+  if (!jinCounterDeferred) CHAR_HOOKS.jin.resolvePendingCounters(engine);
   // ตาข่ายสำรอง (คอนเนอร์ "จัดการปิดคดี"): ไม่ได้เข้าเส้นทางคัตซีนด้วยเหตุใดก็ตาม -> ลงดาเมจทันที
   //  ไม่งั้นแต้มสกิล 8 หน่วยหายไปเปล่าๆ โดยเป้าหมายไม่โดนอะไรเลย
   if (connerCloseCase) CHAR_HOOKS.conner.applyCloseCase(engine, p, connerCloseCase);
