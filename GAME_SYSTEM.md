@@ -11,7 +11,7 @@
 server.js (6.3k บรรทัด)          เอนจินกลางทั้งหมด: state, เฟส, การ์ด, ดาเมจ, สกิล, socket handler
 characters.js (1.7k)             DATA ล้วน — roster/ชื่อสกิล/desc/cost/img + POSITION_COLORS + publicRoster()
 characters/index.js              มัดรวม CHAR_HOOKS = { [characterId]: module } — ตัวละครใหม่ต้อง require+push ที่นี่
-characters/<id>.js               LOGIC ของตัวละครนั้น (39 ตัว) — export { id, ...methods(engine, ...) }
+characters/<id>.js               LOGIC ของตัวละครนั้น (40 ตัว) — export { id, ...methods(engine, ...) }
 characters/_universal_status.js  บัฟ/ดีบัฟกลาง (pure function ไม่พึ่ง engine)
 characters/_transforms.js        ตาราง metadata คัตซีน (TRANSFORMS) — data ล้วน
 characters/yuna.js               "ไอดอลประจำสนาม" ไม่ใช่ตัวละครที่เล่นได้ (ไม่อยู่ใน CHAR_HOOKS, require ตรง)
@@ -261,6 +261,32 @@ yuuki · nanaya · miyako (คอมโบ) · takuto (คอมโบ + คร�
   (สกิลติดตัว 1) ตั้ง `noIntro: true` ใน `TRANSFORMS` -> client ข้ามการ์ดเปิดตัว 950ms เข้าวีดีโอเลย
   และคลิปนี้ขึ้น **ครั้งเดียวต่อเทิร์น** ถึงจะมีคนไพ่แตกพร้อมกันหลายคน
 เทสต์: [tests/characters/dan.test.js](tests/characters/dan.test.js)
+
+**QTE (Quick Time Event) — ระบบกลาง (patch 3.0)** `server.js` · ตัวแรกที่ใช้คือ "ทำนองเพลงร็อก" ของยุย
+```
+startQte(p, { count, perNoteMs, tag })   สุ่มลำดับ w/a/s/d เก็บที่ p.qte
+qteKey(id, key) / qteTimeout(id)         socket handler — ตรวจทั้ง "ตัวถูก" และ "มาทัน" ที่ server
+finishQte(p, ok) -> CHAR_HOOKS[tag].onQteDone(engine, p, ok, qte)
+qtePending() / sweepQte()                กันสรุปรอบ + กวาดตอนหมดเฟส
+```
+- **ไม่มี timer ฝั่ง server เลยโดยตั้งใจ** — `startPhaseTimer` มีตัวเดียวทั้งเกมและถูกล้างทุกครั้งที่เปลี่ยนเฟส
+  ส่วน `setTimeout` ต่อ QTE มีโอกาสค้างเมื่อผู้เล่นหลุด/จบเทิร์น/กลับล็อบบี้ → เก็บแค่ `deadline` (ms)
+  แล้วตัดสินตอนคำตอบมาถึงแทน เวลาจึงยังเป็นของ server เต็มร้อย
+- **ไม่แช่คนอื่น**: อยู่ใน `pendingAnswer` ของ `checkAllLocked()` เท่านั้น — คนอื่นจั่ว/เปิดไพ่ได้ตามปกติ
+  แค่ยังไม่สรุปรอบให้ · หมดเฟสจั่วไพ่แล้วยังไม่จบ = `sweepQte()` ถือว่าพลาด
+- **กันโกง**: ลำดับปุ่มถูกสุ่มและเทียบที่ server · `buildStateFor` ส่งให้เจ้าของ **แค่ปุ่มตัวถัดไปตัวเดียว**
+  (ส่งทั้งชุด = เห็นล่วงหน้าทั้งเพลง หมดความหมาย) · `qteTimeout` จาก client ถูกตรวจเวลาซ้ำก่อนเชื่อ
+- **"เสียแต้มฟรี" ได้มาฟรี**: `useSkill` หัก `p.skillPoints -= cost` ก่อนลง effect อยู่แล้ว — พลาดก็แค่ไม่เรียก effect
+
+**ยุย โยชิโอกะ (patch 3.0)** — `unique` ตัวที่สอง · ตัวละครเดียวที่ "ยิ่งเล่นเก่ง ยิ่งเข้าใกล้จุดจบ"
+- สกิลติดตัว "ความปรารถนา": เล่นครบ 3 เพลงไม่ซ้ำ -> `instantDeath(p, true)` — **พารามิเตอร์ `force` ตัวใหม่**
+  ที่ข้ามระบบกันตาย/เกิดใหม่ทั้งหมด (escanor/hisakawa/phenex/byleth) ตามสเปคที่ระบุว่า "ไม่สนเงื่อนไขอื่นๆ"
+- เพลงเก็บเป็นสถานะบน **ผู้ฟัง** ไม่ใช่บนยุย (`yuiRock`/`yuiBeats`) — การกรองโหมดทีมจึงทำครั้งเดียวตอนแจก
+  (`songAudience()`: ally/enemy/self) แล้วที่เหลืออ่านสถานะตรงๆ ไม่ต้องเช็คทีมซ้ำทุกจุด
+- `girl don't cry` แจกแต้มสกิลให้ "คนน้อยสุดในวง" ที่ **`onRoundStartAfterLoop`** ไม่ใช่ในลูปต้นเทิร์น —
+  ไม่งั้นการเทียบจะใช้ค่าคนละเทิร์นกันตามลำดับที่นั่ง (เหตุผลเดียวกับ `escanor.flushPendingBurn`)
+- `my soul your beats` จั่วตามกันเป็นวง — **ต้องมีธงกันลูป** (`p.yuiDrawEcho`) ไม่งั้นไพ่ที่จั่วตาม
+  จะไปกระตุ้นให้คนอื่นจั่วตามซ้อนกันเป็นทอดๆ ไม่รู้จบ
 
 **คูลดาวน์ท่าไม้ตายที่วัดเป็น "เลขรอบ" (ชิโด · เอจิ)** — คูลดาวน์ที่กินเวลาข้ามเทิร์นห้ามเก็บเป็นตัวนับใน
 `p.statuses` ถ้าไม่อยากให้มันไปโผล่ในรายการสถานะให้ทุกคนเห็น จึงเก็บเป็น **เลขรอบที่ล็อกถึง**

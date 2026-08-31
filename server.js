@@ -921,6 +921,71 @@ function startPhaseTimer(seconds, onExpire) {
 function teamModeActive() {
   return gameMode === "duo" || gameMode === "trio";
 }
+
+// ============================================================
+//  QTE (Quick Time Event) — ระบบกลาง ใช้ร่วมกันได้ทุกตัวละคร
+//  ออกแบบให้ "ไม่มี timer ฝั่ง server เลย" โดยตั้งใจ:
+//    · startPhaseTimer มีตัวเดียวทั้งเกมและถูกล้างทุกครั้งที่เปลี่ยนเฟส จะเอามาใช้ซ้อนไม่ได้
+//    · setTimeout ต่อ QTE = มีโอกาสค้างเมื่อผู้เล่นหลุด/จบเทิร์น/กลับล็อบบี้
+//  จึงเก็บแค่ "เส้นตาย" (deadline เป็น ms) แล้วตัดสินตอนคำตอบมาถึงแทน — เวลายังเป็นของ server เต็มร้อย
+//  (client วิ่งแถบนับถอยหลังเองเพื่อความลื่น แต่โกงไม่ได้: ลำดับปุ่มถูกสุ่มและตรวจที่ server)
+//
+//  p.qte = { keys, idx, deadline, perNoteMs, tag }
+//    tag = ใครเป็นเจ้าของ QTE นี้ — ใช้เลือกว่าจะเรียก callback ของตัวละครไหนตอนจบ
+//  ผลลัพธ์ส่งกลับผ่าน CHAR_HOOKS[<เจ้าของ>].onQteDone(engine, p, ok, qte)
+// ============================================================
+const QTE_KEYS = ["w", "a", "s", "d"];
+function startQte(p, { count, perNoteMs = 2000, tag }) {
+  const keys = Array.from({ length: count }, () => QTE_KEYS[Math.floor(Math.random() * QTE_KEYS.length)]);
+  p.qte = { keys, idx: 0, perNoteMs, deadline: Date.now() + perNoteMs, tag };
+  return p.qte;
+}
+function clearQte(p) { if (p) p.qte = null; }
+// มี QTE ค้างอยู่ไหม — checkAllLocked() ใช้กันไม่ให้สรุปรอบก่อนเจ้าตัวจะเล่นจบ
+function qtePending() {
+  return alivePlayers().some((p) => p.qte);
+}
+// จบ QTE แล้วส่งผลให้เจ้าของ (ok = ผ่านครบทุกตัว)
+function finishQte(p, ok) {
+  const qte = p.qte;
+  if (!qte) return;
+  p.qte = null;
+  const hook = CHAR_HOOKS[qte.tag];
+  if (hook && hook.onQteDone) withEffectSource(p, () => hook.onQteDone(engine, p, ok, qte));
+}
+// ผู้เล่นกดปุ่ม — ตรวจทั้ง "ตัวถูกไหม" และ "มาทันไหม" ที่ server
+function qteKey(id, key) {
+  const p = players[id];
+  if (!p || !p.alive || !p.qte) return;
+  const qte = p.qte;
+  const late = Date.now() > qte.deadline;
+  const wrong = String(key || "").toLowerCase() !== qte.keys[qte.idx];
+  if (late || wrong) {
+    lastLog.push(`🎸 ${p.name} ${late ? "กดไม่ทันจังหวะ" : "กดผิดตัว"} — QTE ล้มเหลว!`);
+    finishQte(p, false);
+    broadcastState();
+    checkAllLocked();
+    return;
+  }
+  qte.idx++;
+  if (qte.idx >= qte.keys.length) { finishQte(p, true); }
+  else qte.deadline = Date.now() + qte.perNoteMs; // ตัวถัดไปเริ่มนับใหม่
+  broadcastState();
+  checkAllLocked();
+}
+// client แจ้งว่านับถอยหลังหมดแล้ว — server ยังตรวจซ้ำเองว่าเลยเส้นตายจริง (กันแจ้งมั่ว)
+function qteTimeout(id) {
+  const p = players[id];
+  if (!p || !p.qte || Date.now() <= p.qte.deadline) return;
+  lastLog.push(`🎸 ${p.name} กดไม่ทันจังหวะ — QTE ล้มเหลว!`);
+  finishQte(p, false);
+  broadcastState();
+  checkAllLocked();
+}
+// ตาข่ายสำรอง: หมดเฟสจั่วไพ่แล้วยังเล่นไม่จบ = ถือว่าพลาด (เหมือนข้อเสนออื่นที่ไม่ตอบ)
+function sweepQte() {
+  for (const p of alivePlayers()) if (p.qte) finishQte(p, false);
+}
 // เอจิ (patch 2.4 new): มีคนกดท่าไม้ตาย "ไม่ว่ายังก็ตาม" ค้างอยู่ไหม — ใช้บีบเวลาเฟสจั่วการ์ด
 //  และกันไม่ให้ยูนะเกิดขึ้นเองแบบปกติระหว่างท่านี้ทำงาน
 function eijiUltFieldActive() {
@@ -1476,7 +1541,9 @@ function maybeBeatSave(p) {
 //  เปิด NTD-System ถาวรฟรี (ไม่เสียเลือด) + พลังโจมตีพื้นฐานถาวร +1 — ท่าไม้ตายเปลี่ยนเป็นท่า 2 / สกิลรองเปลี่ยนเป็นสกิลรอง 2 ถาวร
 // ริต้า เบอร์นัล (characters/phenex.js) — wrapper รอบ CHAR_HOOKS.phenex.resolveRelease
 // ตายกลางเทิร์น (เลือดหมดจากสกิล/ผลสถานะ): ตกรอบทันที
-function instantDeath(p) {
+// force = true: ข้ามระบบกันตาย/เกิดใหม่ทั้งหมด (ใช้โดยสกิลติดตัว "ความปรารถนา" ของยุย ที่ระบุว่า
+//  "ตายทันทีไม่สนเงื่อนไขอื่นๆ") — ยังผ่านการเก็บกวาดท้ายฟังก์ชันตามปกติทุกอย่าง
+function instantDeath(p, force) {
   if (friendlyEffectBlocked(p)) return;
   if (isYuuki(p)) {
     const currentSource = players[effectSourceId];
@@ -1496,13 +1563,13 @@ function instantDeath(p) {
     }
     return;
   }
-  if (p.characterId === "escanor" && CHAR_HOOKS.escanor.tryNoonRevive(engine, p)) return;
-  if (p.characterId === "hisakawa_sister" && resolveHisakawaTwinDeath(p)) return;
+  if (!force && p.characterId === "escanor" && CHAR_HOOKS.escanor.tryNoonRevive(engine, p)) return;
+  if (!force && p.characterId === "hisakawa_sister" && resolveHisakawaTwinDeath(p)) return;
   // Ultraman Trigger: ตายในร่างพิเศษถือว่าตายจริง ไม่คืนร่างแทน
   // ริต้า เบอร์นัล (สกิลติดตัว 1 patch 2.1.6, characters/phenex.js): ตายครั้งแรก -> เกิดใหม่แทนที่จะตกรอบ (ครั้งเดียวต่อเกม)
-  if (p.characterId === "phenex" && CHAR_HOOKS.phenex.tryRebirth(engine, p)) return;
+  if (!force && p.characterId === "phenex" && CHAR_HOOKS.phenex.tryRebirth(engine, p)) return;
   // อาจารย์ ไบเลธ (สกิลติดตัว 2 sothis, characters/byleth.js): ตายครั้งแรก -> ย้อนเวลากลับมาด้วยเลือด 1 เกราะ 0 (ครั้งเดียวต่อเกม)
-  if (p.characterId === "byleth" && CHAR_HOOKS.byleth.tryRevive(engine, p)) return;
+  if (!force && p.characterId === "byleth" && CHAR_HOOKS.byleth.tryRevive(engine, p)) return;
   // ริต้า เบอร์นัล (สกิลติดตัว 2 patch 2.1.7, characters/phenex.js): ตกรอบจริงขณะท่าไม้ตาย 2 ยังทำงานอยู่ -> ปลดปล่อยความเจ็บปวดที่สะสมทั้งหมดก่อนตาย
   if (p.characterId === "phenex") CHAR_HOOKS.phenex.maybeReleasePainOnDeath(engine, p);
   p.hp = 0; p.alive = false; p.result = "dead"; p.locked = true;
@@ -1724,6 +1791,9 @@ function activeSkillMusic() {
   //  (ฝั่ง client เล่นไฟล์ใหม่ต่อจากตำแหน่งเดิมผ่าน MUSIC_POSITION_GROUPS จึงไม่มีรอยสะดุดตอนสลับช่วงเวลา)
   const bestByleth = CHAR_HOOKS.byleth.activeMusic(engine, isNightRound(roundNumber));
   if (bestByleth) return bestByleth;
+  // ยุย (characters/yui.js): เพลงประจำท่าไม้ตายที่กำลังบรรเลงอยู่
+  const bestYui = CHAR_HOOKS.yui.activeMusic(engine);
+  if (bestYui) return bestYui;
   // อิสึกะ ชิโด (characters/shido.js): เพลง shido_theme เล่นค้างตลอดที่ Sandalphon ยังอยู่
   const bestShido = CHAR_HOOKS.shido.activeMusic(engine);
   if (bestShido) return bestShido;
@@ -2184,6 +2254,7 @@ function resetCombat(p) {
   CHAR_HOOKS.conner.resetCombat(p); // คอนเนอร์: ความเครียดของทุกคน + คำขาดจับกุม/สถานะไล่ล่า/โควตาฟื้นคืนชีพ
   CHAR_HOOKS.byleth.resetCombat(p); // ความรู้/หลักสูตร/ผลทบทวนบทเรียนที่ค้าง + ธงสตั้น-ห้ามสกิลพื้นฐานที่หลักสูตรของไบเลธตั้งไว้ให้คนอื่น
   CHAR_HOOKS.haruka.resetCombat(p); // harukaBasicUses / harukaBleedProcs (โควตารายเทิร์น) + harukaStunPending (สตั้นค้างจากการสวนกลับ)
+  CHAR_HOOKS.yui.resetCombat(p);   // ยุย โยชิโอกะ: เพลงที่เล่นแล้ว / คิวชุบชีวิต / ธงกันลูปการจั่วตาม
   CHAR_HOOKS.shido.resetCombat(p); // อิสึกะ ชิโด: ดาเมจที่บันทึกไว้ / กับดักฝากด้วยนะตัวฉัน / คิวเกิดใหม่
   CHAR_HOOKS.dan.resetCombat(p); // โมโรโบชิ ดัน: เป้าหมาย "จงหลบแต่อย่าหนี" / ศิษย์ / สตรีคแพ้แต้มติดกัน
   CHAR_HOOKS.eiji.resetCombat(p); // eijiOrdinal (สแตค Ordinal Scale ของเทิร์นนี้) + eijiDodgeUsedRound (โควตาหลบ 1 ครั้ง/เทิร์น)
@@ -2646,6 +2717,16 @@ function buildStateFor(viewerId) {
           ? Math.max(0, (p.shidoRewindLock || 0) - roundNumber) : undefined,
         // เอจิ: คูลดาวน์ท่าไม้ตายหลัง "ไม่ว่ายังก็ตาม" หมดเวลา (เทิร์นที่เหลือ) — โชว์ทับบนการ์ดสกิล
         eijiUltCd: p.characterId === "eiji" ? CHAR_HOOKS.eiji.ultCooldownLeft(engine, p) : undefined,
+        // QTE ที่กำลังเล่นอยู่ — ส่งให้ "เจ้าของคนเดียว" และส่งเฉพาะปุ่มตัวถัดไป
+        //  (ส่งลำดับทั้งชุดไปให้ = เห็นล่วงหน้าทั้งเพลง หมดความหมายของ QTE)
+        qte: mine && p.qte ? {
+          key: p.qte.keys[p.qte.idx], idx: p.qte.idx, total: p.qte.keys.length,
+          deadline: p.qte.deadline, perNoteMs: p.qte.perNoteMs,
+        } : undefined,
+        // ยุย: เพลงที่เลือกได้ + รายชื่อคนตายที่ชุบได้ (ทำเมนูฝั่ง client)
+        yuiSongs: mine && p.characterId === "yui" ? CHAR_HOOKS.yui.songChoices(p) : undefined,
+        yuiDead: mine && p.characterId === "yui"
+          ? CHAR_HOOKS.yui.deadTargets(engine, p).map((o) => ({ id: o.id, name: o.name })) : undefined,
         maxSkill: maxSkillOf(p), // Bard: เพดานพลังงาน 9
         beamAmmo: p.beamAmmo,
         puddingCount: p.puddingCount || 0,
@@ -3253,6 +3334,8 @@ function dealRound() {
     // คอนเนอร์ RK800 (สกิลติดตัว 3 ปัญญาประดิษฐ์): ครบ 10 เทิร์นหลังตาย -> กลับเข้าสนามด้วยเลือด 3 เกราะ 2
     //  ต้องอยู่ "ก่อน" บล็อกข้ามผู้เล่นที่ตายแล้ว ไม่งั้นเทิร์นที่ฟื้นจะไม่ได้รับไพ่ใบแรก
     if (!p.alive) CHAR_HOOKS.conner.maybeRevive(engine, p);
+    // ยุย: สมบัติล้ำค่าที่สุด..... — ครบกำหนดแล้วชุบชีวิตเป้าหมายที่จองไว้ (ตัวยุยเองต้องยังอยู่)
+    if (p.characterId === "yui") CHAR_HOOKS.yui.maybeRevive(engine, p);
     if (!p.alive) { p.cards = []; p.locked = true; p.busted = false; p.overloadDrawReady = false; continue; }
 
     if (isYuuki(p) && p.hp <= 4) {
@@ -3420,6 +3503,8 @@ function dealRound() {
     if (p.characterId === "eiji") CHAR_HOOKS.eiji.onRoundStartTick(engine, p);
     // ---------- มิซึซาว่า ฮารุกะ (characters/haruka.js): รีเซ็ตโควตาสกิลพื้นฐาน 2 ครั้ง + โควตาเลือดไหลของสกิลติดตัว ----------
     if (p.characterId === "haruka") CHAR_HOOKS.haruka.onRoundStartTick(engine, p);
+    // ---------- ยุย โยชิโอกะ (characters/yui.js): ล็อกมือระหว่างบรรเลงเพลงชุบชีวิต ----------
+    if (p.characterId === "yui") CHAR_HOOKS.yui.onRoundStartTick(engine, p);
     // ---------- อิสึกะ ชิโด (characters/shido.js): ภูติ — ฟื้นพลังชีวิตต่อเทิร์น ----------
     if (p.characterId === "shido") CHAR_HOOKS.shido.onRoundStartTick(engine, p);
     // ---------- โมโรโบชิ ดัน (characters/dan.js): ไม้ค้ำพยุงร่าง — ฟื้นพลังชีวิตต่อเทิร์น ----------
@@ -3463,6 +3548,9 @@ function dealRound() {
   // ---------- คอนเนอร์ RK800 (characters/conner.js): การไล่ล่ายังดำเนินอยู่ -> แช่ผู้เล่นนอกวงใหม่ทุกเทิร์น ----------
   //  ต้องอยู่หลังลูปต้นเทิร์น เพราะในลูปเพิ่งตั้ง p.locked = false และแจกไพ่ใบแรกให้ทุกคนไปแล้ว
   CHAR_HOOKS.conner.onRoundStartAfterLoop(engine);
+  // ---------- ยุย (characters/yui.js): girl don't cry — คนแต้มสกิลน้อยสุดในวงได้ +1 ----------
+  //  ต้องอยู่หลังลูปต้นเทิร์น ไม่งั้นการเทียบ "ใครแต้มน้อยสุด" จะใช้ค่าคนละเทิร์นกันตามลำดับที่นั่ง
+  CHAR_HOOKS.yui.onRoundStartAfterLoop(engine);
 
   // ความตายที่โรยรา (ชิกิ patch 2.0.8, characters/shiki.js): ทุกเทิร์นที่ท่าไม้ตายยังทำงาน มอบเส้นชีวิต +1 ให้ทุกคนยกเว้นตัวเอง
   CHAR_HOOKS.shiki.onRoundStartWitherTick(engine);
@@ -3551,6 +3639,8 @@ function hit(id) {
   // คอนเนอร์ RK800 (สกิลติดตัว 1 สืบสวน): การจั่วไพ่ทำให้เครียด +1 — นับครั้งเดียวต่อเทิร์นไม่ว่าจะจั่วกี่ใบ
   //  นับเฉพาะตอนได้ไพ่จริง (กองหมดกลางคัน = ไม่นับ)
   if (drawn) CHAR_HOOKS.conner.onCardDraw(engine, p);
+  // ยุย (characters/yui.js): my soul your beats — ใครจั่ว คนอื่นในวงจั่วตามด้วย (กันลูปในฮุคเอง)
+  if (drawn) CHAR_HOOKS.yui.onCardDraw(engine, p);
   p.busted = bustedOf(p);
   if (p.busted) { voidUltimateOnBust(p); maybeMoonBurst(p); CHAR_HOOKS.mageslayer.onBustOrLoseRoll(engine, p); }
   // ไพ่แตก: ไม่ล็อกอัตโนมัติ — ยังกดสกิล/ใช้ไอเทมได้ต่อไป จนกว่าจะกดเปิดไพ่เอง หรือทุกคนเปิดไพ่ครบ
@@ -3924,6 +4014,23 @@ function useSkill(id, tier, targets, item) {
       if (!connerTarget) return;
     }
   }
+  // ---------- ยุย โยชิโอกะ (characters/yui.js) ----------
+  //  พื้นฐาน: ไม่กินโควตาสกิลของเทิร์น · สกิลรอง: กดซ้ำระหว่าง "นักมวยปล้ำ" ไม่ได้
+  //  ท่าไม้ตาย: item = คีย์เพลงที่เลือก · เพลงชุบชีวิตต้องเลือกคนตายไว้ก่อนด้วย
+  const isYuiPick = p.characterId === "yui";
+  const isYuiBasic = isYuiPick && tier === "basic";
+  if (isYuiPick) {
+    if (!CHAR_HOOKS.yui.canUseSkill(engine, p, tier)) return;
+    if (tier === "ultimate") {
+      const song = CHAR_HOOKS.yui.SONGS[item];
+      if (!song) return; // ต้องเลือกเพลงก่อนเสมอ
+      if (song.key === "treasure") {
+        const rt = CHAR_HOOKS.yui.prepareReviveTarget(engine, p, targets);
+        if (!rt) return; // ไม่มีคนตายให้ชุบ = กดไม่ได้
+        p.yuiReviveTargetId = rt.id;
+      }
+    }
+  }
   // ---------- อิสึกะ ชิโด (characters/shido.js) ----------
   //  พื้นฐาน: กดซ้ำระหว่าง "ภูติ" มีผลไม่ได้ · สกิลรอง: ต้องมีดาเมจที่บันทึกไว้ >= 3 ก่อนถึงชักดาบได้
   //  ท่าไม้ตาย: กดซ้ำระหว่างกับดักเปิดอยู่ไม่ได้ (และเป็นสกิลเงียบ — ไม่มีแบนเนอร์/ไม่เข้า roundSkills)
@@ -4097,7 +4204,7 @@ function useSkill(id, tier, targets, item) {
     if (p.statuses.freecast <= 0) delete p.statuses.freecast;
     lastLog.push(`👸 ${p.name} การ์ดราชินี — ใช้สกิลนี้โดยไม่เสียแต้มสกิล`);
   }
-  if (!isApplePick && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHarukaBasic && !isBylethPick && !isHisakawaFreeAction) p.skillUsedRound = true; // สลับ/ชุบแฝด, เอาแบบนี้ได้ไหม, มีดพับ, สลับเพศ, Quick Swap-Weapon, รังสรรค์-ลงทัณฑ์, ขึ้น-ลงเกียร์ และไข่ต้ม-อาหารเสริม ไม่นับโควตาสกิลหลัก
+  if (!isApplePick && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHarukaBasic && !isBylethPick && !isHisakawaFreeAction && !isYuiBasic) p.skillUsedRound = true; // สลับ/ชุบแฝด, เอาแบบนี้ได้ไหม, มีดพับ, สลับเพศ, Quick Swap-Weapon, รังสรรค์-ลงทัณฑ์, ขึ้น-ลงเกียร์ และไข่ต้ม-อาหารเสริม ไม่นับโควตาสกิลหลัก
   if (isKaiPick) p.kaiSkillUsesRound = (p.kaiSkillUsesRound || 0) + 1;
   if (isTakumiPick) p.takumiSkillUsesRound = (p.takumiSkillUsesRound || 0) + 1;
 
@@ -4155,6 +4262,8 @@ function useSkill(id, tier, targets, item) {
   if (isEiji) flashSuffix = CHAR_HOOKS.eiji.applyInstantSkill(engine, p, tier) || flashSuffix;
   // ---------- มิซึซาว่า ฮารุกะ (characters/haruka.js): ไข่ต้ม และอาหารเสริม / amazon punish / New Omega ----------
   if (isHaruka) flashSuffix = CHAR_HOOKS.haruka.applyInstantSkill(engine, p, tier) || flashSuffix;
+  // ---------- ยุย โยชิโอกะ (characters/yui.js): ปากแจ๋ว / เยอรมันซูเพล็ก / ทำนองเพลงร็อก ----------
+  if (isYuiPick) flashSuffix = CHAR_HOOKS.yui.applyInstantSkill(engine, p, tier, item) || flashSuffix;
   // ---------- อิสึกะ ชิโด (characters/shido.js): ภูติ / Sandalphon / ฝากด้วยนะตัวฉัน ----------
   if (isShidoPick) flashSuffix = CHAR_HOOKS.shido.applyInstantSkill(engine, p, tier) || flashSuffix;
   // ---------- โมโรโบชิ ดัน (characters/dan.js): ไม้ค้ำ / นายทำให้ฉันผิดหวัง / ฉันบอกว่าอย่าหนี ----------
@@ -4711,7 +4820,9 @@ function checkAllLocked() {
     c.some((p) => p.allyBreakAsk) ||
     c.some((p) => p.allyFinalAsk) ||
     // คอนเนอร์ RK800: คำขาด "ยอมจำนน / ขัดขืน" ที่ยังไม่ตอบ (ไม่ตอบก่อนเปิดไพ่ = ขัดขืน)
-    c.some((p) => p.connorArrestAsk && players[p.connorArrestAsk.fromId] && players[p.connorArrestAsk.fromId].alive);
+    c.some((p) => p.connorArrestAsk && players[p.connorArrestAsk.fromId] && players[p.connorArrestAsk.fromId].alive) ||
+    // QTE ที่ยังเล่นไม่จบ (ยุย: ทำนองเพลงร็อก) — คนอื่นจั่ว/เปิดไพ่ได้ตามปกติ แค่ยังไม่สรุปรอบให้
+    qtePending();
   // ถ้าไม่เหลือใครรอดเลย (เช่น ทาคุโตะระเบิดใส่ทุกคนตายหมดรวมถึงตัวเอง) ก็ต้องสรุปผลด้วยเช่นกัน ไม่งั้นเกมค้าง
   const humans = c.filter((p) => !isYuuki(p));
   if (humans.every((p) => p.locked) && !pendingAnswer) resolveRound();
@@ -4953,6 +5064,8 @@ function resolveRound() {
     }
     p.allyFinalAsk = false; // ไม่ตอบ = ยังไม่ตัดสินใจ (จะถูกถามใหม่ตอนจบเทิร์นถ้ายังเหลือแค่คู่พันธมิตร)
   }
+  // QTE ที่ยังเล่นไม่จบเมื่อถึงเวลาเปิดไพ่ = ถือว่าพลาด (แต้มเสียฟรี) เหมือนข้อเสนออื่นที่ไม่ตอบ
+  sweepQte();
 
   // Bard: บทเพลงที่ยังไม่ได้เลือกเป้าหมายเมื่อถึงเวลาเปิดไพ่ = สุ่มเป้าหมายอัตโนมัติ (บทเพลงไม่สูญเปล่า)
   for (const p of alivePlayers()) {
@@ -5229,6 +5342,8 @@ function afterResolve() {
   // ---------- โมโรโบชิ ดัน (characters/dan.js): "จงหลบแต่อย่าหนี" ลงโทษเป้าหมาย + ครูฝึกสุดเหี้ยมกวาดคนไพ่แตก ----------
   //  ต้องอยู่หลังเอฟเฟกต์ที่กวาดคนไพ่แตกตัวอื่น เพื่อให้ผลบวก 1 หน่วยของสกิลติดตัวเป็นชั้นสุดท้ายเสมอ
   CHAR_HOOKS.dan.onAfterResolve(engine);
+  // ---------- ยุย (characters/yui.js): my soul your beats — ไพ่แตกกลางจังหวะเพลงรับความเสียหาย ----------
+  CHAR_HOOKS.yui.onAfterResolve(engine);
 
   const activated = [];
   for (const p of alivePlayers()) {
@@ -5470,6 +5585,9 @@ function computeAttackBase(engine, attacker, target) {
   // veilAtk/partnerAtk: ungated ตั้งใจ (แจกให้ผู้เล่นอื่นได้ ไม่ผูกกับตัวละครเจ้าของสกิล) — อยู่ที่นี่ ไม่ใช่ hook
   const veilAtk = !triggerForm && (attacker.statuses.veil || 0) > 0;
   const partnerAtk = !triggerForm && CHAR_HOOKS.broadband_man.contractBuffActive(engine, attacker);
+  // ยุย โยชิโอกะ: girl don't cry (+1 ทั้งวง) และบัฟ "ทำนอง" ของคนที่ถูกชุบชีวิต (+2) — ungated ทั้งคู่
+  const yuiRockAtk = !triggerForm && (attacker.statuses.yuiRock || 0) > 0;
+  const yuiMelodyAtk = !triggerForm && (attacker.statuses.yuiMelody || 0) > 0;
   // ศิษย์ (โมโรโบชิ ดัน): ungated เหมือน veil/partner — เป็นบัฟที่แจกให้ผู้เล่นคนอื่น ไม่ผูกกับตัวละครเจ้าของสกิล
   const discipleAtk = !triggerForm && (attacker.statuses.danDisciple || 0) > 0;
   const isRevenge = attacker.characterId === "banagher" && attacker.ntdTarget && attacker.ntdTarget === target.id;
@@ -5484,10 +5602,12 @@ function computeAttackBase(engine, attacker, target) {
   const cardAtkBonus = triggerForm ? 0 : (attacker.statusAmt.cardAtkBonus || 0); // Trigger เสริมพลังตัวเองไม่ได้
   const heroSwordAtk = triggerForm ? 0 : (((attacker.statuses.heroSword || 0) > 0) ? 2 : 0);
 
-  const base = baseHook + hookBonus + (veilAtk ? 1 : 0) + (empowerAtk ? 1 : 0) + (partnerAtk ? 1 : 0) + (discipleAtk ? CHAR_HOOKS.dan.DISCIPLE_ATK_BONUS : 0) + cardAtkBonus + heroSwordAtk;
+  const base = baseHook + hookBonus + (veilAtk ? 1 : 0) + (empowerAtk ? 1 : 0) + (partnerAtk ? 1 : 0) + (discipleAtk ? CHAR_HOOKS.dan.DISCIPLE_ATK_BONUS : 0)
+    + (yuiRockAtk ? CHAR_HOOKS.yui.ROCK_ATK : 0) + (yuiMelodyAtk ? CHAR_HOOKS.yui.MELODY_ATK : 0)
+    + cardAtkBonus + heroSwordAtk;
   return {
     base,
-    storiumAtk, paradiseAtk, isRevenge, isRival, ntdBonus, veilAtk, empowerAtk, partnerAtk, discipleAtk, cardAtkBonus, heroSwordAtk,
+    storiumAtk, paradiseAtk, isRevenge, isRival, ntdBonus, veilAtk, empowerAtk, partnerAtk, discipleAtk, yuiRockAtk, yuiMelodyAtk, cardAtkBonus, heroSwordAtk,
     oberonDayAtk, shradeDayOff, phenexPurgeAtk, hakunoInvertAtk, hakunoNoRegenAtk,
     ...hookCtx,
   };
@@ -5543,6 +5663,7 @@ function doAttack(byId, targetId) {
     ...CHAR_HOOKS.riddhe.findTaunters(engine, attacker),
     ...CHAR_HOOKS.phenex.findTaunters(engine, attacker),
     ...CHAR_HOOKS.bat_ben.findTaunters(engine, attacker),
+    ...CHAR_HOOKS.yui.findTaunters(engine, attacker), // ยุย: ปากแจ๋ว
   ].filter((t) => !sameTeam(attacker, t)).sort((a, b) => a.position - b.position);
   if (taunters.length) {
     const taunter = taunters[Math.max(0, (attacker.position || 1) - 1) % taunters.length];
@@ -5858,6 +5979,8 @@ function doAttack(byId, targetId) {
   const connerCounterFired = CHAR_HOOKS.conner.onAttackedNormally(engine, attacker, target);
   // โมโรโบชิ ดัน (characters/dan.js): "ศิษย์" หันมาโจมตีปกติใส่ดัน -> เล่น dan_skill2.mp4 แล้วสวนคืน 3 หน่วย
   const danCounterFx = CHAR_HOOKS.dan.onAttackedNormally(engine, attacker, target);
+  // ยุย (characters/yui.js): เยอรมันซูเพล็ก — สวนกลับผู้ที่โจมตีปกติใส่ (เล่นวีดีโอก่อนสรุปความเสียหาย)
+  const yuiCounterFx = CHAR_HOOKS.yui.onAttackedNormally(engine, attacker, target);
   // Ginga Strium (ฮิคารุ, characters/hikaru.js): โจมตีโดนเป้าหมาย -> ติดลุกไหม้ให้เป้าหมาย / ถูกโจมตีขณะอยู่ในร่างนี้ -> ผู้โจมตีติดลุกไหม้สวนกลับ
   CHAR_HOOKS.hikaru.onAttackBurnApply(engine, attacker, target);
   const escanorAttackVideoQueued = CHAR_HOOKS.escanor.onAttackLanded(engine, attacker, target);
@@ -6137,6 +6260,7 @@ function doAttack(byId, targetId) {
   if (batReflectDmg > 0) addFx({ name: `เข้ามาเลย — ความเสียหายเกิดกับผู้โจมตีด้วย -${batReflectDmg}`, img: BAT_SKILL3_IMG, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   // ---------- มิซึซาว่า ฮารุกะ (characters/haruka.js) ----------
   if (harukaPunishFx.punishStacks > 0) addFx({ name: `จงไปสู่สุขติ — ระเบิดเลือดไหล +${harukaPunishFx.punishStacks}`, img: CHAR_HOOKS.haruka.IMG.skill2, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
+  if (yuiCounterFx) addFx({ name: `เยอรมันซูเพล็ก — ทุ่มสวนกลับ -${yuiCounterFx.dmg}`, img: CHAR_HOOKS.yui.IMG.skill2, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (danCounterFx) addFx({ name: `นายทำให้ฉันผิดหวัง — สวนกลับศิษย์ -${danCounterFx.dmg}`, img: CHAR_HOOKS.dan.IMG.skill2, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (connerCounterFired) addFx({ name: "การป้องกันตัว — สวนกลับผู้โจมตีทั้งสองคน", img: CHAR_HOOKS.conner.IMG.base, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (bylethSwordUsed > 0) addFx({ name: `ดาบต้องสาป +${bylethSwordUsed}`, img: CHAR_HOOKS.byleth.IMG.skill2, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
@@ -6165,7 +6289,7 @@ function doAttack(byId, targetId) {
   //  / อย่าอยู่เลย แกน่ะ! (ริต้า เบอร์นัล patch 2.1.6) / ฉันยัง...มองเห็นอยู่!!! กันตาย + อย่างนายน่ะ จะไปเข้าใจอะไร (สึงาชิ ทาคุโตะ patch 2.2.4):
   //  เล่นวีดีโอที่ค้างคิวก่อน แล้วค่อยขึ้นสรุปความเสียหาย
   //  (ปกติทุกท่าอื่นจะขึ้นสรุปความเสียหายก่อนแล้วค่อยเล่นวีดีโอค้างคิวตอนจบ — ท่าเหล่านี้กลับลำดับเฉพาะตัว)
-  if ((yuukiAttackVideoQueued || isYuuki(target) || beamPlusAtk || (beam && attacker.characterId === "banagher") || unibeam2Atk || storiumAtk || phenexPurgeAtk || miyakoUltAtk || triggerMultiAtk || triggerZeperionAtk || escanorAttackVideoQueued || (beatSaveFired && target.characterId === "takuto") || takutoUlt2VideoQueued || eijiSwordFx.videoQueued || harukaPunishFx.videoQueued || (harukaCounterFx && harukaCounterFx.videoQueued) || (danCounterFx && danCounterFx.videoQueued)) && cutsceneQueue.length) runCutsceneQueue(showAttackFx);
+  if ((yuukiAttackVideoQueued || isYuuki(target) || beamPlusAtk || (beam && attacker.characterId === "banagher") || unibeam2Atk || storiumAtk || phenexPurgeAtk || miyakoUltAtk || triggerMultiAtk || triggerZeperionAtk || escanorAttackVideoQueued || (beatSaveFired && target.characterId === "takuto") || takutoUlt2VideoQueued || eijiSwordFx.videoQueued || harukaPunishFx.videoQueued || (harukaCounterFx && harukaCounterFx.videoQueued) || (danCounterFx && danCounterFx.videoQueued) || (yuiCounterFx && yuiCounterFx.videoQueued)) && cutsceneQueue.length) runCutsceneQueue(showAttackFx);
   else showAttackFx();
 }
 
@@ -6936,6 +7060,9 @@ io.on('connection', (socket) => {
   onPlayerEvent(socket, 'nanayaToggleEye', (id) => nanayaToggleEye(id), 4);
   onPlayerEvent(socket, 'eijiOrdinalScale', (id) => withEffectSource(players[id], () => eijiOrdinalScale(id)), 8);
   onPlayerEvent(socket, 'nanayaCancelReattack', (id) => nanayaCancelReattack(id), 4);
+  // QTE (ยุย: ทำนองเพลงร็อก) — กดปุ่มทีละตัว · limit สูงกว่าปกติเผื่อกดรัวตอนตื่นเต้น
+  onPlayerEvent(socket, 'qteKey', (id, { key } = {}) => qteKey(id, key), 40);
+  onPlayerEvent(socket, 'qteTimeout', (id) => qteTimeout(id), 10);
   onPlayerEvent(socket, 'backToLobby', () => { if (gameState === 'GAMEOVER') backToLobby(); }, 2);
 
   safeOn(socket, "leave", () => {
@@ -7052,6 +7179,11 @@ const engine = {
   riddheAllied,
   riddheGrantFreeNtdToAlly(rAlly, byId) { return CHAR_HOOKS.riddhe.grantFreeNtdToAlly(engine, rAlly, byId); },
   hasQueuedCutscene() { return cutsceneQueue.length > 0; },
+  startQte,           // ระบบ QTE กลาง (ดูหัวข้อ QTE ด้านบนของไฟล์)
+  clearQte,
+  qteKey,             // เปิดไว้ให้เทสต์กดปุ่มแทนผู้เล่นได้ (โค้ดจริงเรียกจาก socket handler)
+  qtePending,
+  // drawCardFor / voidUltimateOnBust มีอยู่แล้วด้านล่าง — ไม่ต้องประกาศซ้ำ
   // ---------- ระบบย้อนเวลา (ท่าไม้ตายของอิสึกะ ชิโด) ----------
   snapshotBefore,        // หยิบสแนปช็อตต้นเทิร์นของ N เทิร์นก่อนหน้า (ไม่ลึกพอ = ใบเก่าสุดที่มี)
   pushSnapshotHistory,   // เปิดไว้ให้เทสต์สร้างประวัติจำลองได้ (โค้ดจริงเรียกจาก dealRound เท่านั้น)

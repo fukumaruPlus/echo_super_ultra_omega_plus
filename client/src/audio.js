@@ -117,6 +117,10 @@ const FILES = {
   conner_theme: "/characters/connor/conner_theme.m4a",
   // อิสึกะ ชิโด: เพลง Sandalphon — เล่นค้างตลอด 3 เทิร์นที่ดาบยังอยู่
   shido_theme: "/characters/shido/shido_theme.mp3",
+  // ยุย โยชิโอกะ: เพลงประจำท่าไม้ตายแต่ละเพลง — เล่นค้างตลอด 5 เทิร์นที่เพลงทำงาน
+  yui_song1: "/characters/yui/song/song_3.1.mp3",
+  yui_song2: "/characters/yui/song/song_3.2.mp3",
+  yui_song3: "/characters/yui/song/song_3.3.mp3",
   byleth_hit: "/characters/byleth/hit_sound.mp3", // เสียงโจมตีของ "ดาบต้องสาป"
   action_button: "/effect_sound/action_button.wav",
   trun_change: "/effect_sound/trun_change.wav",

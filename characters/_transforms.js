@@ -9,16 +9,24 @@
 const connorImg = require("./conner").IMG; // คอนเนอร์ RK800: ใช้ path รูปชุดเดียวกับไฟล์ตัวละครกันค่าซ้ำสองที่
 const danImg = require("./dan").IMG;       // โมโรโบชิ ดัน: เหตุผลเดียวกัน
 const shidoImg = require("./shido").IMG;   // อิสึกะ ชิโด: เหตุผลเดียวกัน
+const yuiImg = require("./yui").IMG;       // ยุย โยชิโอกะ: เหตุผลเดียวกัน
 
 module.exports = function buildTransforms(img) {
   return {
+    // ---------- ยุย โยชิโอกะ (patch 3.0 new) ----------
+    //  ทุกคลิปเรียกผ่าน queueCutscene = เล่นทุกครั้งที่ทำงาน
+    //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก (17.56 -> 19 · 2.60/2.84 -> 4 · 14.35 -> 16)
+    yuiSuplex:   { img: yuiImg.skill2, video: "/characters/yui/skill2/yui_skill2.mp4",       title: "เยอรมันซูเพล็ก", label: "สวนกลับ",        seconds: 19, music: null, afterReveal: false },
+    yuiSong:     { img: yuiImg.skill3, video: "/characters/yui/skill3/yui_skill3.mp4",       title: "ทำนองเพลงร็อก",  label: "บรรเลงสำเร็จ",    seconds: 4, music: null, afterReveal: false },
+    yuiSongFail: { img: yuiImg.skill3, video: "/characters/yui/skill3/yui_skill3_false.mp4", title: "เสียงเพี้ยน",    label: "บรรเลงล้มเหลว",   seconds: 4, music: null, afterReveal: false },
+    yuiDead:     { img: yuiImg.base,   video: "/characters/yui/yui_dead.mp4",                title: "ความปรารถนา",    label: "คำอธิษฐานเป็นจริง", seconds: 16, music: null, afterReveal: false },
     // ---------- อิสึกะ ชิโด (patch 2.9 new) ----------
     //  คลิปเดียวของตัวละครนี้ และโผล่เฉพาะตอนกับดัก "ฝากด้วยนะตัวฉัน" ทำงานจริง (ชิโดตกรอบ)
     //  คิวที่ endTurn() = เล่นเป็นรอยต่อหลังหน้าจอโจมตี ก่อนขึ้นเทิร์นถัดไป · seconds วัดจาก mvhd จริง 23.08 -> 24
     //  เรียกผ่าน queueCutscene ตรงๆ จึงเล่นทุกครั้งที่กับดักทำงาน (ไม่ใช่ครั้งเดียวต่อเกม)
     shidoGuard: { img: shidoImg.skill3, video: "/characters/shido/shido_skill3.mp4", title: "ฉันคงต้องกลับไปแก้ไขสิ่งที่ผิดพลาด", label: "ท่าไม้ตายทำงาน", seconds: 24, music: null, afterReveal: false },
     // ---------- โมโรโบชิ ดัน (patch 2.8 new) ----------
-    //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก (สกิลรอง 5.27 -> 7 · ไล่ตาม 7.67 -> 9
+    //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก (17.56 -> 19 · 2.60/2.84 -> 4 · 14.35 -> 16) (สกิลรอง 5.27 -> 7 · ไล่ตาม 7.67 -> 9
     //  · เฆี่ยนตี 8.75 -> 10 · ชนตอนแพ้แต้ม 6.14 -> 8 · ชนตอนไพ่แตก 8.73 -> 10)
     //  ยกเว้น danScold ที่คลิปสั้น 1.71 วิ — ตั้ง 2 พอดีคลิป ไม่งั้นค้างเฟรมสุดท้ายนานกว่าตัวคลิปเอง
     //  และเล่นให้ "เฉพาะคนที่ไพ่แตก" เห็น ผ่าน onlyFor ของ queueCutscene

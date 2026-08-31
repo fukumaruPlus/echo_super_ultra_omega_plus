@@ -1196,6 +1196,13 @@ const STATUS_INFO = {
   // ---------- มิซึซาว่า ฮารุกะ (patch 2.5 new) ----------
   harukaOmega:  { icon: "🦾", label: "โอเมก้า", cls: "bg-echo-gold text-gray-900", desc: "New Omega: การโจมตีปกติมอบสถานะ \"เลือดไหล\" ให้เป้าหมาย 3 หน่วยทุกครั้ง · มีโอกาส 15% สวนกลับผู้ที่โจมตีปกติใส่ฮารุกะเป็นความเสียหาย 1 หน่วย พร้อมแปะเลือดไหลให้ผู้โจมตี 2 หน่วย และมอบสตั้น 1 เทิร์นในเทิร์นถัดไป · กดท่าไม้ตายซ้ำได้เพื่อระเบิดแต้มการ์ดอีกครั้ง (ต่ออายุเป็น 10 เทิร์นใหม่)" },
   harukaPunish: { icon: "⚖️", label: "จงไปสู่สุขติ", cls: "bg-echo-magenta", desc: "amazon punish: ตลอด 3 เทิร์นที่สถานะนี้ติดอยู่ ทุกการโจมตีปกติที่ใส่เป้าหมายซึ่งมี \"เลือดไหล\" ตั้งแต่ 3 หน่วยขึ้นไป จะจุดชนวนให้ระเบิดเป็นความเสียหายเพิ่มตามจำนวนหน่วยที่ติดอยู่ แล้วล้างเลือดไหลทั้งหมด — ระเบิดซ้ำได้หลายครั้งตลอด 3 เทิร์น (เป้าหมายต้องสะสมเลือดไหลใหม่ให้ครบก่อน)" },
+  // ---------- ยุย โยชิโอกะ (patch 3.0 new) ----------
+  yuiTaunt:   { icon: "\u{1F4E3}", label: "ปากแจ๋ว", cls: "bg-echo-magenta", desc: "ปากแจ๋ว: การโจมตีปกติของทุกคนถูกล่อมาที่ยุยตลอดเทิร์นนี้" },
+  yuiWrestle: { icon: "\u{1F93C}", label: "นักมวยปล้ำ", cls: "bg-echo-armor", desc: "นักมวยปล้ำ: ความเสียหายที่ได้รับเบาลง 1 หน่วย และถ้าถูกโจมตีปกติจะจับทุ่มสวนคืน 3 หน่วย — สวนครบโควตาเมื่อไหร่สถานะจบทันทีแม้ยังไม่ครบเทิร์น (จำนวนครั้งที่เหลือแสดงเป็นตัวเลขบนป้าย)" },
+  yuiRock:    { icon: "\u{1F3B8}", label: "girl don't cry", cls: "bg-echo-gold text-gray-900", desc: "girl don't cry (ยุย): พลังโจมตี +1 · และคนที่แต้มสกิลน้อยที่สุดในวงจะได้รับแต้มสกิล +1 ทุกเทิร์น (ประเมินใหม่ทุกเทิร์น)" },
+  yuiBeats:   { icon: "\u{1F941}", label: "my soul your beats", cls: "bg-echo-hp", desc: "my soul your beats (ยุย): เมื่อมีใครในวงจั่วการ์ด คนอื่นในวงจะถูกดึงให้จั่วตามด้วย (คนที่เปิดไพ่ไปแล้วไม่โดน) · และถ้าการ์ดแตกจะรับความเสียหาย 1 หน่วยตอนสรุปรอบ" },
+  yuiWait:    { icon: "\u{1F3B6}", label: "กำลังบรรเลง", cls: "bg-echo-cyan text-gray-900", desc: "สมบัติล้ำค่าที่สุด.....: ยุยกำลังบรรเลงเรียกวิญญาณกลับมา — ทำอะไรไม่ได้เลย (จั่วการ์ด ใช้สกิล ใช้ไอเทมไม่ได้) จนกว่าเป้าหมายจะฟื้น · ถ้ายุยตกรอบก่อน ผลจะหายไปทั้งหมด" },
+  yuiMelody:  { icon: "\u{1F3B5}", label: "ทำนอง", cls: "bg-echo-gold text-gray-900", desc: "ทำนอง: พลังโจมตี +2 ตามจำนวนเทิร์นที่เหลือ (ได้จากการถูกชุบชีวิตด้วยเพลงสมบัติล้ำค่าที่สุด.....)" },
   // ---------- อิสึกะ ชิโด (patch 2.9 new) ----------
   shidoSpirit: { icon: "🕊️", label: "ภูติ", cls: "bg-echo-armor", desc: "ภูติ: ฟื้นพลังชีวิต 1 หน่วยตอนเริ่มเทิร์น ตามจำนวนเทิร์นที่เหลือ" },
   shidoSword: { icon: "⚔️", label: "Sandalphon", cls: "bg-echo-gold text-gray-900", desc: "Sandalphon: ฟื้นแต้มสกิล +1 ต่อเทิร์นระหว่างมีผล · พลังโจมตีปกติถูกแทนที่ด้วยพลังดาบที่ล็อกไว้ตอนกด (เท่ากับความเสียหายที่ \"ขอพลังให้ฉันด้วย\" บันทึกไว้ล่าสุด) — โดนโจมตีใหม่ระหว่างนี้ค่าดาบจะไม่เปลี่ยน ต้องกดสกิลรองใหม่ถึงจะอัปเดต" },
@@ -2563,6 +2570,121 @@ function SkillSlot({ label, tier, skill, points, disabled, onUse, ammo, cost, si
   );
 }
 
+// ---------- QTE (ยุย: ทำนองเพลงร็อก) — เดสก์ท็อป: กด W/A/S/D ตามที่ขึ้น ----------
+//  server ส่งมาแค่ "ปุ่มตัวถัดไป" ตัวเดียว (ส่งทั้งชุด = เห็นล่วงหน้าทั้งเพลง หมดความหมาย)
+//  แถบเวลาวิ่งเองฝั่ง client เพื่อความลื่น แต่ผลตัดสินที่ server เสมอ (deadline เป็นเวลาของ server)
+//  หมดเวลาเมื่อไหร่ยิง qteTimeout ไปให้ server ตรวจซ้ำเอง — client โกงให้ผ่านไม่ได้
+function QtePanel({ qte }) {
+  const [now, setNow] = useState(() => Date.now()); // lazy: Date.now() เป็น impure ห้ามเรียกตอน render
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 50);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    const onKey = (e) => {
+      const k = (e.key || "").toLowerCase();
+      if (!["w", "a", "s", "d"].includes(k)) return;
+      e.preventDefault();
+      socket.emit("qteKey", { key: k });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  // แจ้ง server เมื่อนับถอยหลังหมด (server ตรวจเวลาซ้ำอีกชั้นก่อนตัดสินว่าพลาด)
+  const expired = now > qte.deadline;
+  useEffect(() => {
+    if (expired) socket.emit("qteTimeout");
+  }, [expired]);
+
+  const left = Math.max(0, qte.deadline - now);
+  const pct = Math.max(0, Math.min(100, (left / qte.perNoteMs) * 100));
+  return (
+    <div className="absolute inset-x-0 top-[26%] z-50 flex flex-col items-center gap-2 pointer-events-none text-hard">
+      <div className="text-sm font-black bg-black/70 rounded-full px-4 py-1 border border-white/25">
+        🎸 บรรเลงให้ครบ — โน้ตที่ {qte.idx + 1}/{qte.total}
+      </div>
+      <div
+        className="grid place-items-center w-28 h-28 rounded-2xl border-4 bg-black/75"
+        style={{ borderColor: "var(--color-p-accent-bright)" }}
+      >
+        <span className="text-6xl font-black uppercase" style={{ fontFamily: P_DISPLAY }}>{qte.key}</span>
+      </div>
+      <div className="w-48 h-2 bg-black/60 rounded-full overflow-hidden border border-white/20">
+        <div
+          className="h-full transition-none"
+          style={{ width: `${pct}%`, background: pct < 35 ? "var(--color-echo-hp)" : "var(--color-p-accent-bright)" }}
+        />
+      </div>
+      <div className="text-xs opacity-75">กดผิดหรือกดไม่ทัน = แต้มเสียฟรี</div>
+    </div>
+  );
+}
+
+// ---------- ยุย: เลือกเพลงก่อนเริ่ม QTE (เพลงชุบชีวิตต้องเลือกคนตายด้วย) ----------
+function YuiSongModal({ me, onPick, onClose }) {
+  const [pick, setPick] = useState(null);
+  const songs = me.yuiSongs || [];
+  const dead = me.yuiDead || [];
+  const needTarget = pick === "treasure";
+  return (
+    <div className="fixed inset-0 z-40 bg-black/60 grid place-items-center p-4" onClick={onClose}>
+      <div className="bg-echo-navy rounded-2xl p-5 max-w-lg w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="text-lg font-black text-echo-gold mb-1">🎸 ทำนองเพลงร็อก — เลือกเพลง</div>
+      <div className="text-xs opacity-70 mb-3">
+        เลือกแล้วจะขึ้น QTE ให้กด W/A/S/D ตามจังหวะ ตัวละ 2 วินาที — กดผิดหรือกดไม่ทันแม้ตัวเดียว แต้มสกิลเสียฟรี
+        · เล่นครบ 3 เพลงแบบไม่ซ้ำกันเมื่อไหร่ ยุยจะจากไปทันที (สกิลติดตัว)
+      </div>
+      <div className="grid gap-2">
+        {songs.map((sg) => (
+          <button
+            key={sg.key}
+            onClick={() => { clickSound(); setPick(sg.key); }}
+            className={`text-left rounded-lg border-2 px-3 py-2 transition ${
+              pick === sg.key ? "border-white/70 bg-white/10" : "border-white/15 hover:border-white/40"
+            }`}
+          >
+            <div className="font-bold flex items-center gap-2">
+              🎵 {sg.name}
+              <span className="text-[11px] px-1.5 py-0.5 rounded bg-black/50">{sg.notes} ตัวโน้ต</span>
+              {sg.played && <span className="text-[11px] px-1.5 py-0.5 rounded bg-echo-hp">เล่นไปแล้ว</span>}
+            </div>
+            <div className="text-xs opacity-75 mt-1">{sg.desc}</div>
+          </button>
+        ))}
+      </div>
+      {needTarget && (
+        <div className="mt-3">
+          <div className="text-xs font-bold mb-1">เลือกผู้เล่นที่จะชุบชีวิต</div>
+          {dead.length === 0 ? (
+            <div className="text-xs text-echo-hp">ยังไม่มีผู้เล่นที่ตกรอบ — เพลงนี้ยังใช้ไม่ได้</div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {dead.map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => { clickSound(); onPick("treasure", d.id); }}
+                  className="rounded-lg border-2 border-white/20 hover:border-white/60 px-3 py-1.5 text-sm font-bold"
+                >
+                  {d.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {pick && !needTarget && (
+        <button
+          onClick={() => { clickSound(); onPick(pick, null); }}
+          className="mt-3 w-full rounded-lg py-2 font-black text-gray-900 bg-echo-gold"
+        >
+          เริ่มบรรเลง
+        </button>
+      )}
+      </div>
+    </div>
+  );
+}
+
 // ---------- Bard : คีตกวี — ช่องประพันธ์เพลง (แทนที่ช่องท่าไม้ตาย) ----------
 //  แสดงโน้ต ❤️/💚 ที่เติมไว้ 3 ช่อง — ครบ 3 บรรเลงทำนองเองแล้วล้างช่องเพื่อเริ่มบทเพลงใหม่
 //  patch 2.1.2: จำกัด 2 โน้ตต่อเทิร์น — ระหว่างมิติมายาบรรเลง (โลหิต/วิญญาณ) กดได้สูงสุด 6 ครั้งต่อเทิร์น
@@ -2817,7 +2939,8 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
   const [bylethSwordOpen, setBylethSwordOpen] = useState(false);   // ไบเลธ: หน้าต่างเลือกแบบของ "ดาบต้องสาป"
   const [bylethCourseOpen, setBylethCourseOpen] = useState(false);  // ไบเลธ: หน้าต่างเลือกหลักสูตรของท่าไม้ตาย
   const [connorSel, setConnorSel] = useState(null);                 // คอนเนอร์: โหมดเลือกเป้าหมาย ("secondary" | "ultimate" | null)
-  const [danSel, setDanSel] = useState(null);                       // โมโรโบชิ ดัน: โหมดเลือกเป้าหมาย ("secondary" | "ultimate" | null)
+  const [danSel, setDanSel] = useState(null);
+  const [yuiSongOpen, setYuiSongOpen] = useState(false);            // ยุย: เมนูเลือกเพลงก่อนเริ่ม QTE                       // โมโรโบชิ ดัน: โหมดเลือกเป้าหมาย ("secondary" | "ultimate" | null)
   const [bylethStrikeSel, setBylethStrikeSel] = useState(false);    // ไบเลธ: โหมดเลือกเป้าหมายฟาดดาบ (เลือกตัวเองไม่ได้)
   const [msMarkSel, setMsMarkSel] = useState(false);         // ผู้สังหารเมจ: โหมดเลือกเป้าหมาย Witch Mark (เลือกตัวเองไม่ได้)
   const [msRuptureSel, setMsRuptureSel] = useState(false);   // ผู้สังหารเมจ: โหมดเลือกเป้าหมาย Mana Rupture (เลือกตัวเองไม่ได้)
@@ -3132,6 +3255,8 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
     // อาจารย์ ไบเลธ: สกิลรองเปิดหน้าต่างเลือกแบบ (ฟาดทันที/เสริมดาบ) · ท่าไม้ตายเปิดหน้าต่างเลือกหลักสูตร
     // คอนเนอร์ RK800: สกิลรอง/ท่าไม้ตายเข้าโหมดเลือกเป้าหมายก่อนส่งไป server
     if ((tier === "secondary" || tier === "ultimate") && ch?.id === "conner") { setConnorSel(tier); setSkillOpen(false); return; }
+    // ยุย: ท่าไม้ตายต้องเลือกเพลงก่อน แล้วค่อยเข้า QTE
+    if (tier === "ultimate" && ch?.id === "yui") { setYuiSongOpen(true); setSkillOpen(false); return; }
     // โมโรโบชิ ดัน: สกิลรอง (นายทำให้ฉันผิดหวัง) และท่าไม้ตาย 1 (ฉันบอกว่าอย่าหนี) ต้องเลือกเป้าหมายก่อน
     //  ท่าไม้ตาย 2 (อย่าให้ฉันต้องเฆี่ยนตี) เล็งเป้าเดิมอัตโนมัติ — ส่งไป server ตรงๆ ไม่ต้องจิ้มใคร
     //  (ดูจากธง me.danWhip ที่ server คิดมาให้ ไม่ใช่เดาจากชื่อ/ราคาสกิลบนปุ่ม)
@@ -3264,6 +3389,11 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
   const pickDan = (id) => {
     socket.emit("useSkill", { tier: danSel, targets: [id] });
     setDanSel(null);
+  };
+  // ยุย: เลือกเพลง (+ เป้าหมายชุบชีวิตถ้าเป็นเพลงสมบัติล้ำค่าฯ) -> ส่งไป server แล้วเริ่ม QTE
+  const pickYuiSong = (songKey, targetId) => {
+    socket.emit("useSkill", { tier: "ultimate", item: songKey, targets: targetId ? [targetId] : [] });
+    setYuiSongOpen(false);
   };
   const pickBylethStrike = (id) => {
     socket.emit("useSkill", { tier: "secondary", item: "strike", targets: [id] });
@@ -3687,6 +3817,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
           </div>
         </div>
         {deckOpen && !boss && <DeckLedgerModal ledger={state.deckLedger || []} onClose={() => setDeckOpen(false)} />}
+        {me?.qte && <QtePanel key={me.qte.idx} qte={me.qte} />}
 
         {/* ---------- แผงตัวเรา (ล่างสุด กดง่ายด้วยนิ้วโป้ง) ----------
             ออกแบบใหม่: รูป/แต้มรวม ลอยเป็นป้ายเฉียงเจาะทับขอบบนแผง (ไม่ใช่แถวในกล่องเหมือนเดิม)
@@ -3974,6 +4105,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
           bagOpen={bagOpen} onCloseBag={() => setBagOpen(false)} players={state.players} gameState={state.gameState} roundNumber={state.roundNumber} onPickGunAmmo={startGunPick}
           skillConfirm={skillConfirm} onConfirmSkill={confirmSkillUse} onCancelSkill={cancelSkillConfirm}
         />
+        {yuiSongOpen && me && <YuiSongModal me={me} onPick={pickYuiSong} onClose={() => setYuiSongOpen(false)} />}
       </div>
     );
   }
@@ -4002,6 +4134,9 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
         </div>
       </div>
       {deckOpen && !boss && <DeckLedgerModal ledger={state.deckLedger || []} onClose={() => setDeckOpen(false)} />}
+
+      {/* QTE (ยุย) — ลอยกลางจอ ไม่บังกองการ์ด */}
+      {me?.qte && <QtePanel key={me.qte.idx} qte={me.qte} />}
 
       {/* ตัวจับเวลา + รอบ */}
       {(phase === "PLAYING" || phase === "ATTACK") && (
@@ -4484,6 +4619,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
         bagOpen={bagOpen} onCloseBag={() => setBagOpen(false)} players={state.players} gameState={state.gameState} roundNumber={state.roundNumber} onPickGunAmmo={startGunPick}
         skillConfirm={skillConfirm} onConfirmSkill={confirmSkillUse} onCancelSkill={cancelSkillConfirm}
       />
+      {yuiSongOpen && me && <YuiSongModal me={me} onPick={pickYuiSong} onClose={() => setYuiSongOpen(false)} />}
       </div>
     </div>
   );
