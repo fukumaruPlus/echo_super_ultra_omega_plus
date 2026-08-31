@@ -1582,6 +1582,7 @@ function instantDeath(p, force) {
   // อิสึกะ ชิโด (characters/shido.js): ตายระหว่างกับดักเปิดอยู่ -> จองคิวเกิดใหม่ + คิววีดีโอรอยต่อ
   // ยุย (characters/yui.js): ตกรอบขณะมีคิวชุบชีวิตค้าง — ถ้าไม่เหลือใครแล้ว ให้เป้าหมายฟื้นทันที
   //  (ต้องอยู่ก่อน shido.onDeath ที่อาจย้อนเวลา — ลำดับไหนก็ได้ แต่ต้องอยู่ในชุดเดียวกัน)
+  clearQte(p); // ตกรอบแล้ว QTE ที่ค้างอยู่ต้องหายไปด้วย (ไม่งั้นค้างข้ามการชุบชีวิต/ย้อนเวลา)
   CHAR_HOOKS.yui.onDeath(engine, p);
   CHAR_HOOKS.shido.onDeath(engine, p);
   CHAR_HOOKS.dan.onDeath(engine, p);
@@ -2713,7 +2714,13 @@ function buildStateFor(viewerId) {
         cardCount: p.cards.length,
         cards: takumiBlackout ? null : ((mine || connorScan) ? p.cards : null),
         score: takumiBlackout ? null : ((show || promoShow || allyShow || connorScan) ? scoreOf(p) : null),
-        hp: takumiBlackout ? null : p.hp, maxHp: takumiBlackout ? null : maxHpOf(p), // Locacaca (ซาโตรุ): Max HP ลดถาวรได้ / ทาคุมิ: บังตาระหว่างท่าไม้ตายทำงาน
+        // Locacaca (ซาโตรุ): Max HP ลดถาวรได้ / ทาคุมิ: บังตาระหว่างท่าไม้ตายทำงาน (null = ซ่อนทั้งแถบ)
+        // แบทแมนร่างรถแบทโมบิล: ส่ง 0/0 เพื่อให้ "ไม่มีพลังชีวิต เหลือแต่เกราะ" ตามสเปค
+        //  (LifeBar วาดหัวใจตามจำนวน maxHp — 0 = ไม่มีหัวใจสักดวง แต่ยังไม่ใช่ null จึงไม่ขึ้น "???")
+        //  ค่าจริงในเอนจินยังเต็มอยู่โดยตั้งใจ เพราะมีจุดกวาด `if (hp <= 0) instantDeath()` หลายที่
+        //  ซึ่งจะฆ่าเขาทันทีทั้งที่รถยังไม่พัง — เกราะคือพลังชีวิตของรถตัวจริงอยู่แล้ว (ดู carAbsorb)
+        hp: takumiBlackout ? null : (CHAR_HOOKS.bat_ben.inCar(p) ? 0 : p.hp),
+        maxHp: takumiBlackout ? null : (CHAR_HOOKS.bat_ben.inCar(p) ? 0 : maxHpOf(p)),
         armor: takumiBlackout ? null : p.armor, maxArmor: takumiBlackout ? null : maxArmorOf(p),
         shield: takumiBlackout ? null : p.shield,
         tempHp: p.tempHp || 0, // เลือดชั่วคราว (แกมเบลอร์)
@@ -3449,7 +3456,10 @@ function dealRound() {
     // MOON*CELL (คิชินามิ ฮาคุโนะ patch 2.2.1): เกราะไม่ฟื้นเลยระหว่างท่าไม้ตายทำงาน รวมถึงตัวเอง
     // [โหมงานหนัก] (โคโตเนะ patch 2.2.2): เปลี่ยนไปพังโล่แทนเกราะแล้ว — เกราะฟื้นได้ตามปกติ
     // ผุพัง (สถานะ Universal patch 2.2 beta — ไวท์เล็น "ฉันขอรับไปนะคะ"): เกราะไม่ฟื้นระหว่างมีผล
-    if (!p.armorLocked && !((p.statuses.decay || 0) > 0) && !moonCellActive() && roundNumber % 2 === 0) {
+    //  แบทแมนร่างรถ: เกราะคือ "พลังชีวิตของรถ" ไม่ใช่เกราะจริง — ห้ามฟื้นเอง ไม่งั้นรถซ่อมตัวเองฟรีทุก 2 เทิร์น
+    //  และจะไม่มีวันพังเลยถ้าโดนตีเบาๆ (สเปคระบุว่า "ขึ้นรถถาวรจนกว่ารถจะพัง" = ต้องพังได้จริง)
+    if (!p.armorLocked && !((p.statuses.decay || 0) > 0) && !moonCellActive() && roundNumber % 2 === 0
+        && !CHAR_HOOKS.bat_ben.blocksArmorRegen(p)) {
       healArmor(p, 1);
     }
     // คู่แฝดฮิซากาว่า: แฝดที่พักอยู่ฟื้นเกราะเองได้ตามจังหวะเดียวกัน แม้ไม่ได้ถูกควบคุมอยู่

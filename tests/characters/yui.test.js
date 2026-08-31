@@ -115,6 +115,18 @@ test('QTE: จำนวนตัวโน้ตต่างกันตามค
   assert.equal(yui.SONGS.treasure.notes, 5);
 });
 
+// บั๊กที่เจอจริง: ยุยตายระหว่าง QTE ค้างอยู่ -> p.qte ไม่ถูกล้าง
+//  ถ้าเธอถูกชุบชีวิต/ย้อนเวลากลับมา QTE เก่าจะโผล่ค้างให้เล่นต่อ
+test('QTE: ตกรอบระหว่างเล่นอยู่ -> QTE ถูกล้างทิ้ง', () => {
+  const { y } = setup();
+  yui.beginSong(engine, y, 'my_soul_your_beats');
+  assert.ok(y.qte, 'มี QTE ค้างอยู่');
+  y.hp = 0;
+  engine.instantDeath(y);
+  assert.equal(y.alive, false);
+  assert.equal(y.qte, null, 'QTE ต้องถูกล้างตอนตกรอบ');
+});
+
 // ---------------------------------------------------------------- สกิลพื้นฐาน ปากแจ๋ว
 test('ปากแจ๋ว: ล่อเป้า 1 เทิร์น + ฟื้นเลือด 3', () => {
   const { y, a } = setup();

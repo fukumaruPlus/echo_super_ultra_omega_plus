@@ -130,6 +130,22 @@ test('รถแบทโมบิล: สถานะของร่างรถ
   assert.equal(b.statuses.batDoom, undefined);
 });
 
+// บั๊กที่เจอจริง: เกราะของรถถูกฟื้นอัตโนมัติทุกเทิร์นเลขคู่เหมือนเกราะปกติ
+//  = รถซ่อมตัวเองฟรีและแทบไม่มีวันพัง ขัดกับ "ขึ้นรถถาวรจนกว่ารถจะพัง"
+test('รถแบทโมบิล: เกราะของรถต้องไม่ฟื้นเองตามจังหวะปกติของสนาม', () => {
+  const { b } = setup();
+  assert.equal(bat.blocksArmorRegen(b), false, 'ร่างปกติฟื้นเกราะได้ตามปกติ');
+  bat.activateCar(engine, b);
+  assert.equal(bat.blocksArmorRegen(b), true, 'อยู่บนรถ = ห้ามฟื้นเกราะเอง');
+  b.armor = 1;
+  bat.onArmorLost(engine, b);
+  assert.equal(bat.inCar(b), true, 'เกราะยังเหลือ รถยังไม่พัง');
+  b.armor = 0;
+  bat.onArmorLost(engine, b);
+  assert.equal(bat.inCar(b), false, 'เกราะหมดแล้วรถพัง');
+  assert.equal(bat.blocksArmorRegen(b), false, 'คืนร่างแล้วฟื้นเกราะได้ตามปกติ');
+});
+
 // ---------------------------------------------------------------- ลูกปรายล่อ
 test('ลูกปรายล่อ: ตัดความเสียหายทุกก้อนให้เหลือ 2 หน่วย', () => {
   const { b, a } = setup();
