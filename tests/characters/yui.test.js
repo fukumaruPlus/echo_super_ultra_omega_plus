@@ -78,7 +78,7 @@ test('ยุย: อยู่ใน roster กลุ่ม "พิเศษ" · 
   assert.equal(c.difficulty, 'special');
   assert.equal(c.unique, true, 'เลือกได้แค่ 1 คนต่อเกม');
   assert.equal(c.basic.cost, 2);
-  assert.equal(c.secondary.cost, 4);
+  assert.equal(c.secondary.cost, 6);
   assert.equal(c.ultimate.cost, 6);
 });
 
@@ -125,6 +125,24 @@ test('QTE: ตกรอบระหว่างเล่นอยู่ -> QTE �
   engine.instantDeath(y);
   assert.equal(y.alive, false);
   assert.equal(y.qte, null, 'QTE ต้องถูกล้างตอนตกรอบ');
+});
+
+// บั๊กที่เจอจริง: onQteDone แค่ queueCutscene ไว้เฉยๆ แต่ qteKey ไม่เคยสั่งเล่นคิว
+//  คลิปสำเร็จ/ล้มเหลวเลยค้างไปโผล่ตอนจบรอบ แทนที่จะเล่นทันทีที่กดจบ
+//  เทสต์นี้ใช้ queueCutscene ตัวจริง (ไม่ mock) แล้วดูว่าเกมตัดเข้าเฟส CUTSCENE ให้ทันทีไหม
+test('QTE: คลิปสำเร็จ/ล้มเหลวต้องถูกสั่งเล่นทันทีที่เล่นจบ ไม่ค้างในคิว', () => {
+  const { y } = setup();
+  engine.queueCutscene = saved.queueCutscene; // ใช้ของจริงเพื่อให้คิวมีของจริงๆ
+  try {
+    engine.setGameState('PLAYING');
+    yui.beginSong(engine, y, 'girl_dont_cry');
+    playQte(y);
+    assert.equal(engine.gameState, 'CUTSCENE', 'ต้องตัดเข้าเฟสคัตซีนทันทีที่ QTE จบ');
+  } finally {
+    engine.setGameState('PLAYING');
+    engine.clearPhaseTimer();
+    engine.queueCutscene = (p, key) => { queued.push(key); };
+  }
 });
 
 // ---------------------------------------------------------------- สกิลพื้นฐาน ปากแจ๋ว

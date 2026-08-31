@@ -30,7 +30,7 @@ const TAUNT_HEAL = 3;
 // ---------- สกิลรอง เยอรมันซูเพล็ก ----------
 const WRESTLE_TURNS = 3;
 const WRESTLE_REDUCE = 1;        // ความเสียหายที่ได้รับเบาลง
-const WRESTLE_COUNTER = 3;       // สวนคืนเมื่อถูกโจมตีปกติ
+const WRESTLE_COUNTER = 2;       // สวนคืนเมื่อถูกโจมตีปกติ (patch 3.2: 3 -> 2)
 const WRESTLE_USES = 1;          // สวนได้กี่ครั้ง (girl don't cry ทำให้เป็น 2)
 const WRESTLE_USES_ROCK = 2;
 

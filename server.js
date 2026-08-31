@@ -946,12 +946,16 @@ function qtePending() {
   return alivePlayers().some((p) => p.qte);
 }
 // จบ QTE แล้วส่งผลให้เจ้าของ (ok = ผ่านครบทุกตัว)
+//  เจ้าของ QTE มักคิววีดีโอ "สำเร็จ/ล้มเหลว" ไว้ใน onQteDone — ต้องสั่งเล่นทันทีตรงนี้
+//  ไม่งั้นคลิปจะค้างอยู่ในคิวไปโผล่ตอนจบรอบ (คนละจังหวะกับที่ผู้เล่นเพิ่งกดจบ)
+//  pausePlayingForCutscene() พักเฟสจั่วไพ่แล้วคืนเวลาที่เหลือให้เมื่อคลิปจบ — แพทเทิร์นเดียวกับ useSkill()
 function finishQte(p, ok) {
   const qte = p.qte;
   if (!qte) return;
   p.qte = null;
   const hook = CHAR_HOOKS[qte.tag];
   if (hook && hook.onQteDone) withEffectSource(p, () => hook.onQteDone(engine, p, ok, qte));
+  if (gameState === "PLAYING" && cutsceneQueue.length) pausePlayingForCutscene();
 }
 // ผู้เล่นกดปุ่ม — ตรวจทั้ง "ตัวถูกไหม" และ "มาทันไหม" ที่ server
 function qteKey(id, key) {
