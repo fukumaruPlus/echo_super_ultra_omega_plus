@@ -1928,7 +1928,8 @@ const CHARACTERS = [
     id: "shido",
     name: "อิสึกะ ชิโด",
     avatar: 0,
-    difficulty: "easy",
+    difficulty: "special",
+    unique: true, // เลือกได้แค่ 1 คนต่อเกม (server.js กันซ้ำที่ handler "join")
     img: "/characters/shido/shido.jpg",
     // ---------- อิสึกะ ชิโด (patch 2.9 new) — ดู characters/shido.js ----------
     //  เอาความเจ็บที่ได้รับมาแปลงเป็นพลังดาบ — ยิ่งโดนตีหนัก Sandalphon ยิ่งแรง

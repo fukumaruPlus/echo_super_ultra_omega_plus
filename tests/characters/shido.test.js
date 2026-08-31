@@ -61,10 +61,11 @@ function hit(from, target, n) {
 }
 
 // ---------------------------------------------------------------- ข้อมูลตัวละคร
-test('ชิโด: อยู่ใน roster กลุ่ม "ง่าย" พร้อมสกิลครบและค่าใช้ตรงสเปค', () => {
+test('ชิโด: อยู่ใน roster กลุ่ม "พิเศษ" · unique · สกิลครบและค่าใช้ตรงสเปค', () => {
   const c = CHARACTERS.CHAR_BY_ID.shido;
   assert.ok(c, 'ต้องมีตัวละคร shido ใน characters.js');
-  assert.equal(c.difficulty, 'easy');
+  assert.equal(c.difficulty, 'special');
+  assert.equal(c.unique, true, 'เลือกได้แค่ 1 คนต่อเกม');
   assert.equal(c.basic.cost, 2);
   assert.equal(c.secondary.cost, 4);
   assert.equal(c.ultimate.cost, 8);
