@@ -1494,6 +1494,9 @@ function maxArmorOf(p) {
   }
   // คิชินามิ ฮาคุโนะ (patch 2.2.1): เพดานเกราะคงที่ตามเพศ (แทน MAX_ARMOR ปกติ) — ชาย 2 / หญิง 3
   // เอวานเกเลี่ยน หมายเลข 13 (patch 2.2 alpha): ไม่มีเกราะเลยตามปกติ (เพดาน 0) — ได้เพดาน +1 เฉพาะช่วงสกิลติดตัว 3 ทำงาน (ด้านล่าง)
+  // แบทแมน: ระหว่างอยู่บนรถแบทโมบิล เพดานเกราะ = พลังชีวิตของรถ (7)
+  const batCarArmor = CHAR_HOOKS.bat_ben.maxArmor(p);
+  if (batCarArmor != null) return batCarArmor;
   const escanorArmor = (p && p.characterId === "escanor" && CHAR_HOOKS.escanor.maxArmor) ? CHAR_HOOKS.escanor.maxArmor(p) : null;
   // Last Stand: "เกราะ 0" เป็นค่าตายตัวของร่าง — คืนก่อนบวกโบนัสใดๆ ไม่งั้นบัฟเพดานเกราะจากเพื่อนร่วมทีมทะลุได้
   if (escanorArmor === 0) return 0;
@@ -1577,6 +1580,9 @@ function instantDeath(p, force) {
   CHAR_HOOKS.conner.onDeath(engine, p);
   // โมโรโบชิ ดัน (characters/dan.js): เป้าหมาย "จงหลบแต่อย่าหนี"/ศิษย์ตกรอบ (หรือดันเองตกรอบ) -> ปลดสถานะทั้งสองฝั่ง
   // อิสึกะ ชิโด (characters/shido.js): ตายระหว่างกับดักเปิดอยู่ -> จองคิวเกิดใหม่ + คิววีดีโอรอยต่อ
+  // ยุย (characters/yui.js): ตกรอบขณะมีคิวชุบชีวิตค้าง — ถ้าไม่เหลือใครแล้ว ให้เป้าหมายฟื้นทันที
+  //  (ต้องอยู่ก่อน shido.onDeath ที่อาจย้อนเวลา — ลำดับไหนก็ได้ แต่ต้องอยู่ในชุดเดียวกัน)
+  CHAR_HOOKS.yui.onDeath(engine, p);
   CHAR_HOOKS.shido.onDeath(engine, p);
   CHAR_HOOKS.dan.onDeath(engine, p);
   CHAR_HOOKS.kai.pruneOverhaulSlots(engine); // ไค ชิซากิ: ผู้ถือรังสรรค์/ลงทัณฑ์ตกรอบ -> ลบออกจาก Overhaul tracker
@@ -1666,6 +1672,8 @@ function displayImg(p) {
   if (p.characterId === "eiji") { const eimg = CHAR_HOOKS.eiji.displayImg(p); if (eimg) return eimg; }
   // ฮารุกะ: ระหว่างสถานะ "โอเมก้า" จากท่าไม้ตาย New Omega = ภาพ new_omega.jpg (null = ใช้ภาพปกติ)
   if (p.characterId === "haruka") { const himg = CHAR_HOOKS.haruka.displayImg(p); if (himg) return himg; }
+  // แบทแมน: ระหว่างอยู่บนรถแบทโมบิล = ภาพรถ (null = ใช้ภาพปกติ)
+  if (p.characterId === "bat_ben") { const bimg = CHAR_HOOKS.bat_ben.displayImg(p); if (bimg) return bimg; }
   // โอเบรอน: ร่างสลับตามช่วงเวลากลางวัน/กลางคืนเสมอ
   if (p.characterId === "oberon") return isNightRound(roundNumber) ? OBERON_NIGHT_IMG : OBERON_MORNING_IMG;
   // ชเรด เอลัน: รวมร่างทำนองเพลงแล้ว = ร่างอควาเรียน สปาด้า ถาวร
@@ -1903,6 +1911,10 @@ function activeSkillMusic() {
 function loseHp(p) {
   hisakawaSyncIn(p);
   if (friendlyEffectBlocked(p)) return;
+  // แบทแมนร่างรถแบทโมบิล (characters/bat_ben.js): พลังชีวิตลดไม่ได้เลย — ความเสียหายไปลงเกราะ (พลังชีวิตของรถ)
+  //  ต้องอยู่บนสุดของ loseHp เพราะนี่คือจุดคอขวดเดียวที่ hp จะลดได้ ทำให้ครอบคลุมทั้งดาเมจทะลุเกราะ
+  //  (dealDirect = สกิลติดตัว 2 "รถคู่ใจ") และดาเมจที่ทะลุเกราะมาเพราะเกราะหมดพอดี
+  if (CHAR_HOOKS.bat_ben.carAbsorb(engine, p)) { hisakawaSyncOut(p); return; }
   if ((p.tempHp || 0) > 0) { p.tempHp--; hisakawaSyncOut(p); return; }
   if (isYuuki(p) && effectSourceId && effectSourceId !== YUUKI_ID && players[effectSourceId]) p.lastDamageSourceId = effectSourceId;
   // ฉันจะไม่ยอมสูญเสียใครไปอีก (ริดดี้ patch 2.1.1): ริดดี้เองตายไม่ได้ — เลือดค้างที่ 1
@@ -1959,6 +1971,9 @@ function loseArmor(p) {
   CHAR_HOOKS.hikaru.onArmorLost(engine, p);
   // ไม่อยากให้ใครต้องเจ็บปวด (ริต้า เบอร์นัล, characters/phenex.js): ระหว่างล่อเป้า สะสม "ความเจ็บปวด" +1 ทุกๆ 1 หน่วยเกราะที่เสียไป
   CHAR_HOOKS.phenex.onArmorLost(p);
+  // แบทแมนร่างรถ (characters/bat_ben.js): เกราะคือพลังชีวิตของรถ — หมดเมื่อไหร่คือรถพัง
+  //  ต้องเช็คที่นี่ด้วย ไม่ใช่แค่ใน carAbsorb: ถ้าดาเมจพอดีกับเกราะที่เหลือ ท่อจะไม่เคยเรียก loseHp เลย
+  CHAR_HOOKS.bat_ben.onArmorLost(engine, p);
   if (!linkMirror) {
     const buddies = linkedBuddiesOf(p);
     linkMirror = true;
@@ -2254,6 +2269,7 @@ function resetCombat(p) {
   CHAR_HOOKS.conner.resetCombat(p); // คอนเนอร์: ความเครียดของทุกคน + คำขาดจับกุม/สถานะไล่ล่า/โควตาฟื้นคืนชีพ
   CHAR_HOOKS.byleth.resetCombat(p); // ความรู้/หลักสูตร/ผลทบทวนบทเรียนที่ค้าง + ธงสตั้น-ห้ามสกิลพื้นฐานที่หลักสูตรของไบเลธตั้งไว้ให้คนอื่น
   CHAR_HOOKS.haruka.resetCombat(p); // harukaBasicUses / harukaBleedProcs (โควตารายเทิร์น) + harukaStunPending (สตั้นค้างจากการสวนกลับ)
+  CHAR_HOOKS.bat_ben.resetCombat(p); // แบทแมน: ร่างรถแบทโมบิล + โควตากดครั้งเดียวต่อเกม
   CHAR_HOOKS.yui.resetCombat(p);   // ยุย โยชิโอกะ: เพลงที่เล่นแล้ว / คิวชุบชีวิต / ธงกันลูปการจั่วตาม
   CHAR_HOOKS.shido.resetCombat(p); // อิสึกะ ชิโด: ดาเมจที่บันทึกไว้ / กับดักฝากด้วยนะตัวฉัน / คิวเกิดใหม่
   CHAR_HOOKS.dan.resetCombat(p); // โมโรโบชิ ดัน: เป้าหมาย "จงหลบแต่อย่าหนี" / ศิษย์ / สตรีคแพ้แต้มติดกัน
@@ -2613,6 +2629,12 @@ function buildStateFor(viewerId) {
         basicPub = pub(CHAR_HOOKS.kotone.dynamicSkillFor(p, ch, "basic", nightNow));
         secondaryPub = pub(CHAR_HOOKS.kotone.dynamicSkillFor(p, ch, "secondary", nightNow));
         ultimatePub = pub(CHAR_HOOKS.kotone.dynamicSkillFor(p, ch, "ultimate", nightNow));
+      }
+      // แบทแมน (patch 3.1): ขึ้นรถแบทโมบิลแล้ว — ทั้งสามช่องเปลี่ยนเป็นเวอร์ชันรถ
+      if (ch.id === "bat_ben" && CHAR_HOOKS.bat_ben.inCar(p)) {
+        basicPub = pub(ch.basic2);
+        secondaryPub = pub(ch.secondary2);
+        ultimatePub = pub(ch.ultimate2);
       }
       // โมโรโบชิ ดัน (patch 2.8 new): สกิลติดตัว "ครูฝึกสุดเหี้ยม" — เป้าหมาย "จงหลบแต่อย่าหนี" แพ้แต้มติดกัน 2 ครั้ง
       //  -> ปุ่มท่าไม้ตายกลายเป็น "อย่าให้ฉันต้องเฆี่ยนตี" (ต้องคิดสูตรเดียวกับ useSkill เป๊ะ ไม่งั้นราคาบนปุ่มไม่ตรงกับที่หักจริง)
@@ -3808,6 +3830,8 @@ function useSkill(id, tier, targets, item) {
   // โมโรโบชิ ดัน (patch 2.8 new): สกิลติดตัว "ครูฝึกสุดเหี้ยม" — เป้าหมาย "จงหลบแต่อย่าหนี" แพ้แต้มติดกัน 2 ครั้ง
   //  (ไม่นับไพ่แตก) -> ช่องท่าไม้ตายกลายเป็น "อย่าให้ฉันต้องเฆี่ยนตี" สำหรับเทิร์นนั้น (publicState คิดสูตรเดียวกัน)
   if (ch && ch.id === "dan") skill = CHAR_HOOKS.dan.dynamicSkillFor(engine, p, ch, tier);
+  // แบทแมน (patch 3.1): ขึ้นรถแบทโมบิลแล้ว — ทั้งสามช่องเปลี่ยนเป็นเวอร์ชันรถ
+  if (ch && ch.id === "bat_ben") skill = CHAR_HOOKS.bat_ben.dynamicSkillFor(p, ch, tier);
   if (!skill) return;
   const isEscanorSkill = p.characterId === "escanor";
   const isHisakawaSkill = p.characterId === "hisakawa_sister";
@@ -4081,11 +4105,11 @@ function useSkill(id, tier, targets, item) {
   // อืม ฉันเข้าใจแล้ว (สกิลพื้นฐาน): ชักดาบยังค้างอยู่ กดซ้ำไม่ได้ (ไม่งั้นเสียเลือด 3 ฟรี)
   const isPShikiBlade = p.characterId === "princess_shiki" && tier === "basic";
   if (isPShikiBlade && !CHAR_HOOKS.princess_shiki.canCastBlade(p)) return;
-  // ---------- แบทแมน (patch 2.2.7, characters/bat_ben.js) ----------
-  const isBatStealth = p.characterId === "bat_ben" && tier === "basic";     // เร้นเงา
-  if (isBatStealth && !CHAR_HOOKS.bat_ben.canCastStealth(p)) return;        // ซ่อนอยู่แล้ว ต่ออายุหนีกับดักไม่ได้
-  const isBatKarma = p.characterId === "bat_ben" && tier === "secondary";   // นายลืมของน่ะ
-  if (isBatKarma && !CHAR_HOOKS.bat_ben.canCastKarma(p)) return;            // ยังตั้งรับอยู่/ยังไม่ได้เลือกส่งต่อ
+  // ---------- แบทแมน (patch 3.1, characters/bat_ben.js) ----------
+  //  ร่างปกติ: พื้นฐาน = รถแบทโมบิล (ครั้งเดียวต่อเกม) · รอง = นายลืมของน่ะ · ไม้ตาย = เข้ามาเลย
+  //  ร่างรถ: ทั้งสามช่องเปลี่ยนเป็นเวอร์ชันรถ (ลูกปรายล่อ / ปืนติดรถ / แกไม่รอดแน่)
+  const isBatPick = p.characterId === "bat_ben";
+  if (isBatPick && !CHAR_HOOKS.bat_ben.canUseSkill(engine, p, tier)) return;
   // ---------- บานาจ ลิงก์ (patch 2.1.2, characters/banagher.js): Absorb shield — เลือกเป้าหมาย 1 คน (เลือกตัวเองได้) ----------
   const isBanagherShield = p.characterId === "banagher" && tier === "basic";
   let banagherShieldTarget = null;
@@ -4349,7 +4373,8 @@ function useSkill(id, tier, targets, item) {
   }
 
   // ---------- แบทแมน (characters/bat_ben.js) ----------
-  if (st === "batStealth") CHAR_HOOKS.bat_ben.activateStealth(engine, p);
+  //  สกิลที่ไม่ได้ผูกกับสถานะ (รถแบทโมบิล + ทั้งสามช่องของร่างรถ) ลงผลผ่าน applyInstantSkill
+  if (isBatPick) flashSuffix = CHAR_HOOKS.bat_ben.applyInstantSkill(engine, p, tier) || flashSuffix;
   if (st === "batKarma") CHAR_HOOKS.bat_ben.activateKarma(engine, p);
   if (st === "batTaunt") CHAR_HOOKS.bat_ben.activateTaunt(engine, p);
   // ---------- เจ้าหญิงราก (characters/princess_shiki.js) ----------
@@ -5344,6 +5369,8 @@ function afterResolve() {
   CHAR_HOOKS.dan.onAfterResolve(engine);
   // ---------- ยุย (characters/yui.js): my soul your beats — ไพ่แตกกลางจังหวะเพลงรับความเสียหาย ----------
   CHAR_HOOKS.yui.onAfterResolve(engine);
+  // ---------- แบทแมน (characters/bat_ben.js): แกไม่รอดแน่ — พุ่งชนคนที่ไพ่แตก ----------
+  CHAR_HOOKS.bat_ben.onAfterResolve(engine);
 
   const activated = [];
   for (const p of alivePlayers()) {
@@ -5429,11 +5456,6 @@ function afterSummary() {
   }
 
   // แบทแมน (characters/bat_ben.js): ระหว่างเร้นเงา ออกจากเงามืดมาโจมตีไม่ได้
-  if (winner && winner.alive && CHAR_HOOKS.bat_ben.cannotAttack(winner)) {
-    lastLog.push(`🌑 ${winner.name} ยังเร้นเงาอยู่ — ไม่ออกมาจากความมืด ไม่มีเทิร์นโจมตี`);
-    endTurn();
-    return;
-  }
   // เจ้าหญิงราก (characters/princess_shiki.js): สกิลติดตัว — โจมตีปกติไม่ได้เลย เว้นแต่ติด "ชักดาบ"
   if (winner && winner.alive && CHAR_HOOKS.princess_shiki.cannotAttack(winner)) {
     lastLog.push(`👁️ ${winner.name} ไม่ได้ชักดาบออกมา — ไม่มีเทิร์นโจมตี (สกิลติดตัว · ใช้สกิลพื้นฐาน "อืม ฉันเข้าใจแล้ว" เพื่อโจมตีได้)`);
@@ -5633,7 +5655,6 @@ function doAttack(byId, targetId) {
     if (isYuuki(attacker)) postAttackFollowup(attacker);
     return;
   }
-  if (CHAR_HOOKS.bat_ben.cannotAttack(attacker)) return;              // แบทแมน (patch 2.2.7): ระหว่างเร้นเงา โจมตีไม่ได้
   if (CHAR_HOOKS.princess_shiki.cannotAttack(attacker)) return;       // เจ้าหญิงราก (patch 2.2.7): โจมตีไม่ได้ เว้นแต่ติดชักดาบ
   // ไค ชิซากิ: โทสะระงับด้วยโทสะ — มีคู่ปรับ (kaiRival1/kaiRival2 ยังไม่หมด) บังคับเป้าหมายมีแค่คู่ปรับเท่านั้น
   if (attacker.kaiRivalId && ((attacker.statuses.kaiRival1 || 0) > 0 || (attacker.statuses.kaiRival2 || 0) > 0) && target.id !== attacker.kaiRivalId) {
@@ -5981,6 +6002,8 @@ function doAttack(byId, targetId) {
   const danCounterFx = CHAR_HOOKS.dan.onAttackedNormally(engine, attacker, target);
   // ยุย (characters/yui.js): เยอรมันซูเพล็ก — สวนกลับผู้ที่โจมตีปกติใส่ (เล่นวีดีโอก่อนสรุปความเสียหาย)
   const yuiCounterFx = CHAR_HOOKS.yui.onAttackedNormally(engine, attacker, target);
+  // แบทแมน (characters/bat_ben.js): ปืนติดรถ — ใช้แล้วหมดกระสุน (ดาเมจถูกบวกไปแล้วที่ computeAttackBase)
+  const batGunFired = CHAR_HOOKS.bat_ben.consumeGun(engine, attacker);
   // Ginga Strium (ฮิคารุ, characters/hikaru.js): โจมตีโดนเป้าหมาย -> ติดลุกไหม้ให้เป้าหมาย / ถูกโจมตีขณะอยู่ในร่างนี้ -> ผู้โจมตีติดลุกไหม้สวนกลับ
   CHAR_HOOKS.hikaru.onAttackBurnApply(engine, attacker, target);
   const escanorAttackVideoQueued = CHAR_HOOKS.escanor.onAttackLanded(engine, attacker, target);
@@ -6260,6 +6283,7 @@ function doAttack(byId, targetId) {
   if (batReflectDmg > 0) addFx({ name: `เข้ามาเลย — ความเสียหายเกิดกับผู้โจมตีด้วย -${batReflectDmg}`, img: BAT_SKILL3_IMG, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   // ---------- มิซึซาว่า ฮารุกะ (characters/haruka.js) ----------
   if (harukaPunishFx.punishStacks > 0) addFx({ name: `จงไปสู่สุขติ — ระเบิดเลือดไหล +${harukaPunishFx.punishStacks}`, img: CHAR_HOOKS.haruka.IMG.skill2, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
+  if (batGunFired) addFx({ name: `ปืนติดรถ +${CHAR_HOOKS.bat_ben.GUN_BONUS}`, img: CHAR_HOOKS.bat_ben.IMG_GUN, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
   if (yuiCounterFx) addFx({ name: `เยอรมันซูเพล็ก — ทุ่มสวนกลับ -${yuiCounterFx.dmg}`, img: CHAR_HOOKS.yui.IMG.skill2, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (danCounterFx) addFx({ name: `นายทำให้ฉันผิดหวัง — สวนกลับศิษย์ -${danCounterFx.dmg}`, img: CHAR_HOOKS.dan.IMG.skill2, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (connerCounterFired) addFx({ name: "การป้องกันตัว — สวนกลับผู้โจมตีทั้งสองคน", img: CHAR_HOOKS.conner.IMG.base, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
@@ -6289,7 +6313,7 @@ function doAttack(byId, targetId) {
   //  / อย่าอยู่เลย แกน่ะ! (ริต้า เบอร์นัล patch 2.1.6) / ฉันยัง...มองเห็นอยู่!!! กันตาย + อย่างนายน่ะ จะไปเข้าใจอะไร (สึงาชิ ทาคุโตะ patch 2.2.4):
   //  เล่นวีดีโอที่ค้างคิวก่อน แล้วค่อยขึ้นสรุปความเสียหาย
   //  (ปกติทุกท่าอื่นจะขึ้นสรุปความเสียหายก่อนแล้วค่อยเล่นวีดีโอค้างคิวตอนจบ — ท่าเหล่านี้กลับลำดับเฉพาะตัว)
-  if ((yuukiAttackVideoQueued || isYuuki(target) || beamPlusAtk || (beam && attacker.characterId === "banagher") || unibeam2Atk || storiumAtk || phenexPurgeAtk || miyakoUltAtk || triggerMultiAtk || triggerZeperionAtk || escanorAttackVideoQueued || (beatSaveFired && target.characterId === "takuto") || takutoUlt2VideoQueued || eijiSwordFx.videoQueued || harukaPunishFx.videoQueued || (harukaCounterFx && harukaCounterFx.videoQueued) || (danCounterFx && danCounterFx.videoQueued) || (yuiCounterFx && yuiCounterFx.videoQueued)) && cutsceneQueue.length) runCutsceneQueue(showAttackFx);
+  if ((yuukiAttackVideoQueued || isYuuki(target) || beamPlusAtk || (beam && attacker.characterId === "banagher") || unibeam2Atk || storiumAtk || phenexPurgeAtk || miyakoUltAtk || triggerMultiAtk || triggerZeperionAtk || escanorAttackVideoQueued || (beatSaveFired && target.characterId === "takuto") || takutoUlt2VideoQueued || eijiSwordFx.videoQueued || harukaPunishFx.videoQueued || (harukaCounterFx && harukaCounterFx.videoQueued) || (danCounterFx && danCounterFx.videoQueued) || (yuiCounterFx && yuiCounterFx.videoQueued) || batGunFired) && cutsceneQueue.length) runCutsceneQueue(showAttackFx);
   else showAttackFx();
 }
 
@@ -6432,9 +6456,6 @@ function endTurn() {
         }
         // เร้นเงาหมดเวลา (แบทแมน patch 2.2.7, characters/bat_ben.js): เล่นวีดีโอ -> ระเบิดใส่ทุกคน + ใบ้สกิลคนอื่น
         //  patch 2.2.7.1: ทำงานเสมอเมื่อครบ 3 เทิร์น — โดนโจมตีระหว่างทางไม่ทำให้สถานะหลุดอีกแล้ว
-        if (k === "batStealth" && p.characterId === "bat_ben") {
-          CHAR_HOOKS.bat_ben.onStealthExpire(engine, p);
-        }
         // ความตายที่โรยราหมดเวลา (ชิกิ patch 2.0.6.1): ลบเส้นชีวิตส่วนที่ท่าไม้ตายแจกไปออกจากทุกคน
         if (k === "wither" && p.characterId === "shiki") {
           clearWitherLines(p.id);

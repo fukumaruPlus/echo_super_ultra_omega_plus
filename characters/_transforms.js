@@ -10,9 +10,21 @@ const connorImg = require("./conner").IMG; // คอนเนอร์ RK800: �
 const danImg = require("./dan").IMG;       // โมโรโบชิ ดัน: เหตุผลเดียวกัน
 const shidoImg = require("./shido").IMG;   // อิสึกะ ชิโด: เหตุผลเดียวกัน
 const yuiImg = require("./yui").IMG;       // ยุย โยชิโอกะ: เหตุผลเดียวกัน
+const BAT_CAR_IMG = "/characters/bat_ben/bat_update/bat_ben_car.webp";
+const BAT_SHOT_IMG = "/characters/bat_ben/bat_update/skill1.2/bat_ben_skill1.2.jpg";
+const BAT_GUN_IMG = "/characters/bat_ben/bat_update/skill2.2/bat_ben_skill2.2.png";
+const BAT_DOOM_IMG = "/characters/bat_ben/bat_update/skill3.2/bat_ben_skill3.2.png";
 
 module.exports = function buildTransforms(img) {
   return {
+    // ---------- แบทแมน ร่างรถแบทโมบิล (patch 3.1) ----------
+    //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก (7.88/9.46/8.64/6.37/5.53)
+    //  ทุกคลิปเรียกผ่าน queueCutscene = เล่นทุกครั้งที่ทำงาน
+    batCar:     { img: BAT_CAR_IMG,   video: "/characters/bat_ben/bat_update/skill1_update/bat_ben_skill1.mp4", title: "รถแบทโมบิล",             label: "ขึ้นรถ",          seconds: 9,  music: null, afterReveal: false },
+    batCarShot: { img: BAT_SHOT_IMG,  video: "/characters/bat_ben/bat_update/skill1.2/bat_ben_skill1.2.mp4",    title: "ลูกปรายล่อ",             label: "กางเกราะ",        seconds: 11, music: null, afterReveal: false },
+    batGun:     { img: BAT_GUN_IMG,   video: "/characters/bat_ben/bat_update/skill2.2/bat_ben_skill2.2.mp4",    title: "ปืนติดรถ",               label: "ยิง",             seconds: 10, music: null, afterReveal: false },
+    batDoom:    { img: BAT_DOOM_IMG,  video: "/characters/bat_ben/bat_update/skill3.2/bat_ben_skill3.2.mp4",    title: "ฉันไม่เคยปล่อยใครรอดพ้น", label: "พุ่งชน",          seconds: 8,  music: null, afterReveal: false },
+    batCarFail: { img: BAT_CAR_IMG,   video: "/characters/bat_ben/bat_update/bat_ben_car_fail.mp4",             title: "รถแบทโมบิลพังยับ",        label: "คืนร่าง",         seconds: 7,  music: null, afterReveal: false },
     // ---------- ยุย โยชิโอกะ (patch 3.0 new) ----------
     //  ทุกคลิปเรียกผ่าน queueCutscene = เล่นทุกครั้งที่ทำงาน
     //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก (17.56 -> 19 · 2.60/2.84 -> 4 · 14.35 -> 16)
@@ -241,8 +253,6 @@ module.exports = function buildTransforms(img) {
     takumiBlackoutBust: { img: "/characters/takumi/takumi_skill3.jpg", video: "/characters/takumi/takumi_skill3_second.mp4", title: "ถึงจะมองไม่เห็น แต่ฉันยังอยู่", label: "ไพ่แตก", seconds: 10, music: null, afterReveal: false }, // takumi_skill3_second.mp4 ~9.86s
     // ---------- แบทแมน (เบน แอฟเฟล็ก) (patch 2.2.7) ----------
     // seconds วัดจากความยาววีดีโอจริง (+buffer ~0.5-1 วิ กันตัดก่อนจบ)
-    // batStealthBurst: สกิลพื้นฐาน เร้นเงา — เล่นตอนสถานะหมดเวลาเอง (ท้ายเทิร์น) ก่อนระเบิดใส่ทุกคน
-    batStealthBurst: { img: "/characters/bat_ben/bat_ben_skill1.jpg", video: "/characters/bat_ben/bat_ben_skill1.mp4", title: "เร้นเงา", label: "ออกจากเงามืด", seconds: 10, music: null, afterReveal: false }, // bat_ben_skill1.mp4 ~9.48s
     // batKarmaSend: สกิลรอง นายลืมของน่ะ — เล่นตอนเลือกเป้าหมายส่งต่อความเสียหาย ก่อนความเสียหายเกิดขึ้น
     batKarmaSend: { img: "/characters/bat_ben/bat_ben_skill2.jpg", video: "/characters/bat_ben/bat_ben_skill2.mp4", title: "นายลืมของน่ะ", label: "ส่งคืนความเสียหาย", seconds: 7, music: null, afterReveal: false }, // bat_ben_skill2.mp4 ~6.28s
     // batTaunt: ท่าไม้ตาย เข้ามาเลย — เล่นทันทีตอนกด (ก่อนเปิดการ์ด) แล้วเพลง bat_ben_theme เล่นค้าง

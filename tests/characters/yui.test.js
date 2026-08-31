@@ -242,9 +242,30 @@ test('สมบัติล้ำค่าฯ: ยุยยืนเฉยๆ 5 
   assert.equal(y.statuses.yuiWait, undefined, 'ยุยขยับได้แล้ว');
 });
 
-test('สมบัติล้ำค่าฯ: ยุยตายก่อน -> ผลหายไป ไม่มีการชุบชีวิต', () => {
-  const { y, a } = setup();
+// บั๊กที่เจอจริง: บรรเลงเพลงชุบชีวิตเป็นเพลงที่ 3 พอดี -> "ความปรารถนา" ฆ่ายุยในจังหวะเดียวกัน
+//  เป้าหมายเลยค้างตายถาวรและเกมจบแบบไม่มีใครได้อะไร
+test('สมบัติล้ำค่าฯ: ยุยตายแล้วไม่เหลือใครอีก -> เป้าหมายฟื้นทันที ไม่รอครบ 5 เทิร์น', () => {
+  const { y, a, b } = setup();
   a.alive = false; a.hp = 0;
+  b.alive = false; b.hp = 0;   // เหลือแค่ยุยกับเป้าหมาย
+  y.yuiSongs = ['girl_dont_cry', 'my_soul_your_beats'];
+  y.yuiReviveTargetId = a.id;
+
+  yui.beginSong(engine, y, 'treasure');
+  playQte(y);
+
+  assert.equal(y.yuiSongs.length, 3);
+  assert.equal(y.alive, false, 'ความปรารถนาฆ่ายุยทันที');
+  assert.equal(a.alive, true, 'เป้าหมายฟื้นทันที ไม่ต้องรอ 5 เทิร์น');
+  assert.equal(a.hp, yui.REVIVE_HP);
+  assert.equal(a.statuses.yuiMelody, yui.MELODY_TURNS);
+  assert.equal(y.yuiReviveRound, 0, 'คิวถูกล้างแล้ว');
+});
+
+test('สมบัติล้ำค่าฯ: ยุยตายก่อนแต่ยังมีคนเล่นต่อได้ -> ผลหายไป ไม่มีการชุบชีวิต', () => {
+  const { y, a, b } = setup();
+  a.alive = false; a.hp = 0;
+  assert.ok(b.alive, 'ยังมีคนอื่นเหลืออยู่ = ไม่เข้าเงื่อนไขฟื้นทันที');
   y.yuiReviveTargetId = a.id;
   yui.beginSong(engine, y, 'treasure');
   playQte(y);

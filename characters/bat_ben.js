@@ -1,5 +1,14 @@
 // ============================================================
-//  แบทแมน (เบน แอฟเฟล็ก) (patch 2.2.7) — เร้นเงา / นายลืมของน่ะ / เข้ามาเลย / อัศวินรัตติกาล
+//  แบทแมน (เบน แอฟเฟล็ก) (patch 3.1) — รถแบทโมบิล / นายลืมของน่ะ / เข้ามาเลย / อัศวินรัตติกาล
+//
+//  patch 3.1: ถอด "เร้นเงา" ออกจากเกมทั้งหมด แล้วแทนที่ด้วย "รถแบทโมบิล" (กดได้ครั้งเดียวต่อเกม)
+//  ซึ่งเป็น **ร่างที่ 2 ของตัวละคร** — ขึ้นรถแล้วสลับทั้งสามช่องสกิลเป็นเวอร์ชันรถ (basic2/secondary2/ultimate2)
+//
+//  กลไกสำคัญของร่างรถอยู่ที่ "ท่อดาเมจ" ทั้งหมด และรวมศูนย์ไว้ที่ carAbsorb() จุดเดียว
+//  ซึ่งถูกเรียกจาก **หัวของ loseHp()** — จุดคอขวดเดียวที่พลังชีวิตจะลดลงได้:
+//    · ระหว่างอยู่บนรถ พลังชีวิตของแบทแมนลดไม่ได้เลย ความเสียหายไปลงที่เกราะ (= พลังชีวิตของรถ) แทน
+//    · การโจมตี "ทะลุเกราะ" (dealDirect) จึงกลายเป็นความเสียหายที่เกราะโดยอัตโนมัติ = สกิลติดตัว 2 "รถคู่ใจ"
+//    · เกราะหมดเมื่อไหร่ = รถพัง -> เล่นวีดีโอ แล้วคืนร่างด้วยพลังชีวิตเต็ม 7 (กดขึ้นรถอีกไม่ได้ตลอดเกม)
 //  เขียนแยกไฟล์ตั้งแต่ต้น (ไม่เคยอยู่ใน server.js) — ดู characters/index.js สำหรับไฟล์มัดรวม
 //
 //  หมายเหตุ: กลไก 2 อย่างของตัวนี้เกาะกับ shared infra ของ server.js จึงมี call site อยู่ที่นั่นด้วย
@@ -13,10 +22,15 @@
 //  จึงไม่มี onDamaged() แล้ว (เอา hook ออกจาก loseHp()/loseArmor() ใน server.js ด้วย)
 // ============================================================
 
-const BAT_STEALTH_TURNS = 3;          // เร้นเงา: คงอยู่ 3 เทิร์น
-const BAT_STEALTH_HEAL = 1;           // เร้นเงา: ฟื้นพลังชีวิต +1 ต่อเทิร์น (ไม่มีเงื่อนไข — โดนตีก็ยังฟื้น)
-const BAT_STEALTH_BURST_DMG = 1;      // เร้นเงาหมดเวลาเอง: ความเสียหาย 1 หน่วยใส่ผู้เล่นทุกคน (รวมตัวเอง)
-const BAT_STEALTH_SILENCE_TURNS = 3;  // เร้นเงาหมดเวลาเอง: [ห้ามใช้สกิล] 3 เทิร์น ให้ทุกคนยกเว้นตัวเอง
+// ---------- ร่างรถแบทโมบิล (patch 3.1) ----------
+const BAT_CAR_ARMOR = 7;              // พลังชีวิตของรถ (เป็นเกราะล้วน — เพดานเกราะถูกดันขึ้นเท่านี้ระหว่างอยู่บนรถ)
+const BAT_CAR_REVERT_HP = 7;          // รถพังแล้วคืนร่างด้วยพลังชีวิตเต็ม
+const BAT_SHOT_TURNS = 1;             // ลูกปรายล่อ: คงอยู่ 1 เทิร์น
+const BAT_SHOT_CAP = 2;               // ลูกปรายล่อ: ความเสียหายที่เข้าถูกตัดให้เหลือไม่เกินเท่านี้
+const BAT_GUN_TURNS = 3;              // ปืนติดรถ: คงอยู่ 3 เทิร์น (ทำงาน 1 ครั้ง)
+const BAT_GUN_BONUS = 3;              // ปืนติดรถ: การโจมตีปกติแรงขึ้น
+const BAT_DOOM_TURNS = 3;             // แกไม่รอดแน่: คงอยู่ 3 เทิร์น (ทำงาน 1 ครั้ง)
+const BAT_DOOM_DMG = 4;               // แกไม่รอดแน่: พุ่งชนคนที่ไพ่แตก
 const BAT_KARMA_TURNS = 2;            // กรรมถึงตัว: คงอยู่ 2 เทิร์น (ทำงานได้ 1 ครั้งแล้วหายไป · ราคา 4 แต้ม)
 const BAT_KARMA_ULT_BONUS = 1;        // กรรมถึงตัว + เข้ามาเลย: ความเสียหายที่ส่งต่อ +1
 const BAT_TAUNT_TURNS = 5;            // เข้ามาเลย: ล่อเป้าทุกคน 5 เทิร์น
@@ -25,11 +39,21 @@ const BAT_NIGHT_GOLD = 1;             // อัศวินรัตติกา
 const BAT_NIGHT_ATK = 1;              // อัศวินรัตติกาล: กลางคืนพลังโจมตี +1
 const BAT_PROFILE_IMG = "/characters/bat_ben/bat_ben.webp";
 const BAT_SKILL2_IMG = "/characters/bat_ben/bat_ben_skill2.jpg";
+const BAT_CAR_IMG = "/characters/bat_ben/bat_update/bat_ben_car.webp";
+const BAT_GUN_IMG = "/characters/bat_ben/bat_update/skill2.2/bat_ben_skill2.2.png";
 
 module.exports = {
   id: "bat_ben",
-  STEALTH_TURNS: BAT_STEALTH_TURNS,
   KARMA_TURNS: BAT_KARMA_TURNS,
+  CAR_ARMOR: BAT_CAR_ARMOR,
+  CAR_REVERT_HP: BAT_CAR_REVERT_HP,
+  SHOT_TURNS: BAT_SHOT_TURNS,
+  SHOT_CAP: BAT_SHOT_CAP,
+  GUN_TURNS: BAT_GUN_TURNS,
+  GUN_BONUS: BAT_GUN_BONUS,
+  DOOM_TURNS: BAT_DOOM_TURNS,
+  DOOM_DMG: BAT_DOOM_DMG,
+  IMG_GUN: BAT_GUN_IMG,
   TAUNT_TURNS: BAT_TAUNT_TURNS,
   PROFILE_IMG: BAT_PROFILE_IMG,
 
@@ -38,7 +62,167 @@ module.exports = {
     const batNightAtk = attacker.characterId === "bat_ben" &&
       engine.isNightRound(engine.roundNumber) && !engine.passiveSealed(attacker);
     ctx.batNightAtk = batNightAtk;
-    return batNightAtk ? BAT_NIGHT_ATK : 0;
+    // ปืนติดรถ: การโจมตีปกติครั้งถัดไปแรงขึ้น 3 หน่วย (สถานะถูกใช้ไปที่ doAttack หลังลงดาเมจ)
+    const batGunAtk = attacker.characterId === "bat_ben" && (attacker.statuses.batGun || 0) > 0;
+    ctx.batGunAtk = batGunAtk;
+    return (batNightAtk ? BAT_NIGHT_ATK : 0) + (batGunAtk ? BAT_GUN_BONUS : 0);
+  },
+
+  // ---------- ลูกปรายล่อ: ตัดความเสียหายที่เข้าให้เหลือไม่เกิน 2 หน่วย ----------
+  //  ทำที่ adjustIncomingDamage เพราะเป็นจุดที่เห็น "ขนาดก้อนดาเมจ" ก่อนถูกหั่นเข้าเกราะ/เลือด
+  //  จึงครอบคลุมทุกท่อ (โจมตีปกติ/สกิล/ปืน/ดีบัฟ) ตามสเปคที่ว่า "ไม่ว่าจะแรงแค่ไหน"
+  adjustIncomingDamage(engine, p, n) {
+    if (p.characterId !== "bat_ben" || n <= BAT_SHOT_CAP) return n;
+    if ((p.statuses.batShot || 0) <= 0) return n;
+    engine.log(`🛡️ ${p.name} ลูกปรายล่อ — ความเสียหาย ${n} หน่วยถูกตัดเหลือ ${BAT_SHOT_CAP}`);
+    return BAT_SHOT_CAP;
+  },
+
+  // ---------- ร่างรถแบทโมบิล ----------
+  inCar(p) { return !!(p && p.characterId === "bat_ben" && p.batCar); },
+  // เพดานเกราะระหว่างอยู่บนรถ (เรียกจาก maxArmorOf) — null = ใช้สูตรปกติ
+  maxArmor(p) { return this.inCar(p) ? BAT_CAR_ARMOR : null; },
+  // ภาพประจำตัวระหว่างอยู่บนรถ
+  displayImg(p) { return this.inCar(p) ? BAT_CAR_IMG : null; },
+  // กดขึ้นรถได้ไหม — ครั้งเดียวต่อเกม และรถพังแล้วกดอีกไม่ได้
+  canCastCar(p) { return !p.batCar && !p.batCarUsed; },
+
+  // **จุดรวมศูนย์ของร่างรถ** — เรียกจากหัว loseHp() คืน true = จัดการเองแล้ว ผู้เรียกต้องหยุดทันที
+  //  ระหว่างอยู่บนรถ พลังชีวิตลดไม่ได้เลย: ความเสียหายไปลงเกราะ (พลังชีวิตของรถ) แทน
+  //  ผลพลอยได้คือการโจมตี "ทะลุเกราะ" กลายเป็นความเสียหายที่เกราะไปด้วย = สกิลติดตัว 2 "รถคู่ใจ"
+  carAbsorb(engine, p) {
+    if (!this.inCar(p)) return false;
+    if (p.armor > 0) {
+      engine.loseArmor(p);
+      if (p.armor <= 0) this.breakCar(engine, p);
+      return true;
+    }
+    this.breakCar(engine, p); // ไม่มีเกราะเหลือแล้ว (เผื่อหลุดมาถึงตรงนี้) — รถพังทันที
+    return true;
+  },
+
+  // เรียกจากท้าย loseArmor() — เกราะหมดพอดีโดยไม่เคยแตะ loseHp ก็ต้องนับว่ารถพังเหมือนกัน
+  onArmorLost(engine, p) {
+    if (this.inCar(p) && p.armor <= 0) this.breakCar(engine, p);
+  },
+
+  // รถพัง -> เล่นวีดีโอ แล้วคืนร่างด้วยพลังชีวิตเต็ม (กดขึ้นรถอีกไม่ได้ตลอดเกม)
+  breakCar(engine, p) {
+    if (!p.batCar) return;
+    p.batCar = false;
+    p.batCarUsed = true;
+    p.armor = 0;
+    p.hp = Math.min(engine.maxHpOf(p), BAT_CAR_REVERT_HP); // คืนร่างด้วยเลือดเต็ม
+    // สถานะที่ผูกกับร่างรถล้วนๆ ไม่ควรค้างหลังคืนร่าง
+    for (const k of ["batShot", "batGun", "batDoom"]) {
+      delete p.statuses[k];
+      if (p.statusAmt) delete p.statusAmt[k];
+    }
+    engine.queueCutscene(p, "batCarFail"); // bat_ben_car_fail.mp4
+    engine.log(`🚗💥 ${p.name} รถแบทโมบิลพังยับ — คืนร่างด้วยพลังชีวิตเต็ม ${p.hp} หน่วย (ขึ้นรถอีกไม่ได้แล้วตลอดเกม)`);
+  },
+
+  // ---------- สกิลพื้นฐาน 1: รถแบทโมบิล ----------
+  activateCar(engine, p) {
+    p.batCar = true;
+    p.batCarUsed = true;
+    // พลังชีวิต "เต็มและแตะไม่ได้" ระหว่างอยู่บนรถ — ตั้งใจไม่เซ็ตเป็น 0 ตามตัวอักษรของสเปค
+    //  เพราะเอนจินมีจุดกวาด `if (o.alive && o.hp <= 0) instantDeath(o)` อยู่หลายที่ (afterResolve,
+    //  ท่อดาเมจ, ระเบิดของเอวา ฯลฯ) — hp 0 จะโดนกวาดตายทันทีทั้งที่รถยังไม่พัง
+    //  ผลลัพธ์ที่ผู้เล่นเห็นเหมือนกันทุกประการ: carAbsorb กัน hp ไม่ให้ลดเลย เกราะ 7 คือชีวิตของรถจริงๆ
+    //  และตอนรถพังก็ "คืนร่างด้วยเลือดเต็ม" พอดีเพราะเลือดไม่เคยถูกแตะ
+    p.hp = engine.maxHpOf(p);
+    p.armor = BAT_CAR_ARMOR;
+    p.transformAt = engine.nextTransformCounter();
+    engine.queueCutscene(p, "batCar"); // bat_ben_skill1.mp4 (ชุด bat_update)
+    engine.log(`🚗 ${p.name} รถแบทโมบิล — "ฉันจะไม่ปล่อยแกหนีรอดหรอก" ขึ้นรถถาวรจนกว่ารถจะพัง! พลังชีวิตกลายเป็นเกราะล้วน ${BAT_CAR_ARMOR} หน่วย และสกิลทั้งสามช่องเปลี่ยนเป็นเวอร์ชันรถ`);
+    return " — ขึ้นรถแบทโมบิล";
+  },
+
+  // ---------- สกิลพื้นฐาน 2: ลูกปรายล่อ ----------
+  activateShot(engine, p) {
+    p.statuses.batShot = BAT_SHOT_TURNS;
+    engine.queueCutscene(p, "batCarShot"); // bat_ben_skill1.2.mp4
+    engine.log(`🛡️ ${p.name} ลูกปรายล่อ — เทิร์นนี้ความเสียหายที่เข้าไม่ว่าจะแรงแค่ไหน จะเหลือแค่ ${BAT_SHOT_CAP} หน่วย`);
+    return ` — ตัดดาเมจเหลือ ${BAT_SHOT_CAP}`;
+  },
+
+  // ---------- สกิลรอง 2: ฉันไม่เคยฆ่าใคร แต่รถเป็นคนทำ ----------
+  activateGun(engine, p) {
+    p.statuses.batGun = BAT_GUN_TURNS;
+    engine.log(`🔫 ${p.name} ฉันไม่เคยฆ่าใคร แต่รถเป็นคนทำ — ติดตั้ง "ปืนติดรถ" ${BAT_GUN_TURNS} เทิร์น: การโจมตีปกติครั้งถัดไปแรงขึ้น ${BAT_GUN_BONUS} หน่วย (ทำงาน 1 ครั้ง)`);
+    return " — ปืนติดรถ";
+  },
+  // ใช้สถานะไปหลังโจมตีปกติสำเร็จ (เรียกจาก doAttack) — คืน true ถ้าปืนเพิ่งทำงาน
+  consumeGun(engine, p) {
+    if (p.characterId !== "bat_ben" || (p.statuses.batGun || 0) <= 0) return false;
+    delete p.statuses.batGun;
+    if (p.statusAmt) delete p.statusAmt.batGun;
+    engine.queueCutscene(p, "batGun"); // bat_ben_skill2.2.mp4 — เล่นก่อนขึ้นสรุปความเสียหาย
+    engine.log(`🔫 ${p.name} ปืนติดรถทำงาน — ความเสียหาย +${BAT_GUN_BONUS} แล้วปืนหมดกระสุน`);
+    return true;
+  },
+
+  // ---------- ท่าไม้ตาย 2: ฉันไม่เคยปล่อยใครรอดพ้น ----------
+  activateDoom(engine, p) {
+    p.statuses.batDoom = BAT_DOOM_TURNS;
+    engine.log(`🚗 ${p.name} ฉันไม่เคยปล่อยใครรอดพ้น — เฝ้ารอ ${BAT_DOOM_TURNS} เทิร์น: ใครไพ่แตกเมื่อไหร่ แบทโมบิลจะพุ่งชนทันที ${BAT_DOOM_DMG} หน่วย (ทำงาน 1 ครั้ง)`);
+    return " — แกไม่รอดแน่";
+  },
+  // เรียกจาก afterResolve() — รู้ผลไพ่แตกครบแล้ว
+  onAfterResolve(engine) {
+    for (const p of engine.alivePlayers()) {
+      if (p.characterId !== "bat_ben" || (p.statuses.batDoom || 0) <= 0) continue;
+      const victim = engine.alivePlayers().find(
+        (o) => o.id !== p.id && engine.bustedOf(o) && !engine.withEffectSource(p, () => engine.friendlyEffectBlocked(o))
+      );
+      if (!victim) continue;
+      delete p.statuses.batDoom;
+      if (p.statusAmt) delete p.statusAmt.batDoom;
+      engine.queueCutscene(p, "batDoom"); // bat_ben_skill3.2.mp4 — เล่นก่อนพุ่งชน
+      engine.withEffectSource(p, () => {
+        engine.dealMixed(victim, BAT_DOOM_DMG);
+        victim.wasAttacked = true;
+        engine.maybeBeatSave(victim); engine.maybeBeatMode(victim); engine.maybeEva3(victim); engine.maybeWakeKotone(victim);
+      });
+      engine.log(`🚗💥 ${p.name} ฉันไม่เคยปล่อยใครรอดพ้น — แบทโมบิลพุ่งชน ${victim.name} ที่ไพ่แตก -${BAT_DOOM_DMG}`);
+      if (victim.alive && victim.hp <= 0) {
+        engine.instantDeath(victim);
+        if (!victim.alive) engine.log(`💀 ${victim.name} เลือดจริงหมด ตกรอบ!`);
+      }
+    }
+  },
+
+  // ---------- useSkill/publicState: สลับชุดสกิลตามร่าง ----------
+  dynamicSkillFor(p, ch, tier) {
+    if (!this.inCar(p)) return ch[tier];
+    if (tier === "basic") return ch.basic2;
+    if (tier === "secondary") return ch.secondary2;
+    if (tier === "ultimate") return ch.ultimate2;
+    return ch[tier];
+  },
+  canUseSkill(engine, p, tier) {
+    if (p.characterId !== "bat_ben") return true;
+    if (this.inCar(p)) {
+      if (tier === "basic") return !((p.statuses.batShot || 0) > 0);   // ลูกปรายล่อยังมีผล = กดซ้ำไม่ได้
+      if (tier === "secondary") return !((p.statuses.batGun || 0) > 0); // ปืนยังไม่ได้ใช้ = ติดซ้ำไม่ได้
+      if (tier === "ultimate") return !((p.statuses.batDoom || 0) > 0);
+      return true;
+    }
+    if (tier === "basic") return this.canCastCar(p);
+    if (tier === "secondary") return this.canCastKarma(p);
+    return true;
+  },
+  applyInstantSkill(engine, p, tier) {
+    if (p.characterId !== "bat_ben") return "";
+    if (this.inCar(p)) {
+      if (tier === "basic") return this.activateShot(engine, p);
+      if (tier === "secondary") return this.activateGun(engine, p);
+      if (tier === "ultimate") return this.activateDoom(engine, p);
+      return "";
+    }
+    if (tier === "basic") return this.activateCar(engine, p);
+    return "";
   },
 
   // ---------- สกิลติดตัว อัศวินรัตติกาล ----------
@@ -64,55 +248,17 @@ module.exports = {
       engine.addGold(p, BAT_NIGHT_GOLD);
       if (p.gold > before) engine.log(`🦇🌙 ${p.name} อัศวินรัตติกาล — ราตรีคือถิ่นของเขา เหรียญ +${p.gold - before} (มี ${p.gold})`);
     }
-    // เร้นเงา: ฟื้นพลังชีวิต +1 ทุกเทิร์นที่ยังซ่อนอยู่ (patch 2.2.7.1: ไม่มีเงื่อนไข "ต้องไม่โดนตี" แล้ว)
-    if ((p.statuses.batStealth || 0) > 0) {
-      const heal = engine.healHp(p, BAT_STEALTH_HEAL);
-      engine.log(`🌑 ${p.name} เร้นเงา — พรางตัวอยู่ในความมืด ฟื้นพลังชีวิต +${heal} (เหลืออีก ${p.statuses.batStealth} เทิร์น · โจมตีไม่ได้ระหว่างนี้)`);
-    }
-    // เข้ามาเลย: ฟื้นพลังชีวิต +1 ต่อเทิร์นตลอดที่ล่อเป้าอยู่
-    if ((p.statuses.batTaunt || 0) > 0) {
+    // เข้ามาเลย: ฟื้นพลังชีวิต +1 ต่อเทิร์นตลอดที่ล่อเป้าอยู่ (อยู่บนรถ = ไม่มีพลังชีวิตให้ฟื้น)
+    if ((p.statuses.batTaunt || 0) > 0 && !this.inCar(p)) {
       const heal = engine.healHp(p, BAT_TAUNT_HEAL);
       engine.log(`🦇 ${p.name} เข้ามาเลย — ยิ่งเจ็บยิ่งแกร่ง ฟื้นพลังชีวิต +${heal} (เหลืออีก ${p.statuses.batTaunt} เทิร์น)`);
     }
   },
 
-  // ---------- สกิลพื้นฐาน เร้นเงา ----------
-  // เรียกจาก useSkill()'s gate — เร้นเงายังทำงานอยู่ กดซ้ำไม่ได้ (ไม่งั้นต่ออายุหนีการระเบิดได้เรื่อยๆ)
-  canCastStealth(p) {
-    return !((p.statuses.batStealth || 0) > 0);
-  },
-
-  // เรียกจาก useSkill() ในส่วน effect (สถานะ batStealth ถูก applyEffect ตั้งให้แล้ว) — แถมหลบหลีก 1 สแตค
-  activateStealth(engine, p) {
-    const got = engine.grantEvadeStack(p);
-    engine.log(`🌑 ${p.name} เร้นเงา — หายเข้าไปในความมืด ${BAT_STEALTH_TURNS} เทิร์น! ${got ? `ได้รับหลบหลีก +1 · ` : `(หลบหลีกเต็มเพดานแล้ว) · `}ฟื้นพลังชีวิต +${BAT_STEALTH_HEAL} ต่อเทิร์น (โดนโจมตีก็ไม่หลุด) — โจมตีไม่ได้ระหว่างนี้ และเมื่อหมดเวลาจะออกจากเงามืดพร้อมกับดักเสมอ`);
-  },
-
-  // เรียกจากลูปลดเทิร์นสถานะใน endTurn() ตอน batStealth หมดเวลา
-  //  -> เล่นวีดีโอ แล้วระเบิด 1 หน่วยใส่ทุกคน + [ห้ามใช้สกิล] 3 เทิร์นให้ทุกคนยกเว้นตัวเอง
-  //  patch 2.2.7.1: ทำงานเสมอเมื่อครบ 3 เทิร์น — ไม่มีทางถูกยกเลิกด้วยการโดนโจมตีอีกแล้ว
-  onStealthExpire(engine, p) {
-    if (p.characterId !== "bat_ben") return;
-    engine.triggerCutscene(p, "batStealthBurst"); // bat_ben_skill1.mp4
-    engine.log(`🌑💥 ${p.name} เร้นเงาหมดเวลา — ออกจากเงามืดพร้อมกับดัก! ความเสียหาย ${BAT_STEALTH_BURST_DMG} หน่วยใส่ผู้เล่นทุกคน`);
-    for (const o of engine.alivePlayers()) {
-      engine.dealMixed(o, BAT_STEALTH_BURST_DMG); // ลดเกราะก่อน ถ้าไม่มีเกราะจึงเข้าเลือดจริง (โดนตัวเองด้วย)
-      o.wasAttacked = true;
-      engine.maybeBeatSave(o); engine.maybeBeatMode(o); engine.maybeEva3(o); engine.maybeWakeKotone(o);
-      if (o.id === p.id) continue;
-      if (engine.resistActive(o)) {
-        engine.log(`🛡️ ${o.name} ต้านสถานะผิดปกติ — ไม่ติด [ห้ามใช้สกิล] จากกับดักของ ${p.name}`);
-        continue;
-      }
-      o.statuses.noskill = Math.max(o.statuses.noskill || 0, BAT_STEALTH_SILENCE_TURNS);
-      engine.log(`🚫 ${o.name} ติด [ห้ามใช้สกิล] ${BAT_STEALTH_SILENCE_TURNS} เทิร์น จากกับดักของ ${p.name}`);
-    }
-    for (const o of Object.values(engine.players)) {
-      if (o.alive && o.hp <= 0) {
-        engine.instantDeath(o);
-        if (!o.alive) engine.log(`💀 ${o.name} เลือดจริงหมด ตกรอบ!`);
-      }
-    }
+  // ---------- ฟิลด์เฉพาะตัวละคร: ต้องล้างทุกแมตช์ใหม่ (เรียกจาก resetCombat ของ server.js) ----------
+  resetCombat(p) {
+    p.batCar = false;      // อยู่บนรถแบทโมบิลอยู่ไหม
+    p.batCarUsed = false;  // เคยขึ้นรถไปแล้วหรือยัง (กดได้ครั้งเดียวต่อเกม)
   },
 
   // ---------- สกิลรอง นายลืมของน่ะ ----------
@@ -209,8 +355,4 @@ module.exports = {
     return dmg;
   },
 
-  // เรียกจาก afterSummary()/doAttack() — เร้นเงาทำงานอยู่ = โจมตีไม่ได้ (ยังชนะการจั่วได้ แต่ไม่มีเทิร์นโจมตี)
-  cannotAttack(p) {
-    return p.characterId === "bat_ben" && (p.statuses.batStealth || 0) > 0;
-  },
 };

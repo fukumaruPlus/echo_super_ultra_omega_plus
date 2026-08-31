@@ -43,6 +43,7 @@ const BEATS_BUST_DMG = 1;        // my soul your beats: ไพ่แตกรั
 const REVIVE_DELAY = SONG_TURNS; // สมบัติล้ำค่าฯ: ครบ 5 เทิร์นถึงฟื้น
 const REVIVE_HP = 5;
 const REVIVE_ARMOR = 0;
+const REVIVE_RUSH_ALIVE = 1;     // ยุยตายแล้วเหลือคนอื่นไม่เกินเท่านี้ -> เป้าหมายฟื้นทันที ไม่รอครบ 5 เทิร์น
 const MELODY_TURNS = 3;          // บัฟ "ทำนอง" ที่คนฟื้นได้รับ
 const MELODY_ATK = 2;
 
@@ -125,6 +126,7 @@ module.exports = {
   REVIVE_DELAY,
   REVIVE_HP,
   REVIVE_ARMOR,
+  REVIVE_RUSH_ALIVE,
   MELODY_TURNS,
   MELODY_ATK,
   WISH_SONGS,
@@ -321,7 +323,7 @@ module.exports = {
   // ---------- ครบกำหนดชุบชีวิต — เรียกจาก dealRound() ----------
   maybeRevive(engine, yui) {
     if (!isYui(yui) || !yui.yuiReviveRound) return false;
-    if (!yui.alive) { // ยุยตายก่อน = ผลหายไป (สเปคระบุชัด)
+    if (!yui.alive) { // ยุยตายก่อน = ผลหายไป (สเปคระบุชัด) — ยกเว้นกรณีเหลือแค่เรากับเป้าหมาย (ดู onYuiDeath)
       yui.yuiReviveRound = 0;
       yui.yuiReviveTargetId = null;
       return false;
@@ -332,6 +334,12 @@ module.exports = {
     yui.yuiReviveTargetId = null;
     delete yui.statuses.yuiWait;
     if (!t || t.alive) return false;
+    this.reviveTarget(engine, t, "สมบัติล้ำค่าที่สุด..... —");
+    return true;
+  },
+
+  // ชุบชีวิตจริง — ใช้ร่วมกันทั้งทางปกติ (ครบ 5 เทิร์น) และทางลัดตอนยุยตายแบบไม่เหลือใคร
+  reviveTarget(engine, t, prefix) {
     t.alive = true;
     t.hp = Math.min(engine.maxHpOf(t), REVIVE_HP);
     t.armor = REVIVE_ARMOR;
@@ -341,8 +349,25 @@ module.exports = {
     t.statuses = {};
     t.statusAmt = {};
     t.statuses.yuiMelody = MELODY_TURNS;
-    engine.log(`🎵✨ สมบัติล้ำค่าที่สุด..... — ${t.name} กลับมามีชีวิตอีกครั้ง! (พลังชีวิต ${t.hp} เกราะ ${t.armor}) พร้อมบัฟ "ทำนอง" พลังโจมตี +${MELODY_ATK} เป็นเวลา ${MELODY_TURNS} เทิร์น`);
-    return true;
+    engine.log(`🎵✨ ${prefix} ${t.name} กลับมามีชีวิตอีกครั้ง! (พลังชีวิต ${t.hp} เกราะ ${t.armor}) พร้อมบัฟ "ทำนอง" พลังโจมตี +${MELODY_ATK} เป็นเวลา ${MELODY_TURNS} เทิร์น`);
+  },
+
+  // ---------- ยุยตกรอบขณะยังมีคิวชุบชีวิตค้างอยู่ ----------
+  //  ปกติ "ยุยตายก่อน = ผลหายไป" ตามสเปค — แต่ถ้าตายแล้วไม่เหลือใครอีกเลย (หรือเหลือคนเดียว)
+  //  การปล่อยให้ผลหายไปจะทำให้เป้าหมายค้างตายถาวรและเกมจบแบบไม่มีใครได้อะไร
+  //  เคสที่เจอจริง: บรรเลงเพลงชุบชีวิตเป็นเพลงที่ 3 พอดี -> "ความปรารถนา" ฆ่ายุยทันทีในจังหวะเดียวกัน
+  //  -> กรณีนี้ให้เป้าหมายฟื้นทันที ไม่ต้องรอครบ 5 เทิร์น
+  //  เรียกจาก instantDeath() หลังตั้ง p.alive = false แล้ว
+  onDeath(engine, p) {
+    if (!isYui(p) || !p.yuiReviveRound) return;
+    const othersAlive = engine.alivePlayers().filter((o) => o.id !== p.id).length;
+    if (othersAlive > REVIVE_RUSH_ALIVE) return; // ยังมีคนเล่นต่อได้ — ผลหายไปตามสเปคเดิม
+    const t = p.yuiReviveTargetId && engine.players[p.yuiReviveTargetId];
+    p.yuiReviveRound = 0;
+    p.yuiReviveTargetId = null;
+    delete p.statuses.yuiWait;
+    if (!t || t.alive) return;
+    this.reviveTarget(engine, t, `${p.name} จากไปพร้อมเสียงเพลงสุดท้าย —`);
   },
 
   // ---------- สกิลติดตัว ความปรารถนา: เล่นครบ 3 เพลง = ตายทันที ----------

@@ -1161,7 +1161,10 @@ const STATUS_INFO = {
   wither:    { icon: "🥀", label: "โรยรา", cls: "bg-echo-hp", desc: "ความตายที่โรยรา (rework patch 2.0.8): ทุกเทิร์นมอบเส้นชีวิต +1 ให้ผู้เล่นทุกคน (ยกเว้นชิกิ) — ท่าไม้ตายแจกได้สูงสุด 3 หน่วยต่อคน (รวมแหล่งปกติสูงสุด 5) — โจมตีปกติ: เส้นชีวิตแปรเป็นดาเมจเสริม +1 ต่อเส้น (พลังโจมตีรวมสูงสุด 5 ต่อครั้ง) และมีโอกาสสังหารทันที 1% คงที่ เพิ่มไม่ได้ — เมื่อท่าจบลง (สังหารสำเร็จ/หมดเวลา) เส้นชีวิตส่วนที่ท่าแจกไปถูกลบออกจากทุกคน" },
   godslay:   { icon: "👁️", label: "ยกเลิกอัลติ", cls: "bg-echo-gold text-gray-900", desc: "นายมีฝีมือแค่ไหนหรอ?: ชิกิพร้อมยกเลิกท่าไม้ตายของผู้เล่นอื่น 1 คน 1 ครั้ง (2 เทิร์น — ผลยังอยู่กดสกิลซ้ำไม่ได้) — ผู้เล่นอื่นคนแรกที่กดท่าไม้ตายระหว่างนี้จะถูกยกเลิกทันที (แต้มสกิลเสียฟรี) และหากเจ้าของท่าไม้ตายที่มีผลอยู่ก่อนแล้วมาโจมตีชิกิ จะถูกยกเลิกท่าแบบย้อนหลังทันที" },
   // ---------- แบทแมน (เบน แอฟเฟล็ก) (patch 2.2.7) ----------
-  batStealth: { icon: "🌑", label: "เร้นเงา", cls: "bg-echo-cyan text-gray-900", desc: "เร้นเงา: ซ่อนตัวในความมืด — ฟื้นพลังชีวิต +1 ทุกเทิร์น (ถูกโจมตีก็ไม่หลุด ไม่มีข้อเสียใดๆ) แต่โจมตีปกติไม่ได้ระหว่างนี้ — เมื่อครบเวลา จะเล่นวีดีโอแล้วระเบิดใส่ผู้เล่นทุกคน 1 หน่วย (รวมแบทแมนเอง) และมอบ [ห้ามใช้สกิล] 3 เทิร์นให้ทุกคนยกเว้นแบทแมน" },
+  // ---------- แบทแมน ร่างรถแบทโมบิล (patch 3.1) ----------
+  batShot: { icon: "🛡️", label: "ลูกปรายล่อ", cls: "bg-echo-armor", desc: "ลูกปรายล่อ: ความเสียหายที่เข้าไม่ว่าจะแรงแค่ไหน จะถูกตัดให้เหลือแค่ 2 หน่วยตลอดเทิร์นนี้" },
+  batGun: { icon: "🔫", label: "ปืนติดรถ", cls: "bg-echo-gold text-gray-900", desc: "ปืนติดรถ: การโจมตีปกติครั้งถัดไปสร้างความเสียหายเพิ่มอีก 3 หน่วย (เล่นวีดีโอก่อนแล้วจึงเกิดความเสียหาย) — ทำงาน 1 ครั้งแล้วหมดกระสุน" },
+  batDoom: { icon: "🚗", label: "แกไม่รอดแน่", cls: "bg-echo-hp", desc: "แกไม่รอดแน่: เมื่อมีผู้เล่นคนไหนการ์ดแตก แบทโมบิลจะพุ่งชนเป้าหมายคนนั้นด้วยความเสียหาย 4 หน่วย — ทำงาน 1 ครั้งแล้วหายไป" },
   batKarma:   { icon: "🎁", label: "กรรมถึงตัว", cls: "bg-echo-gold text-gray-900", desc: "นายลืมของน่ะ: ถูกโจมตีครั้งถัดไปแล้วจะไม่ได้รับความเสียหายเลย — รับก้อนนั้นไว้แล้วเลือกส่งต่อให้ผู้เล่น 1 คนแทน (เลือกผู้โจมตีเองก็ได้ · ไม่สนการหลบหลีก) — ทำงานได้ 1 ครั้งแล้วหายไป · ระหว่างท่าไม้ตายทำงาน จำนวนที่ส่งต่อ +1" },
   batTaunt:   { icon: "🦇", label: "เข้ามาเลย", cls: "bg-echo-magenta", desc: "เข้ามาเลย: ล่อเป้าการโจมตีของผู้เล่นทุกคนมาที่แบทแมน — ความเสียหายที่ผู้โจมตีทำใส่แบทแมนจะเกิดขึ้นกับผู้โจมตีเองด้วยเท่ากัน และแบทแมนฟื้นพลังชีวิต +1 ทุกเทิร์น (ใช้คู่กับ [กรรมถึงตัว] ไม่มีใครเจ็บทั้งคู่ แต่ส่งต่อ +1)" },
   // ---------- เจ้าหญิงราก (เรียวกิ ชิกิ) (patch 2.2.7) ----------
@@ -2623,9 +2626,12 @@ function QtePanel({ qte }) {
 // ---------- ยุย: เลือกเพลงก่อนเริ่ม QTE (เพลงชุบชีวิตต้องเลือกคนตายด้วย) ----------
 function YuiSongModal({ me, onPick, onClose }) {
   const [pick, setPick] = useState(null);
+  const [target, setTarget] = useState(null);
   const songs = me.yuiSongs || [];
   const dead = me.yuiDead || [];
   const needTarget = pick === "treasure";
+  // เพลงชุบชีวิตต้องเลือก "เป้าหมายให้เสร็จก่อน" ถึงจะกดเริ่มบรรเลงได้ (ไม่มีคนตาย = เลือกเพลงนี้ไม่ได้เลย)
+  const ready = pick && (!needTarget || !!target);
   return (
     <div className="fixed inset-0 z-40 bg-black/60 grid place-items-center p-4" onClick={onClose}>
       <div className="bg-echo-navy rounded-2xl p-5 max-w-lg w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -2638,9 +2644,11 @@ function YuiSongModal({ me, onPick, onClose }) {
         {songs.map((sg) => (
           <button
             key={sg.key}
-            onClick={() => { clickSound(); setPick(sg.key); }}
+            disabled={sg.key === "treasure" && dead.length === 0}
+            onClick={() => { clickSound(); setPick(sg.key); setTarget(null); }}
             className={`text-left rounded-lg border-2 px-3 py-2 transition ${
-              pick === sg.key ? "border-white/70 bg-white/10" : "border-white/15 hover:border-white/40"
+              sg.key === "treasure" && dead.length === 0 ? "opacity-40 cursor-not-allowed border-white/10"
+              : pick === sg.key ? "border-white/70 bg-white/10" : "border-white/15 hover:border-white/40"
             }`}
           >
             <div className="font-bold flex items-center gap-2">
@@ -2654,7 +2662,7 @@ function YuiSongModal({ me, onPick, onClose }) {
       </div>
       {needTarget && (
         <div className="mt-3">
-          <div className="text-xs font-bold mb-1">เลือกผู้เล่นที่จะชุบชีวิต</div>
+          <div className="text-xs font-bold mb-1">เลือกผู้เล่นที่จะชุบชีวิต (ต้องเลือกก่อนเริ่มบรรเลง)</div>
           {dead.length === 0 ? (
             <div className="text-xs text-echo-hp">ยังไม่มีผู้เล่นที่ตกรอบ — เพลงนี้ยังใช้ไม่ได้</div>
           ) : (
@@ -2662,8 +2670,10 @@ function YuiSongModal({ me, onPick, onClose }) {
               {dead.map((d) => (
                 <button
                   key={d.id}
-                  onClick={() => { clickSound(); onPick("treasure", d.id); }}
-                  className="rounded-lg border-2 border-white/20 hover:border-white/60 px-3 py-1.5 text-sm font-bold"
+                  onClick={() => { clickSound(); setTarget(d.id); }}
+                  className={`rounded-lg border-2 px-3 py-1.5 text-sm font-bold transition ${
+                    target === d.id ? "border-echo-gold bg-echo-gold/20" : "border-white/20 hover:border-white/60"
+                  }`}
                 >
                   {d.name}
                 </button>
@@ -2672,14 +2682,15 @@ function YuiSongModal({ me, onPick, onClose }) {
           )}
         </div>
       )}
-      {pick && !needTarget && (
-        <button
-          onClick={() => { clickSound(); onPick(pick, null); }}
-          className="mt-3 w-full rounded-lg py-2 font-black text-gray-900 bg-echo-gold"
-        >
-          เริ่มบรรเลง
-        </button>
-      )}
+      <button
+        disabled={!ready}
+        onClick={() => { clickSound(); onPick(pick, needTarget ? target : null); }}
+        className={`mt-3 w-full rounded-lg py-2 font-black transition ${
+          ready ? "text-gray-900 bg-echo-gold" : "opacity-40 cursor-not-allowed bg-white/15"
+        }`}
+      >
+        {!pick ? "เลือกเพลงก่อน" : needTarget && !target ? "เลือกเป้าหมายก่อน" : "เริ่มบรรเลง"}
+      </button>
       </div>
     </div>
   );
@@ -3167,7 +3178,6 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
   const skSecLocked = ch?.id === "shiki" && !!me?.statuses?.godslay;
   // ---------- แบทแมน (patch 2.2.7) ----------
   // เร้นเงา: ยังซ่อนอยู่ กดซ้ำ (ต่ออายุหนีกับดัก) ไม่ได้ / นายลืมของน่ะ: ยังตั้งรับอยู่ หรือยังไม่ได้เลือกส่งต่อ
-  const batStealthLocked = ch?.id === "bat_ben" && (me?.statuses?.batStealth || 0) > 0;
   const batKarmaLocked = ch?.id === "bat_ben" && ((me?.statuses?.batKarma || 0) > 0 || !!state.batKarmaAsk);
   // ---------- เจ้าหญิงราก (patch 2.2.7) ----------
   // อืม ฉันเข้าใจแล้ว (พื้นฐาน): ชักดาบยังค้างอยู่ กดซ้ำไม่ได้ / อย่าทำอะไรไม่เข้าท่าเลย (รอง): ผลยกเลิกท่าไม้ตายยังอยู่ กดซ้ำไม่ได้
@@ -3906,7 +3916,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
               {/* ช่องสกิล 3 อัน — ทรงพัด: ช่องกลาง (สกิลรอง) ยกสูงกว่าอีก 2 ช่อง */}
               <div className="grid grid-cols-3 gap-2 mt-3 items-end">
                 <div className="translate-y-1.5">
-                  <SkillSlot label="สกิลพื้นฐาน" tier="basic" skill={ch?.basic} points={me.skillPoints} disabled={!me.alive || phase !== "PLAYING" || (!isHisakawa && (done || noSkill || moonCellOn)) || hisakawaSwitchLocked || miyakoHealPending || hakunoSecondaryPending || beatBasicLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || witchMarkCooldown || (me.skillUsed && !gambleRepeat && !isByleth && !isHaruka && !isApple && !isBard && !isTohno && !isHakuno && !isDoomguy && !isKai && !isTakumi && !isHisakawa) || harukaBasicLocked || bylethBasicLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || cassiusLocked || veilLocked || ktBasicLocked || (isHakuno && me.hakunoGenderSwitched) || doomBasicLocked || takutoBasicPending || tepeuCookLocked || tepeuPonderLocked || batStealthLocked || psBladeLocked} onUse={requestSkillUse} cooldown={witchMarkCd} ammo={isGambler ? me.gamblerUses : undefined} cost={isGambler && goldenOn ? halfCost(ch?.basic) : undefined} />
+                  <SkillSlot label="สกิลพื้นฐาน" tier="basic" skill={ch?.basic} points={me.skillPoints} disabled={!me.alive || phase !== "PLAYING" || (!isHisakawa && (done || noSkill || moonCellOn)) || hisakawaSwitchLocked || miyakoHealPending || hakunoSecondaryPending || beatBasicLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || witchMarkCooldown || (me.skillUsed && !gambleRepeat && !isByleth && !isHaruka && !isApple && !isBard && !isTohno && !isHakuno && !isDoomguy && !isKai && !isTakumi && !isHisakawa) || harukaBasicLocked || bylethBasicLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || cassiusLocked || veilLocked || ktBasicLocked || (isHakuno && me.hakunoGenderSwitched) || doomBasicLocked || takutoBasicPending || tepeuCookLocked || tepeuPonderLocked || psBladeLocked} onUse={requestSkillUse} cooldown={witchMarkCd} ammo={isGambler ? me.gamblerUses : undefined} cost={isGambler && goldenOn ? halfCost(ch?.basic) : undefined} />
                 </div>
                 <div className="-translate-y-2">
                   <SkillSlot label="สกิลรอง" tier="secondary" skill={ch?.secondary} points={me.skillPoints} disabled={done || phase !== "PLAYING" || noSkill || moonCellOn || miyakoComboPending || hakunoSecondaryPending || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || (me.skillUsed && !isByleth && !isBard && !isDoomguy && !isKai && !isTakumi) || bylethSecLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || ohgerLocked || lanLocked || ktSecLocked || skSecLocked || banagherAssaultLocked || doomNoEffectLocked || takutoSecPending || takutoNotApprivoiseLocked || monsterMe || tepeuPonderLocked || tepeuCookLocked || batKarmaLocked || psSealLocked || harukaSecLocked || burdenCooldown} onUse={requestSkillUse} cooldown={burdenCd} ammo={isApple ? me.appleGiveUses : me.beamAmmo} cost={isGambler && goldenOn ? halfCost(ch?.secondary) : undefined} />
@@ -4475,7 +4485,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
               <div className="flex flex-col items-center gap-1.5">
                 <div className="flex items-end gap-2 sm:gap-3">
                   <div className="w-40 sm:w-48">
-                    <SkillSlot size="lg" label="พื้นฐาน" tier="basic" skill={ch?.basic} points={me.skillPoints} disabled={!me.alive || phase !== "PLAYING" || (!isHisakawa && (done || noSkill || moonCellOn)) || hisakawaSwitchLocked || miyakoHealPending || hakunoSecondaryPending || beatBasicLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || witchMarkCooldown || (me.skillUsed && !gambleRepeat && !isByleth && !isHaruka && !isApple && !isBard && !isTohno && !isHakuno && !isDoomguy && !isKai && !isTakumi && !isHisakawa) || harukaBasicLocked || bylethBasicLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || cassiusLocked || veilLocked || ktBasicLocked || (isHakuno && me.hakunoGenderSwitched) || doomBasicLocked || takutoBasicPending || tepeuCookLocked || tepeuPonderLocked || batStealthLocked || psBladeLocked} onUse={requestSkillUse} cooldown={witchMarkCd} ammo={isGambler ? me.gamblerUses : undefined} cost={isGambler && goldenOn ? halfCost(ch?.basic) : undefined} />
+                    <SkillSlot size="lg" label="พื้นฐาน" tier="basic" skill={ch?.basic} points={me.skillPoints} disabled={!me.alive || phase !== "PLAYING" || (!isHisakawa && (done || noSkill || moonCellOn)) || hisakawaSwitchLocked || miyakoHealPending || hakunoSecondaryPending || beatBasicLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || witchMarkCooldown || (me.skillUsed && !gambleRepeat && !isByleth && !isHaruka && !isApple && !isBard && !isTohno && !isHakuno && !isDoomguy && !isKai && !isTakumi && !isHisakawa) || harukaBasicLocked || bylethBasicLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || cassiusLocked || veilLocked || ktBasicLocked || (isHakuno && me.hakunoGenderSwitched) || doomBasicLocked || takutoBasicPending || tepeuCookLocked || tepeuPonderLocked || psBladeLocked} onUse={requestSkillUse} cooldown={witchMarkCd} ammo={isGambler ? me.gamblerUses : undefined} cost={isGambler && goldenOn ? halfCost(ch?.basic) : undefined} />
                   </div>
                   <div className="w-40 sm:w-48">
                     <SkillSlot size="lg" label="รอง" tier="secondary" skill={ch?.secondary} points={me.skillPoints} disabled={done || phase !== "PLAYING" || noSkill || moonCellOn || miyakoComboPending || hakunoSecondaryPending || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || (me.skillUsed && !isByleth && !isBard && !isDoomguy && !isKai && !isTakumi) || bylethSecLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || ohgerLocked || lanLocked || ktSecLocked || skSecLocked || banagherAssaultLocked || doomNoEffectLocked || takutoSecPending || takutoNotApprivoiseLocked || monsterMe || tepeuPonderLocked || tepeuCookLocked || batKarmaLocked || psSealLocked || harukaSecLocked || burdenCooldown} onUse={requestSkillUse} cooldown={burdenCd} ammo={isApple ? me.appleGiveUses : me.beamAmmo} cost={isGambler && goldenOn ? halfCost(ch?.secondary) : undefined} />
