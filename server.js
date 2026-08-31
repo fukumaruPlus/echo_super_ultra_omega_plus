@@ -2644,6 +2644,8 @@ function buildStateFor(viewerId) {
         //  ใช้โชว์เป็นตัวเลขทับบนการ์ดสกิล คู่กับ shidoGuard (ตัวนับกับดักที่กำลังเปิดอยู่)
         shidoCd: mine && p.characterId === "shido"
           ? Math.max(0, (p.shidoRewindLock || 0) - roundNumber) : undefined,
+        // เอจิ: คูลดาวน์ท่าไม้ตายหลัง "ไม่ว่ายังก็ตาม" หมดเวลา (เทิร์นที่เหลือ) — โชว์ทับบนการ์ดสกิล
+        eijiUltCd: p.characterId === "eiji" ? CHAR_HOOKS.eiji.ultCooldownLeft(engine, p) : undefined,
         maxSkill: maxSkillOf(p), // Bard: เพดานพลังงาน 9
         beamAmmo: p.beamAmmo,
         puddingCount: p.puddingCount || 0,
@@ -6298,6 +6300,8 @@ function endTurn() {
         if (k === "phenexTaunt") p.phenexTauntGrace = true;
         // ความเร็วสูงหมดอายุ (เอจิ): คืนแต้มสกิลที่จ่ายค่าสกิลพื้นฐานไป
         if (k === "eijiSwift" && p.characterId === "eiji") CHAR_HOOKS.eiji.onSwiftExpire(engine, p);
+        // เอจิ: "ไม่ว่ายังก็ตาม" หมดเวลา -> ติดคูลดาวน์ห้ามกดซ้ำ 3 เทิร์น (เก็บเป็นเลขรอบ ไม่ใช่สถานะ)
+        if (k === "eijiUlt" && p.characterId === "eiji") CHAR_HOOKS.eiji.onUltExpire(engine, p);
         // Sleeping time หมดเวลาเอง (โคโตเนะ rework 2.3): ตื่นนอนอย่างสดชื่น (ไม่มีผลต่อเนื่องแล้ว)
         if (k === "ksleep" && p.characterId === "kotone") {
           lastLog.push(`🌅 ${p.name} ตื่นนอนอย่างสดชื่น — พร้อมลุยต่อแล้ว!`);

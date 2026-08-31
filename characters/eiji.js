@@ -30,6 +30,7 @@ const SWORD_PCT_PER_UNIT = 10;      // ระหว่างมีดาบ: โ
 
 // ---------- ไม่ว่ายังก็ตาม (ท่าไม้ตาย) ----------
 const ULT_TURNS = 5;
+const ULT_COOLDOWN_TURNS = 3;    // หมดเวลาท่าไม้ตายแล้วห้ามกดซ้ำอีกกี่เทิร์น (แพทเทิร์นเดียวกับชิโด)
 const ULT_DODGE = 20;               // +20% ต่อการหลบ 1 ครั้ง/เทิร์น
 const ULT_CARD_TIME = 40;           // เวลาช่วงจั่วการ์ดถูกบีบเหลือ 40 วินาที
 const ULT_SKILL_REGEN = 1;          // ระหว่างท่าไม้ตายทำงาน ฟื้นแต้มสกิล +1 ต่อเทิร์น
@@ -110,6 +111,7 @@ module.exports = {
     if (tier === "secondary") return !swordOn(p);    // "ดาบแห่งความทรงจำ" ยังอยู่ = กดซ้ำไม่ได้
     if (tier === "ultimate") {
       if (ultOn(p)) return false;
+      if (this.ultCooldownLeft(engine, p) > 0) return false; // เพิ่งหมดเวลาไป ยังอยู่ในคูลดาวน์
       // เอฟเฟกต์สนามยูนะทำงานอยู่ = กดไม่ได้ (ท่านี้เป็นการ "บังคับเปิด" สนามยูนะเอง)
       return !(engine.yunaEffect && engine.roundNumber <= engine.yunaWindowEnd);
     }
@@ -376,9 +378,26 @@ module.exports = {
   // Delete ลงเอจิเอง: ดีบัฟอยู่แค่ 3 เทิร์นแทน 5 — เรียกจาก characters/yuna.js ตอนแจกดีบัฟ
   yunaDeleteTurns(target, def) { return isEiji(target) ? DELETE_SELF_TURNS : def; },
 
+  // ---------- คูลดาวน์ท่าไม้ตาย (patch 2.9.3) ----------
+  //  "ไม่ว่ายังก็ตาม" หมดเวลาเมื่อไหร่ ล็อกไม่ให้กดซ้ำอีก ULT_COOLDOWN_TURNS เทิร์น
+  //  เก็บเป็น "เลขรอบที่ล็อกถึง" ไม่ใช่ตัวนับถอยหลัง เพราะไม่ได้อยู่ใน p.statuses จึงไม่มีใครลดเทิร์นให้
+  //  (เหตุผลเดียวกับ shidoRewindLock ของอิสึกะ ชิโด)
+  ULT_COOLDOWN_TURNS,
+  onUltExpire(engine, p) {
+    if (!isEiji(p)) return;
+    p.eijiUltLock = engine.roundNumber + ULT_COOLDOWN_TURNS;
+    engine.log(`🔥 ${p.name} ไม่ว่ายังก็ตาม หมดเวลาแล้ว — ใช้ท่าไม้ตายซ้ำไม่ได้อีก ${ULT_COOLDOWN_TURNS} เทิร์น`);
+  },
+  // เทิร์นที่เหลือของคูลดาวน์ (0 = กดได้แล้ว) — ใช้ทั้งด่านเงื่อนไขและตัวเลขบนการ์ดสกิลฝั่ง client
+  ultCooldownLeft(engine, p) {
+    if (!isEiji(p)) return 0;
+    return Math.max(0, (p.eijiUltLock || 0) - engine.roundNumber + 1);
+  },
+
   // ---------- ฟิลด์ที่ต้องรีเซ็ตทุกแมตช์ — เรียกจาก resetCombat() ----------
   resetCombat(p) {
     p.eijiOrdinal = 0;            // กลโกง Ordinal Scale: สแตคที่กดสะสมในเทิร์นนี้ (0-5 · รีเซ็ตทุกเทิร์น)
     p.eijiDodgeUsedRound = false; // ใช้โควตาหลบหลีกของเทิร์นนี้ไปแล้วหรือยัง
+    p.eijiUltLock = 0;            // คูลดาวน์ท่าไม้ตาย: ล็อกถึงรอบนี้ (ไม่ใช่สถานะ จึงต้องล้างเอง)
   },
 };

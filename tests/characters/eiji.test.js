@@ -54,6 +54,39 @@ function setup() {
 }
 
 const vitals = (p) => p.hp + p.armor;
+
+// ---------------------------------------------------------------- คูลดาวน์ท่าไม้ตาย (patch 2.9.3)
+test('ไม่ว่ายังก็ตาม: หมดเวลาแล้วติดคูลดาวน์ 3 เทิร์น ก่อนจะกดซ้ำได้', () => {
+  const { e } = setup();
+  const r = engine.roundNumber;
+  assert.equal(eiji.canUseSkill(engine, e, 'ultimate'), true, 'ตอนเริ่มกดได้ปกติ');
+
+  e.statuses.eijiUlt = 1;
+  assert.equal(eiji.canUseSkill(engine, e, 'ultimate'), false, 'ระหว่างทำงานอยู่กดซ้ำไม่ได้');
+
+  // จำลอง endTurn: สถานะหมดอายุ -> server เรียก onUltExpire ให้
+  delete e.statuses.eijiUlt;
+  eiji.onUltExpire(engine, e);
+  assert.equal(e.eijiUltLock, r + eiji.ULT_COOLDOWN_TURNS);
+
+  for (let i = 1; i <= eiji.ULT_COOLDOWN_TURNS; i++) {
+    engine.setRoundNumber(r + i);
+    assert.equal(eiji.canUseSkill(engine, e, 'ultimate'), false, `รอบที่ ${r + i} ยังติดคูลดาวน์`);
+    assert.equal(eiji.ultCooldownLeft(engine, e), eiji.ULT_COOLDOWN_TURNS - i + 1, 'ตัวเลขบนการ์ดนับถอยหลังถูกต้อง');
+  }
+
+  engine.setRoundNumber(r + eiji.ULT_COOLDOWN_TURNS + 1);
+  assert.equal(eiji.ultCooldownLeft(engine, e), 0);
+  assert.equal(eiji.canUseSkill(engine, e, 'ultimate'), true, 'ครบ 3 เทิร์นแล้วกดได้');
+});
+
+test('ไม่ว่ายังก็ตาม: คูลดาวน์ถูกล้างเมื่อเริ่มแมตช์ใหม่', () => {
+  const { e } = setup();
+  e.eijiUltLock = engine.roundNumber + 3;
+  eiji.resetCombat(e);
+  assert.equal(e.eijiUltLock, 0);
+  assert.equal(eiji.ultCooldownLeft(engine, e), 0);
+});
 const maxOrdinal = (e) => { for (let i = 0; i < eiji.ORDINAL_MAX; i++) eiji.pressOrdinal(engine, e); };
 
 test('กลโกง Ordinal Scale: กด 1 ครั้ง = หลบ +20% และสละแต้มสกิล 1', () => {
