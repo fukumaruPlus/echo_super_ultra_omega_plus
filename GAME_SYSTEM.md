@@ -574,7 +574,7 @@ module.exports = {
 7. **`p.seen[key]` vs `p.cutsceneShown[key]`** — อันแรกกันเอฟเฟกต์ทำงานซ้ำ อันหลังกันวีดีโอเล่นซ้ำ คนละเรื่องกัน
 8. `process.on("uncaughtException")` ที่หัวไฟล์เป็น **ตาข่ายสำรอง** ไม่ใช่ที่จัดการ error — handler ต้อง try/catch เอง (`safeOn`/`onPlayerEvent` ทำให้แล้ว)
 9. ไฟล์สื่อ (รูป/วีดีโอ/เพลง) ไม่ track ใน git — ไม่มีไฟล์ในเครื่อง client จะ fallback เป็นอีโมจิ (`client/src/data/avatars.js`)
-10. **ตัวละคร `unique`** (คอนเนอร์ RK800) กันซ้ำ **2 ชั้น**: handler `join` ตอบ `characterTaken` และหน้าเลือกตัวละคร
+10. **ตัวละคร `unique`** (คอนเนอร์ RK800 · ยุย โยชิโอกะ · อิสึกะ ชิโด) กันซ้ำ **2 ชั้น**: handler `join` ตอบ `characterTaken` และหน้าเลือกตัวละคร
     ปิดการ์ดจาก event `takenChars` — เพิ่มตัว unique ใหม่ต้องแค่ใส่ `unique: true` ใน `characters.js` เท่านั้น
 11. `resetCombat(p)` `:1939` คือรายการฟิลด์ผู้เล่นทั้งหมด — **ฟิลด์ใหม่ของตัวละครต้องรีเซ็ตที่นี่** ไม่งั้นค้างข้ามแมตช์
 
