@@ -175,22 +175,49 @@ test('Mahapralaya: แจกเปราะบางให้ทุกคนย�
   assert.equal(arjuna.canUseSkill(engine, j, 'ultimate'), false);
 });
 
-test('Mahapralaya: ล้างดีบัฟของอรชุนเองทั้งหมดตอนกด (ไม่แตะดีบัฟของคนอื่น)', () => {
-  const { j, a } = setup();
-  j.statuses.weak = 3; j.statusAmt.weak = 1;
-  j.statuses.stun = 2;
-  j.statuses.hburn = 4;
+test('Mahapralaya: ล้างดีบัฟให้เป้าหมายที่ถูกโจมตี "คนละ 1 ขั้น" ไม่ใช่ล้างทั้งหมด', () => {
+  const { j, a, b } = setup();
+  arjuna.onAttacked(engine, a, j); // ให้ดาเมจใส่ A ไม่เป็น 0 (ตัดส่วนลดของสกิลติดตัวออก)
+  arjuna.onAttacked(engine, b, j);
+  a.statuses.stun = 2;
   a.statuses.weak = 3; a.statusAmt.weak = 1;
+  a.statuses.hburn = 4;
   arjuna.startPralaya(engine, j);
-  assert.ok(!j.statuses.weak && !j.statuses.stun && !j.statuses.hburn, 'ดีบัฟของอรชุนถูกล้างหมด');
-  assert.equal(a.statuses.weak, 3, 'ดีบัฟของคนอื่นไม่ถูกแตะ');
-  assert.equal(a.statuses.fragile, 3, 'และยังโดนเปราะบางตามปกติ');
+  arjuna.applyPralaya(engine, j);
+  const left = ['stun', 'weak', 'hburn', 'fragile'].filter((k) => (a.statuses[k] || 0) > 0);
+  assert.equal(left.length, 3, 'ติดมา 3 + เปราะบางจากท่า = 4 · ถูกล้างไป 1 ขั้น เหลือ 3');
+  assert.ok(!a.statuses.stun, 'ล้างตัวแรกในรายการดีบัฟพื้นฐาน (stun มาก่อน weak)');
 });
 
-test('Mahapralaya: อรชุนไม่ล้างเปราะบางที่ท่าเพิ่งแจกของตัวเองทิ้ง (ล้างก่อนแจก)', () => {
-  const { j } = setup();
+test('Mahapralaya: ล้างหลังลงดาเมจ — สังหารโลกาจึงคิดจากดีบัฟเต็มจำนวนก่อนถูกล้าง', () => {
+  const { j, a } = setup();
+  arjuna.onAttacked(engine, a, j);
+  arjuna.applySlay(engine, j);           // +1 และ +1 ต่อดีบัฟเสีย 1 ตัว
+  a.statuses.stun = 2;                   // 1 ดีบัฟก่อนกดท่า
+  const hp0 = a.hp;
+  arjuna.startPralaya(engine, j);        // แจกเปราะบาง -> A มี 2 ดีบัฟตอนคิดดาเมจ
+  arjuna.applyPralaya(engine, j);
+  assert.equal(hp0 - a.hp, 4, 'ฐาน 1 + สังหารโลกา 1 + ดีบัฟ 2 ตัว = 4');
+  assert.ok(!a.statuses.stun, 'แล้วค่อยล้างให้ 1 ขั้นหลังดาเมจลง');
+});
+
+test('Mahapralaya: อรชุนไม่ได้ล้างดีบัฟให้ตัวเอง (ล้างเฉพาะคนที่ถูกโจมตี)', () => {
+  const { j, a } = setup();
+  arjuna.onAttacked(engine, a, j);
+  j.statuses.stun = 2;
   arjuna.startPralaya(engine, j);
-  assert.ok(!j.statuses.fragile, 'ท่านี้ไม่แจกเปราะบางให้ตัวเองอยู่แล้ว');
+  arjuna.applyPralaya(engine, j);
+  assert.equal(j.statuses.stun, 2, 'ดีบัฟของอรชุนเองยังอยู่ครบ');
+});
+
+test('Mahapralaya: เป้าหมายที่ตายจากท่านี้ไม่ถูกล้างดีบัฟ', () => {
+  const { j, a } = setup();
+  arjuna.onAttacked(engine, a, j);
+  a.hp = 1; a.armor = 0;
+  a.statuses.stun = 2;
+  arjuna.applyPralaya(engine, j);
+  assert.equal(a.alive, false);
+  assert.equal(a.statuses.stun, 2, 'ตกรอบแล้วไม่ต้องชำระล้างให้');
 });
 
 test('Mahapralaya: เล่นวีดีโอทุกครั้งที่กด ไม่ใช่ครั้งแรกครั้งเดียว', () => {

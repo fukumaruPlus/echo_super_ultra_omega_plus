@@ -142,6 +142,29 @@ function blindActive(p) {
   return !!p && ((p.statuses && p.statuses.blind) || 0) > 0;
 }
 
+// ล้างดีบัฟ "ทีละ 1 ขั้น" — ล้างดีบัฟพื้นฐานตัวแรกที่เจอ ถ้าไม่มีเลยจึงลดดีบัฟแบบขั้นบันได 1 ขั้นแทน
+//  คู่กับ cleanseDebuffs() ที่ล้างทีเดียวทั้งหมด — ใช้กับเอฟเฟกต์ที่ตั้งใจให้ "ค่อยๆ ชำระล้าง"
+//  (ผู้วิงวอน Prayer และ Mahapralaya ของอรชุน) · คืนจำนวนขั้นที่ล้างได้จริง (0 หรือ 1)
+function cleanseOneStep(p) {
+  if (!p || !p.statuses) return 0;
+  for (const k of BASIC_DEBUFF_CLEAR) {
+    if ((p.statuses[k] || 0) > 0) {
+      delete p.statuses[k];
+      if (p.statusAmt) delete p.statusAmt[k];
+      if (k === "mageslayerMark") delete p.mageslayerMarks; // ผู้สังหารเมจ: ล้าง map ผู้ร่ายที่ผูกกับตราด้วย
+      return 1;
+    }
+  }
+  for (const k of SOFT_DEBUFF_STEP) {
+    if ((p.statuses[k] || 0) > 0) {
+      p.statuses[k]--;
+      if (p.statuses[k] <= 0) delete p.statuses[k];
+      return 1;
+    }
+  }
+  return 0;
+}
+
 // "ไร้ทางเยียวยา" (สถานะ Universal): ฟื้นเลือดจริงไม่ได้
 function noHealActive(p) {
   return !!p && ((p.statuses && p.statuses.nohealing) || 0) > 0;
@@ -329,6 +352,7 @@ module.exports = {
   BASIC_DEBUFF_CLEAR,
   SOFT_DEBUFF_STEP,
   cleanseDebuffs,
+  cleanseOneStep,
   coolReduction,
   MEND_MAX_TURNS,
   applyMend,

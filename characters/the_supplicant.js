@@ -207,26 +207,8 @@ module.exports = {
   },
 
   // ---------- สกิลติดตัว: ล้างดีบัฟ 1 ขั้น แล้วเก็บคำวิงวอน ----------
-  //  ล้างดีบัฟพื้นฐาน "1 สถานะ" — ถ้าไม่มีเลย ก็ลดดีบัฟแบบขั้นบันได (ยามฟ้าสาง/เส้นชีวิต) ลง 1 ขั้นแทน
-  //  คืนจำนวนขั้นที่ล้างได้จริง (0 หรือ 1)
-  cleanseOneStep(engine, target) {
-    for (const k of engine.BASIC_DEBUFF_CLEAR) {
-      if ((target.statuses[k] || 0) > 0) {
-        delete target.statuses[k];
-        if (target.statusAmt) delete target.statusAmt[k];
-        if (k === "mageslayerMark") delete target.mageslayerMarks;
-        return 1;
-      }
-    }
-    for (const k of engine.SOFT_DEBUFF_STEP) {
-      if ((target.statuses[k] || 0) > 0) {
-        target.statuses[k]--;
-        if (target.statuses[k] <= 0) delete target.statuses[k];
-        return 1;
-      }
-    }
-    return 0;
-  },
+  //  ตรรกะการล้าง 1 ขั้นย้ายไปเป็นของกลางที่ _universal_status.js แล้ว (อรชุนใช้ร่วมด้วย)
+  cleanseOneStep(engine, target) { return engine.cleanseOneStep(target); },
 
   // เก็บคำวิงวอน + จ่ายรางวัลตามขั้น — เรียก "ทุกครั้ง" ที่ผู้วิงวอนล้างดีบัฟได้ steps ขั้น
   //  รางวัลขั้น 8/12 จ่ายต่อ "ขั้นที่ล้างได้" ตามสเปค (ท่าที่ล้างทีเดียวหลายตัวจึงจ่ายหลายหน่วย)
