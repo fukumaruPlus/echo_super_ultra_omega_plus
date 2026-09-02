@@ -163,7 +163,7 @@ test('ขจัดความชั่วร้าย: กดซ้ำไม่
 });
 
 // ---------------------------------------------------------------- ท่าไม้ตาย Mahapralaya
-test('Mahapralaya: แจกเปราะบางให้ทุกคนยกเว้นตัวเอง + คิววีดีโอ + ติดคูลดาวน์ 3 เทิร์น', () => {
+test('Mahapralaya: แจกเปราะบางให้ทุกคนยกเว้นตัวเอง + คิววีดีโอ + ติดคูลดาวน์ 5 เทิร์น', () => {
   const { j, a, b } = setup();
   arjuna.startPralaya(engine, j);
   assert.equal(a.statuses.fragile, 3);
@@ -171,8 +171,19 @@ test('Mahapralaya: แจกเปราะบางให้ทุกคนย�
   assert.equal(b.statuses.fragile, 3);
   assert.ok(!j.statuses.fragile, 'อรชุนไม่ติดเปราะบางของตัวเอง');
   assert.deepEqual(queued, ['arjunaPralaya']);
-  assert.equal(arjuna.ultCooldownLeft(engine, j), 3);
+  assert.equal(arjuna.ultCooldownLeft(engine, j), arjuna.PRALAYA_COOLDOWN);
   assert.equal(arjuna.canUseSkill(engine, j, 'ultimate'), false);
+});
+
+test('Mahapralaya: เล่นวีดีโอทุกครั้งที่กด ไม่ใช่ครั้งแรกครั้งเดียว', () => {
+  const { j } = setup();
+  arjuna.startPralaya(engine, j);
+  engine.setRoundNumber(engine.roundNumber + arjuna.PRALAYA_COOLDOWN);
+  arjuna.startPralaya(engine, j);
+  engine.setRoundNumber(engine.roundNumber + arjuna.PRALAYA_COOLDOWN);
+  arjuna.startPralaya(engine, j);
+  assert.deepEqual(queued, ['arjunaPralaya', 'arjunaPralaya', 'arjunaPralaya'],
+    'ต้องใช้ queueCutscene (เล่นทุกครั้ง) ไม่ใช่ triggerCutscene (ครั้งเดียวต่อเกม)');
 });
 
 test('Mahapralaya: ความเสียหายเท่าพลังโจมตีปกติต่อเป้าหมายแต่ละคน', () => {
@@ -197,7 +208,7 @@ test('Mahapralaya: เปราะบางของท่าไม่ทำใ�
 test('Mahapralaya: คูลดาวน์หมดแล้วกดได้อีกครั้ง', () => {
   const { j } = setup();
   arjuna.startPralaya(engine, j);
-  engine.setRoundNumber(engine.roundNumber + 3);
+  engine.setRoundNumber(engine.roundNumber + arjuna.PRALAYA_COOLDOWN);
   assert.equal(arjuna.ultCooldownLeft(engine, j), 0);
   assert.equal(arjuna.canUseSkill(engine, j, 'ultimate'), true);
 });

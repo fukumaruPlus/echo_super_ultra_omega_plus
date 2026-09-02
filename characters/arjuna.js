@@ -27,7 +27,7 @@ const SLAY_ATK = 1;         // พลังโจมตี +1
 const SLAY_PER_DEBUFF = 1;  // ดาเมจเพิ่ม 1 ต่อดีบัฟเสีย 1 ตัวที่เป้าหมายมี
 
 // ---------- ท่าไม้ตาย Mahapralaya ----------
-const PRALAYA_COOLDOWN = 3; // หลังทำงานแล้ว ต้องรออีก 3 เทิร์นจึงกดได้อีก
+const PRALAYA_COOLDOWN = 5; // หลังทำงานแล้ว ต้องรออีก 5 เทิร์นจึงกดได้อีก (balance 3.4.1: เดิม 3)
 const PRALAYA_FRAGILE = 1;  // "เปราะบาง" 1 หน่วยให้ทุกคน
 const PRALAYA_FRAGILE_TURNS = 3;
 

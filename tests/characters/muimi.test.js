@@ -117,21 +117,19 @@ test('ดาบสนิมกับดาบสะบั้นล็อกก�
   assert.equal(muimi.canUseSkill(engine, m, 'ultimate'), true, 'ท่าไม้ตายกดซ้ำได้ถ้าดาบสนิมไม่ทำงาน');
 });
 
-test('ดาบสะบั้นหมดลงแล้วคูลดาวน์ 3 เทิร์น ก่อนใช้ท่าไม้ตายซ้ำได้', () => {
+test('ดาบสะบั้นหมดลงแล้วคูลดาวน์ 5 เทิร์น ก่อนใช้ท่าไม้ตายซ้ำได้', () => {
   const { m } = setup();
   engine.setRoundNumber(10);
   muimi.onUltExpire(engine, m);
   assert.equal(m.muimiUltLock, 10 + muimi.ULT_COOLDOWN_TURNS);
 
-  engine.setRoundNumber(11);
-  assert.equal(muimi.ultCooldownLeft(engine, m), 3);
-  assert.equal(muimi.canUseSkill(engine, m, 'ultimate'), false);
-  engine.setRoundNumber(12);
-  assert.equal(muimi.ultCooldownLeft(engine, m), 2);
-  engine.setRoundNumber(13);
-  assert.equal(muimi.ultCooldownLeft(engine, m), 1);
-  assert.equal(muimi.canUseSkill(engine, m, 'ultimate'), false);
-  engine.setRoundNumber(14);
+  // นับถอยหลังทีละเทิร์นจนครบ — ผูกกับค่าคงที่ ไม่ใช่เลขตายตัว จะได้ไม่พังทุกครั้งที่ปรับบาลานซ์
+  for (let i = 1; i <= muimi.ULT_COOLDOWN_TURNS; i++) {
+    engine.setRoundNumber(10 + i);
+    assert.equal(muimi.ultCooldownLeft(engine, m), muimi.ULT_COOLDOWN_TURNS - i + 1);
+    assert.equal(muimi.canUseSkill(engine, m, 'ultimate'), false);
+  }
+  engine.setRoundNumber(10 + muimi.ULT_COOLDOWN_TURNS + 1);
   assert.equal(muimi.ultCooldownLeft(engine, m), 0);
   assert.equal(muimi.canUseSkill(engine, m, 'ultimate'), true);
 });

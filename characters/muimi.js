@@ -9,7 +9,7 @@ const RUSTY_TURNS = 3;
 const TOWER_TURNS = 2;
 const RESIST_TURNS = 3;
 const TOWER_ATK_BONUS = 3;
-const ULT_COOLDOWN_TURNS = 3;
+const ULT_COOLDOWN_TURNS = 5;
 const HEART_LOSSES = 3;
 const HEART_CHANCE = 0.5;
 
