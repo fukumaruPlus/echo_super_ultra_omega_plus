@@ -10,6 +10,7 @@ const connorImg = require("./conner").IMG; // คอนเนอร์ RK800: �
 const danImg = require("./dan").IMG;       // โมโรโบชิ ดัน: เหตุผลเดียวกัน
 const shidoImg = require("./shido").IMG;   // อิสึกะ ชิโด: เหตุผลเดียวกัน
 const yuiImg = require("./yui").IMG;       // ยุย โยชิโอกะ: เหตุผลเดียวกัน
+const ippoImg = require("./ippo").IMG;     // มาคุโนะอุจิ อิปโป: เหตุผลเดียวกัน
 const muimiImg = require("./muimi").IMG;   // มุยมิ: ใช้ path รูปจาก hook กลาง
 const BAT_CAR_IMG = "/characters/bat_ben/bat_update/bat_ben_car.webp";
 const BAT_SHOT_IMG = "/characters/bat_ben/bat_update/skill1.2/bat_ben_skill1.2.jpg";
@@ -22,6 +23,12 @@ module.exports = function buildTransforms(img) {
     // ปัดขึ้นเผื่อเวลาตัดฉากเพื่อให้วิดีโอเล่นจบครบ และ queueCutscene ทำให้เล่นทุกครั้งที่กด
     muimiUltimateFull:  { img: muimiImg.skill3, video: "/characters/muimi/muimi_skill3.mp4",       title: "ดาบสะบั้นหอคอยสวรรค์", label: "ปล่อยท่าไม้ตาย", seconds: 24, music: "muimi", afterReveal: false },
     muimiUltimateShort: { img: muimiImg.skill3, video: "/characters/muimi/muimi_skill3_short.mp4", title: "ดาบสะบั้นหอคอยสวรรค์", label: "ปล่อยท่าไม้ตาย", seconds: 12, music: "muimi", afterReveal: false },
+    // ---------- มาคุโนะอุจิ อิปโป (patch 3.3 new) ----------
+    //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก (หลบหลีก 4.69 -> 6 · Dempsey 10.96 -> 12 · อัลติ 2.88 -> 4)
+    //  ทุกคลิปเรียกผ่าน queueCutscene = เล่นทุกครั้งที่ทำงาน (การหลบเกิดบ่อย จึงตั้งเวลาให้กระชับ)
+    ippoDodge:   { img: ippoImg.base,   video: "/characters/ippo/ippo_dodge.mp4",              title: "หลบหลีก",      label: "ผู้ยืนหยัด",   seconds: 6,  music: null, afterReveal: false },
+    ippoRoll:    { img: ippoImg.skill3, video: "/characters/ippo/ippo_dempsey.mp4",            title: "DEMPSEY ROLL", label: "หมัดต่อเนื่อง", seconds: 12, music: null, afterReveal: false },
+    ippoDempsey: { img: ippoImg.skill3, video: "/characters/ippo/skill3/ippo_skill3.mp4",      title: "Dempsey roll", label: "เข้าท่า",      seconds: 4,  music: null, afterReveal: false },
     // ---------- แบทแมน ร่างรถแบทโมบิล (patch 3.1) ----------
     //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก (7.88/9.46/8.64/6.37/5.53)
     //  ทุกคลิปเรียกผ่าน queueCutscene = เล่นทุกครั้งที่ทำงาน

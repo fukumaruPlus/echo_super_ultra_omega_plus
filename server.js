@@ -401,6 +401,8 @@ function maxHpOf(p) {
   if (p && p.characterId === "hisakawa_sister") return CHAR_HOOKS.hisakawa_sister.maxHp(p);
   // เอจิ (patch 2.4 new): พลังชีวิตพื้นฐาน 4 หน่วย (แทน MAX_HP ปกติ)
   if (p && p.characterId === "eiji") return Math.max(1, CHAR_HOOKS.eiji.maxHp() - ((p.maxHpPenalty) || 0));
+  // มาคุโนะอุจิ อิปโป (patch 3.3 new): พลังชีวิตพื้นฐาน 5 หน่วย
+  if (p && p.characterId === "ippo") return Math.max(1, CHAR_HOOKS.ippo.maxHp() - ((p.maxHpPenalty) || 0));
   return Math.max(1, MAX_HP - ((p && p.maxHpPenalty) || 0));
 }
 // ฟื้นเลือดจริงแบบเคารพสถานะ "ไม่ใช้งานต่อ" / "ไร้ทางเยียวยา" — คืนจำนวนที่ฟื้นได้จริง
@@ -1512,6 +1514,7 @@ function maxArmorOf(p) {
     : (p && p.characterId === "hisakawa_sister") ? CHAR_HOOKS.hisakawa_sister.maxArmor(p)
     : (escanorArmor != null) ? escanorArmor
     : (p && p.characterId === "eva13") ? 0
+    : (p && p.characterId === "ippo") ? CHAR_HOOKS.ippo.maxArmor() // อิปโป (patch 3.3 new): "โล่ 4" = เพดานเกราะ 4
     : (p && p.characterId === "eiji") ? CHAR_HOOKS.eiji.maxArmor() // เอจิ (patch 2.4 new): เกราะพื้นฐาน 4 หน่วย
     : MAX_ARMOR;
   return armorBase
@@ -1817,6 +1820,9 @@ function activeSkillMusic() {
   //  (ฝั่ง client เล่นไฟล์ใหม่ต่อจากตำแหน่งเดิมผ่าน MUSIC_POSITION_GROUPS จึงไม่มีรอยสะดุดตอนสลับช่วงเวลา)
   const bestByleth = CHAR_HOOKS.byleth.activeMusic(engine, isNightRound(roundNumber));
   if (bestByleth) return bestByleth;
+  // อิปโป (characters/ippo.js): เพลงประจำท่า Dempsey roll — เล่นค้างตลอดที่บัฟยังอยู่
+  const bestIppo = CHAR_HOOKS.ippo.activeMusic(engine);
+  if (bestIppo) return bestIppo;
   // ยุย (characters/yui.js): เพลงประจำท่าไม้ตายที่กำลังบรรเลงอยู่
   const bestYui = CHAR_HOOKS.yui.activeMusic(engine);
   if (bestYui) return bestYui;
@@ -2287,6 +2293,7 @@ function resetCombat(p) {
   CHAR_HOOKS.conner.resetCombat(p); // คอนเนอร์: ความเครียดของทุกคน + คำขาดจับกุม/สถานะไล่ล่า/โควตาฟื้นคืนชีพ
   CHAR_HOOKS.byleth.resetCombat(p); // ความรู้/หลักสูตร/ผลทบทวนบทเรียนที่ค้าง + ธงสตั้น-ห้ามสกิลพื้นฐานที่หลักสูตรของไบเลธตั้งไว้ให้คนอื่น
   CHAR_HOOKS.haruka.resetCombat(p); // harukaBasicUses / harukaBleedProcs (โควตารายเทิร์น) + harukaStunPending (สตั้นค้างจากการสวนกลับ)
+  CHAR_HOOKS.ippo.resetCombat(p);    // อิปโป: อัตราหลบสะสม / Dempsey Charge / คูลดาวน์รายสกิล
   CHAR_HOOKS.bat_ben.resetCombat(p); // แบทแมน: ร่างรถแบทโมบิล + โควตากดครั้งเดียวต่อเกม
   CHAR_HOOKS.yui.resetCombat(p);   // ยุย โยชิโอกะ: เพลงที่เล่นแล้ว / คิวชุบชีวิต / ธงกันลูปการจั่วตาม
   CHAR_HOOKS.shido.resetCombat(p); // อิสึกะ ชิโด: ดาเมจที่บันทึกไว้ / กับดักฝากด้วยนะตัวฉัน / คิวเกิดใหม่
@@ -2810,6 +2817,15 @@ function buildStateFor(viewerId) {
         kotoneReadyMax: p.characterId === "kotone" ? CHAR_HOOKS.kotone.READY_MAX : undefined,
         kotoneForm: p.characterId === "kotone" ? CHAR_HOOKS.kotone.formActive(p) : undefined,   // อยู่ในร่าง [พร้อมลุย] หรือไม่
         // ---------- เอจิ (patch 2.4 new): UI อัตราหลบหลีกปัจจุบัน (ไม่ใช่สถานะสะสม) ----------
+        // อิปโป: อัตราหลบรวม · Dempsey Charge · คูลดาวน์รายสกิล (โชว์เป็นตัวเลขบนการ์ดสกิล)
+        ippoDodge: p.characterId === "ippo" ? CHAR_HOOKS.ippo.dodgeChance(p) : undefined,
+        ippoCharge: p.characterId === "ippo" ? CHAR_HOOKS.ippo.chargeOf(p) : undefined,
+        ippoChargeMax: p.characterId === "ippo" ? CHAR_HOOKS.ippo.DEMPSEY_MAX : undefined,
+        ippoCd: p.characterId === "ippo" ? {
+          basic: CHAR_HOOKS.ippo.cooldownLeft(engine, p, "basic"),
+          secondary: CHAR_HOOKS.ippo.cooldownLeft(engine, p, "secondary"),
+          ultimate: CHAR_HOOKS.ippo.cooldownLeft(engine, p, "ultimate"),
+        } : undefined,
         eijiDodge: p.characterId === "eiji" ? CHAR_HOOKS.eiji.dodgeChance(p) : undefined,        // % หลบหลีกรวมของเทิร์นนี้
         eijiOrdinal: p.characterId === "eiji" ? CHAR_HOOKS.eiji.ordinalStacks(p) : undefined,    // สแตค Ordinal Scale ที่กดไปแล้ว
         eijiOrdinalMax: p.characterId === "eiji" ? CHAR_HOOKS.eiji.ORDINAL_MAX : undefined,
@@ -3574,6 +3590,9 @@ function dealRound() {
     // สตั้น/ห้ามใช้สกิลพื้นฐาน ที่หลักสูตรของไบเลธตั้งไว้เมื่อเทิร์นก่อน -> เริ่มมีผลตอนนี้
     //  ต้องอยู่ "ก่อน" บล็อกเช็คสตั้นด้านล่าง (เหตุผลเดียวกับ Gargorgon Ray) ไม่งั้นสตั้นจะเลื่อนไปอีกเทิร์น
     CHAR_HOOKS.byleth.applyPendingFromCourses(engine, p);
+    // อิปโป (characters/ippo.js): Uper Cut ตั้งสตั้นไว้เมื่อเทิร์นก่อน -> เริ่มมีผลตอนนี้
+    //  ต้องอยู่ "ก่อน" บล็อกเช็คสตั้นด้านล่าง ไม่งั้นสตั้นจะเลื่อนไปมีผลอีกเทิร์นหนึ่ง
+    CHAR_HOOKS.ippo.applyPendingStun(engine, p);
     // อมาซอน (ฮารุกะ สกิลติดตัว): โดนสวนกลับเมื่อเทิร์นก่อน -> สตั้นเริ่มมีผลตอนนี้
     //  ต้องอยู่ "ก่อน" บล็อกเช็คสตั้นด้านล่างเหมือน Gargorgon Ray ไม่งั้นสตั้นจะเลื่อนไปอีกเทิร์นหนึ่ง
     if (p.harukaStunPending > 0) {
@@ -4150,6 +4169,10 @@ function useSkill(id, tier, targets, item) {
   // ---------- แบทแมน (patch 3.1, characters/bat_ben.js) ----------
   //  ร่างปกติ: พื้นฐาน = รถแบทโมบิล (ครั้งเดียวต่อเกม) · รอง = นายลืมของน่ะ · ไม้ตาย = เข้ามาเลย
   //  ร่างรถ: ทั้งสามช่องเปลี่ยนเป็นเวอร์ชันรถ (ลูกปรายล่อ / ปืนติดรถ / แกไม่รอดแน่)
+  // ---------- มาคุโนะอุจิ อิปโป (characters/ippo.js) ----------
+  //  ทั้งสามช่องมีคูลดาวน์รายสกิล (เก็บเป็นเลขรอบ ไม่ใช่สถานะ) — ด่านเดียวกันทั้ง canUseSkill และปุ่มฝั่ง client
+  const isIppoPick = p.characterId === "ippo";
+  if (isIppoPick && !CHAR_HOOKS.ippo.canUseSkill(engine, p, tier)) return;
   const isBatPick = p.characterId === "bat_ben";
   if (isBatPick && !CHAR_HOOKS.bat_ben.canUseSkill(engine, p, tier)) return;
   // ---------- บานาจ ลิงก์ (patch 2.1.2, characters/banagher.js): Absorb shield — เลือกเป้าหมาย 1 คน (เลือกตัวเองได้) ----------
@@ -4418,6 +4441,7 @@ function useSkill(id, tier, targets, item) {
 
   // ---------- แบทแมน (characters/bat_ben.js) ----------
   //  สกิลที่ไม่ได้ผูกกับสถานะ (รถแบทโมบิล + ทั้งสามช่องของร่างรถ) ลงผลผ่าน applyInstantSkill
+  if (isIppoPick) flashSuffix = CHAR_HOOKS.ippo.applyInstantSkill(engine, p, tier) || flashSuffix;
   if (isBatPick) flashSuffix = CHAR_HOOKS.bat_ben.applyInstantSkill(engine, p, tier) || flashSuffix;
   if (st === "batKarma") CHAR_HOOKS.bat_ben.activateKarma(engine, p);
   if (st === "batTaunt") CHAR_HOOKS.bat_ben.activateTaunt(engine, p);
@@ -5583,6 +5607,8 @@ function postAttackFollowup(attacker) {
   if (attacker && attacker.alive && attacker.characterId === "takuto") {
     if (CHAR_HOOKS.takuto.startThirdAttack(engine, attacker)) return;
   }
+  // อิปโป (characters/ippo.js): Dempsey roll — โจมตีต่อเนื่องตามจำนวน Dempsey Charge ที่สะสมไว้
+  if (CHAR_HOOKS.ippo.startExtraAttack(engine, attacker)) return;
   // ฟุจิตะ โคโตเนะ (characters/kotone.js): Self-affirmation Explosion! Love Love — โจมตีเพิ่มอีก 1 ครั้ง
   if (attacker && attacker.alive && attacker.characterId === "kotone") {
     if (CHAR_HOOKS.kotone.startExtraAttack(engine, attacker)) return;
@@ -5868,6 +5894,8 @@ function doAttack(byId, targetId) {
 
   // เอจิ (characters/eiji.js): อัตราหลบหลีกรวม (ว่องไว + ไม่ว่ายังก็ตาม + Ordinal Scale) — 1 ครั้งต่อเทิร์น
   if (CHAR_HOOKS.eiji.tryAttackDodge(engine, attacker, target)) return;
+  // อิปโป (characters/ippo.js): หลบการโจมตีปกติ — หลบพ้นแล้วจบเทิร์นด้วยฉากหลบ
+  if (CHAR_HOOKS.ippo.tryAttackDodge(engine, attacker, target)) return;
   // เอจิ สกิลติดตัว 1 (ผู้เล่นอันดับ 2): ผู้ชนะไปตีคนอื่นที่ไม่ใช่เอจิ -> 25% ขัดจังหวะแล้วสวนคืน
   if (CHAR_HOOKS.eiji.tryInterrupt(engine, attacker, target)) return;
 
@@ -6024,6 +6052,7 @@ function doAttack(byId, targetId) {
   // DoomGuy (patch 2.2 full): บางอาวุธ (Heavy Cannon / Plasma Rifle / Ballista) ดาเมจเจาะเกราะ — ทะลุเกราะเข้าเลือดจริงเสมอ
   const doomPierceAtk = attacker.characterId === "doomguy" && !((attacker.statuses.doomCrucible || 0) > 0) &&
     !!(DOOM_WEAPONS[attacker.doomWeapon] || DOOM_WEAPONS.shotgun).pierce;
+  const ippoArmorBefore = target.armor; // อิปโป Uper Cut: ตัดสินจากเกราะ "ก่อน" โดนหมัดนี้
   if (attackerBeat || profitAtk > 0 || phenexPurgeAtk || doomPierceAtk) dealDirect(target, dmg, true); // ประกายเขี้ยวปฏิปักษ์ / กำไรเท่าตัวโว้ย / อย่าอยู่เลย แกน่ะ!: ทะลุเกราะเข้าเลือดจริง
   else dealMixed(target, dmg, true);               // กฎปกติ: ลดเกราะก่อน ถ้าไม่มีเกราะจึงเข้าเลือดจริง
   CHAR_HOOKS.escanor.onNormalAttackReceived(engine, attacker, target, escanorFormBeforeHit);
@@ -6054,6 +6083,10 @@ function doAttack(byId, targetId) {
   const yuiCounterFx = CHAR_HOOKS.yui.onAttackedNormally(engine, attacker, target);
   // แบทแมน (characters/bat_ben.js): ปืนติดรถ — ใช้แล้วหมดกระสุน (ดาเมจถูกบวกไปแล้วที่ computeAttackBase)
   const batGunFired = CHAR_HOOKS.bat_ben.consumeGun(engine, attacker);
+  // อิปโป (characters/ippo.js): Uper Cut ลงผลตามว่าเป้าหมาย "มีเกราะก่อนโดนหมัดนี้" หรือไม่
+  const ippoUpperFx = CHAR_HOOKS.ippo.resolveUpper(engine, attacker, target, ippoArmorBefore);
+  // Dempsey Charge: เทหมดหน้าตัก -> จำนวนครั้งที่ต้องตีเพิ่ม (บัฟหายทั้งก้อนตรงนี้)
+  if (CHAR_HOOKS.ippo.dempseyActive(attacker)) attacker.ippoExtraAtk = (attacker.ippoExtraAtk || 0) + CHAR_HOOKS.ippo.consumeCharge(engine, attacker);
   // Ginga Strium (ฮิคารุ, characters/hikaru.js): โจมตีโดนเป้าหมาย -> ติดลุกไหม้ให้เป้าหมาย / ถูกโจมตีขณะอยู่ในร่างนี้ -> ผู้โจมตีติดลุกไหม้สวนกลับ
   CHAR_HOOKS.hikaru.onAttackBurnApply(engine, attacker, target);
   const escanorAttackVideoQueued = CHAR_HOOKS.escanor.onAttackLanded(engine, attacker, target);
@@ -6334,6 +6367,7 @@ function doAttack(byId, targetId) {
   if (batReflectDmg > 0) addFx({ name: `เข้ามาเลย — ความเสียหายเกิดกับผู้โจมตีด้วย -${batReflectDmg}`, img: BAT_SKILL3_IMG, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   // ---------- มิซึซาว่า ฮารุกะ (characters/haruka.js) ----------
   if (harukaPunishFx.punishStacks > 0) addFx({ name: `จงไปสู่สุขติ — ระเบิดเลือดไหล +${harukaPunishFx.punishStacks}`, img: CHAR_HOOKS.haruka.IMG.skill2, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
+  if (ippoUpperFx) addFx({ name: ippoUpperFx.kind === "decay" ? "Uper Cut — ผุพัง 3 เทิร์น" : "Uper Cut — สตั้นเทิร์นหน้า", img: CHAR_HOOKS.ippo.IMG.skill2, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
   if (batGunFired) addFx({ name: `ปืนติดรถ +${CHAR_HOOKS.bat_ben.GUN_BONUS}`, img: CHAR_HOOKS.bat_ben.IMG_GUN, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
   if (yuiCounterFx) addFx({ name: `เยอรมันซูเพล็ก — ทุ่มสวนกลับ -${yuiCounterFx.dmg}`, img: CHAR_HOOKS.yui.IMG.skill2, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (danCounterFx) addFx({ name: `นายทำให้ฉันผิดหวัง — สวนกลับศิษย์ -${danCounterFx.dmg}`, img: CHAR_HOOKS.dan.IMG.skill2, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
@@ -6475,6 +6509,8 @@ function endTurn() {
       if (k === "triggerDarkWail") continue; // อวดครวญ: สแตคถาวรจนกว่า Impact จะล้างทั้งสนาม
       if (k === "escanorMorning" || k === "escanorNight" || k === "escanorNoon" || k === "escanorLastStand" || k === "escanorSolar" || k === "escanorFlare" || k === "escanorFlareNoon" || k === "escanorPunch" || k === "escanorRhitta" || k === "escanorRhittaNoon" || k === "escanorSun") continue;
       // ---------- โอกูริ แคป (patch 2.0.8.1) ----------
+      // อิปโป: Dempsey roll เป็น "ธงบัฟเปิดอยู่" ไม่ใช่ตัวนับเทิร์น — หายเมื่อโจมตีสำเร็จเท่านั้น
+      if (k === "ippoDempsey") continue;
       if (k === "graybeast") continue;  // ร่าง Zone: ถาวรจนกว่าจะเข้าร่างหมดแรง
       // burnout (ร่างหมดแรง): เดิมถูกยกเว้นไม่ลดเทิร์นตรงนี้ แต่ไม่มีจุดไหนในโค้ดเคลียร์ทิ้งเองเลย (ไม่มี delete p.statuses.burnout ที่ไหนทั้งไฟล์)
       //  ผลคือติดแล้วค้างถาวรทั้งแมตช์ ทั้งที่ตั้งใจให้เป็นดีบัฟ 2 เทิร์นตายตัว (ดู OGURI_BURNOUT_TURNS, characters/oguri.js) — เอาข้อยกเว้นออก ให้ลดเทิร์นตามปกติ

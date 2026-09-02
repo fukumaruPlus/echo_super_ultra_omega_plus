@@ -124,6 +124,8 @@ const FILES = {
   yui_song1: "/characters/yui/song/song_3.1.mp3",
   yui_song2: "/characters/yui/song/song_3.2.mp3",
   yui_song3: "/characters/yui/song/song_3.3.mp3",
+  // มาคุโนะอุจิ อิปโป: เพลงประจำท่า Dempsey roll — เล่นค้างตลอดที่บัฟยังอยู่
+  ippo_theme: "/characters/ippo/ippo_theme.mp3",
   byleth_hit: "/characters/byleth/hit_sound.mp3", // เสียงโจมตีของ "ดาบต้องสาป"
   action_button: "/effect_sound/action_button.wav",
   trun_change: "/effect_sound/trun_change.wav",

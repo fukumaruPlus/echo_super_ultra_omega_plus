@@ -45,6 +45,7 @@ const conner = require("./conner");
 const dan = require("./dan");
 const shido = require("./shido");
 const yui = require("./yui");
+const ippo = require("./ippo");
 const muimi = require("./muimi");
 
 const CHARACTER_MODULES = [
@@ -90,6 +91,7 @@ const CHARACTER_MODULES = [
   shido,
   yui,
   muimi,
+  ippo,
 ];
 
 const CHAR_HOOKS = {};

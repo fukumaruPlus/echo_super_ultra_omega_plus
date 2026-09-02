@@ -11,7 +11,7 @@
 server.js (6.3k บรรทัด)          เอนจินกลางทั้งหมด: state, เฟส, การ์ด, ดาเมจ, สกิล, socket handler
 characters.js (1.7k)             DATA ล้วน — roster/ชื่อสกิล/desc/cost/img + POSITION_COLORS + publicRoster()
 characters/index.js              มัดรวม CHAR_HOOKS = { [characterId]: module } — ตัวละครใหม่ต้อง require+push ที่นี่
-characters/<id>.js               LOGIC ของตัวละครนั้น (40 ตัว) — export { id, ...methods(engine, ...) }
+characters/<id>.js               LOGIC ของตัวละครนั้น (43 ตัว) — export { id, ...methods(engine, ...) }
 characters/_universal_status.js  บัฟ/ดีบัฟกลาง (pure function ไม่พึ่ง engine)
 characters/_transforms.js        ตาราง metadata คัตซีน (TRANSFORMS) — data ล้วน
 characters/yuna.js               "ไอดอลประจำสนาม" ไม่ใช่ตัวละครที่เล่นได้ (ไม่อยู่ใน CHAR_HOOKS, require ตรง)
@@ -310,6 +310,20 @@ qtePending() / sweepQte()                กันสรุปรอบ + กว
   จะฆ่ายุยในจังหวะเดียวกัน -> เป้าหมายค้างตายถาวรและเกมจบแบบไม่มีใครได้อะไร
   `CHAR_HOOKS.yui.onDeath()` (เรียกจาก `instantDeath`) จึงชุบชีวิตให้ทันทีเมื่อ **ไม่เหลือผู้เล่นอื่นเกิน 1 คน**
   นอกเหนือจากนั้นยังยึดสเปคเดิม (ยุยตายก่อน = ผลหายไป)
+
+**มาคุโนะอุจิ อิปโป (patch 3.3)** — ตัวละครที่หมุนรอบ "การหลบหลีก"
+- ค่าสถานะพื้นฐานต่างจากคนอื่น: `maxHpOf` 5 · `maxArmorOf` **4** (สเปคเรียกว่า "โล่" แต่คือเกราะ ไม่ใช่ `p.shield`
+  ซึ่งในเกมนี้เป็นโล่กันครั้ง) · อัตราหลบหลีกพื้นฐาน 20%
+- โครงหลบหลีกยืมแพทเทิร์นเดียวกับเอจิทั้งชุด (`tryDodge` / `tryAttackDodge` ใน `doAttack` /
+  `adjustIncomingDamage` สำหรับดาเมจสกิล) ต่างกันที่ **อิปโปไม่มีโควตาหลบต่อเทิร์น** —
+  ถ้าจำกัดเหมือนเอจิจะสะสม Dempsey Charge ไม่ได้เลย
+- `adjustIncomingDamage` ของอิปโปเป็นทั้ง "ด่านหลบดาเมจสกิล" และ "จุดล้างอัตราหลบสะสมเมื่อโดนเต็มๆ" ในตัวเดียว
+- **Dempsey Charge เก็บที่ `p.ippoCharge` + ธง `statuses.ippoDempsey`** ซึ่ง**ไม่นับเทิร์น** (ต้อง `continue`
+  ในลูปลดเทิร์นของ `endTurn`) เพราะหายเมื่อ "โจมตีสำเร็จ" เท่านั้น · การตีเพิ่มใช้ `p.ippoExtraAtk`
+  แล้วเปิดเฟส ATTACK ซ้ำทีละครั้งที่ `postAttackFollowup()` (แพทเทิร์นเดียวกับคอมโบของทาคุโตะ/โคโตเนะ)
+- **Uper Cut ตัดสินจาก `armorBefore`** ที่เก็บไว้ก่อน `dealMixed`/`dealDirect` — ถ้าอ่านเกราะหลังหมัดลง
+  หมัดที่พังเกราะหมดพอดีจะพลิกผลจาก "ผุพัง" เป็น "สตั้น" เอง
+- คูลดาวน์ทั้งสามช่องเก็บเป็น**เลขรอบ** (`p.ippoCd`) ตามคอนเวนชันด้านล่าง
 
 **คูลดาวน์ท่าไม้ตายที่วัดเป็น "เลขรอบ" (ชิโด · เอจิ)** — คูลดาวน์ที่กินเวลาข้ามเทิร์นห้ามเก็บเป็นตัวนับใน
 `p.statuses` ถ้าไม่อยากให้มันไปโผล่ในรายการสถานะให้ทุกคนเห็น จึงเก็บเป็น **เลขรอบที่ล็อกถึง**
