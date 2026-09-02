@@ -175,6 +175,24 @@ test('Mahapralaya: แจกเปราะบางให้ทุกคนย�
   assert.equal(arjuna.canUseSkill(engine, j, 'ultimate'), false);
 });
 
+test('Mahapralaya: ล้างดีบัฟของอรชุนเองทั้งหมดตอนกด (ไม่แตะดีบัฟของคนอื่น)', () => {
+  const { j, a } = setup();
+  j.statuses.weak = 3; j.statusAmt.weak = 1;
+  j.statuses.stun = 2;
+  j.statuses.hburn = 4;
+  a.statuses.weak = 3; a.statusAmt.weak = 1;
+  arjuna.startPralaya(engine, j);
+  assert.ok(!j.statuses.weak && !j.statuses.stun && !j.statuses.hburn, 'ดีบัฟของอรชุนถูกล้างหมด');
+  assert.equal(a.statuses.weak, 3, 'ดีบัฟของคนอื่นไม่ถูกแตะ');
+  assert.equal(a.statuses.fragile, 3, 'และยังโดนเปราะบางตามปกติ');
+});
+
+test('Mahapralaya: อรชุนไม่ล้างเปราะบางที่ท่าเพิ่งแจกของตัวเองทิ้ง (ล้างก่อนแจก)', () => {
+  const { j } = setup();
+  arjuna.startPralaya(engine, j);
+  assert.ok(!j.statuses.fragile, 'ท่านี้ไม่แจกเปราะบางให้ตัวเองอยู่แล้ว');
+});
+
 test('Mahapralaya: เล่นวีดีโอทุกครั้งที่กด ไม่ใช่ครั้งแรกครั้งเดียว', () => {
   const { j } = setup();
   arjuna.startPralaya(engine, j);

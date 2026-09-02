@@ -180,6 +180,13 @@ module.exports = {
   //  why: สเปคระบุลำดับชัด — แจกเปราะบาง -> เล่นวีดีโอ -> ค่อยสร้างความเสียหาย
   startPralaya(engine, p) {
     p.arjunaUltCd = engine.roundNumber + PRALAYA_COOLDOWN;
+    // มหาประลัยชำระล้างตัวผู้ปล่อยท่าก่อนเป็นอย่างแรก — ล้างดีบัฟของอรชุนทั้งหมด
+    //  ทำ "ตอนกด" ไม่ใช่หลังวีดีโอ เพื่อให้ได้ผลแน่นอนแม้เส้นทางคัตซีนจะไม่ทำงาน
+    //  (และต้องอยู่ก่อนการแจกเปราะบางด้านล่าง ไม่งั้นถ้าวันหนึ่งท่านี้แจกให้ตัวเองด้วย จะโดนล้างทิ้งทันที)
+    const purged = engine.cleanseDebuffs(p);
+    engine.log(purged > 0
+      ? `🌊✨ ${p.name} Mahapralaya — มหาประลัยชำระล้างดีบัฟของตัวเองออกทั้งหมด (${purged} สถานะ)`
+      : `🌊 ${p.name} Mahapralaya — ไม่มีดีบัฟติดอยู่ให้ชำระล้าง`);
     let hit = 0;
     for (const o of engine.alivePlayers()) {
       if (o.id === p.id) continue;

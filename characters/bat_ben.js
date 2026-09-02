@@ -28,7 +28,7 @@ const BAT_CAR_REVERT_HP = 7;          // รถพังแล้วคืนร
 const BAT_SHOT_TURNS = 1;             // ลูกปรายล่อ: คงอยู่ 1 เทิร์น
 const BAT_SHOT_CAP = 2;               // ลูกปรายล่อ: ความเสียหายที่เข้าถูกตัดให้เหลือไม่เกินเท่านี้
 const BAT_GUN_TURNS = 3;              // ปืนติดรถ: คงอยู่ 3 เทิร์น (ทำงาน 1 ครั้ง)
-const BAT_GUN_BONUS = 3;              // ปืนติดรถ: การโจมตีปกติแรงขึ้น
+const BAT_GUN_BONUS = 2;              // ปืนติดรถ: การโจมตีปกติแรงขึ้น (balance 3.4.4: เดิม 3)
 const BAT_DOOM_TURNS = 3;             // แกไม่รอดแน่: คงอยู่ 3 เทิร์น (ทำงาน 1 ครั้ง)
 const BAT_DOOM_DMG = 4;               // แกไม่รอดแน่: พุ่งชนคนที่ไพ่แตก
 const BAT_KARMA_TURNS = 2;            // กรรมถึงตัว: คงอยู่ 2 เทิร์น (ทำงานได้ 1 ครั้งแล้วหายไป · ราคา 4 แต้ม)
@@ -62,7 +62,7 @@ module.exports = {
     const batNightAtk = attacker.characterId === "bat_ben" &&
       engine.isNightRound(engine.roundNumber) && !engine.passiveSealed(attacker);
     ctx.batNightAtk = batNightAtk;
-    // ปืนติดรถ: การโจมตีปกติครั้งถัดไปแรงขึ้น 3 หน่วย (สถานะถูกใช้ไปที่ doAttack หลังลงดาเมจ)
+    // ปืนติดรถ: การโจมตีปกติครั้งถัดไปแรงขึ้นตาม BAT_GUN_BONUS (สถานะถูกใช้ไปที่ doAttack หลังลงดาเมจ)
     const batGunAtk = attacker.characterId === "bat_ben" && (attacker.statuses.batGun || 0) > 0;
     ctx.batGunAtk = batGunAtk;
     return (batNightAtk ? BAT_NIGHT_ATK : 0) + (batGunAtk ? BAT_GUN_BONUS : 0);
