@@ -250,6 +250,57 @@ test('วิเคราะห์สถานการณ์: กดไม่ไ
   assert.equal(conner.canUseSkill(engine, c, 'basic'), false);
 });
 
+// ---------- วิเคราะห์สถานการณ์: ผ่านท่อจริงของ useSkill (จับบั๊กการต่อสาย ไม่ใช่แค่ตรรกะในฮุค) ----------
+
+test('[integration] useSkill พาลำดับที่ทายไปถึงฮุค หักแต้มสกิลถูกต้อง และไม่กินโควตาสกิลผิดช่อง', () => {
+  const { c, a } = setup();
+  a.connorActionsPrev = ['draw', 'skill'];
+  c.skillPoints = 5; c.hp = 3;
+  engine.useSkill('C', 'basic', ['A'], ['draw', 'skill']);
+  // จ่าย 3 แต้ม แล้วได้คืน 2 (ถูก 2 ข้อ) = 5 - 3 + 2
+  assert.equal(c.skillPoints, 4);
+  assert.equal(c.hp, 5, 'ถูก 2 ข้อ = เลือด +2');
+  assert.equal(conner.stressOf(a), conner.PREDICT_PERFECT_STRESS);
+  assert.equal(c.skillUsedRound, true, 'นับเป็นการใช้สกิลของเทิร์นตามปกติ');
+});
+
+test('[integration] ไม่เลือกเป้าหมาย = ไม่เกิดอะไรเลย และไม่เสียแต้มสกิล', () => {
+  const { c, a } = setup();
+  a.connorActionsPrev = ['draw'];
+  c.skillPoints = 5;
+  engine.useSkill('C', 'basic', [], ['draw']);
+  assert.equal(c.skillPoints, 5);
+  assert.ok(!c.skillUsedRound);
+});
+
+test('[integration] payload ลำดับผิดรูป = ไม่เสียแต้มสกิลทิ้ง', () => {
+  const { c, a } = setup();
+  a.connorActionsPrev = ['draw'];
+  c.skillPoints = 5;
+  engine.useSkill('C', 'basic', ['A'], ['draw', 'ระเบิด']);
+  assert.equal(c.skillPoints, 5, 'ต้องกันไว้ก่อนหักแต้ม');
+  assert.ok(!c.skillUsedRound);
+});
+
+test('[integration] แต้มสกิลไม่พอ = ไม่ลงผล และลำดับที่ค้างไว้ไม่ทำงานย้อนหลังในเทิร์นถัดไป', () => {
+  const { c, a } = setup();
+  a.connorActionsPrev = ['draw'];
+  c.skillPoints = 1; // ราคา 3
+  engine.useSkill('C', 'basic', ['A'], ['draw']);
+  assert.equal(conner.stressOf(a), 0, 'ไม่ลงผล');
+  assert.equal(c.skillPoints, 1);
+  // ลำดับที่ค้างอยู่ต้องถูกล้างตอนขึ้นเทิร์นใหม่ ไม่ใช่ค้างไปโผล่ตอนกดครั้งหน้า
+  conner.onRoundStartTick(engine, c);
+  assert.equal(c.connorGuess, null);
+});
+
+test('[integration] คนอื่นกดสกิล/ใช้ไอเทม/ซื้อของ ถูกบันทึกลำดับผ่านท่อจริง', () => {
+  const { c, a } = setup();
+  a.skillPoints = 8;
+  engine.useSkill('A', 'basic', [], null); // เทมาริ สกิลพื้นฐาน (ไม่ต้องเลือกเป้าหมาย)
+  assert.ok(a.connorActions.includes('skill'), 'การกดสกิลจริงต้องเข้าลำดับ');
+});
+
 // ---------- สกิลรอง ข่มขวัญ/จับกุม ----------
 
 test('ข่มขวัญ: ระดับผู้ต้องสงสัย ได้แค่ผลพื้นฐาน (+1 เครียด, -1 แต้มสกิลเป้าหมาย)', () => {

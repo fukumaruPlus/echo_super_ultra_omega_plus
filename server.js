@@ -4646,9 +4646,9 @@ function useSkill(id, tier, targets, item) {
     const flashImg = isApplePick ? CHAR_HOOKS.appleguy.ITEMS[item].img
       : (skill.img || null);
     // เทเปา (ชิกิ): กดสกิลพื้นฐาน/สกิลรอง ให้เล่นเสียง tepeu_skill1_2 ก่อนเสมอ
-    // คอนเนอร์: วิเคราะห์สถานการณ์เล่นเพลงคิด conner_think.m4a ทุกครั้งที่กด
-    const flashSound = (isConnerPick && tier === "basic") ? "conner_think"
-      : (isTepeuCook || isTepeuPonder) ? "tepeu_skill1_2" : isHisakawaSkill ? CHAR_HOOKS.hisakawa_sister.skillVoice(p, tier, skill) : null;
+    // คอนเนอร์: เพลงคิด conner_think.m4a "ไม่" เล่นที่นี่ — มันต้องเล่นระหว่างกำลังเรียงลำดับในโมดัล
+    //  (ฝั่ง client คุมเอง ดู ConnorPredictModal) ตอนกดยืนยันคือตอนที่คิดเสร็จแล้ว เพลงต้องหยุดพอดี
+    const flashSound = (isTepeuCook || isTepeuPonder) ? "tepeu_skill1_2" : isHisakawaSkill ? CHAR_HOOKS.hisakawa_sister.skillVoice(p, tier, skill) : null;
     // อิสึกะ ชิโด "ฝากด้วยนะตัวฉัน": สกิลเงียบ — ห้ามมีแบนเนอร์ให้ใครเห็นว่าเขากดอะไรไป
     if (!CHAR_HOOKS.shido.silentSkill(p, tier)) {
       io.emit("skillFlash", { name: skill.name + flashSuffix, img: flashImg, by: p.name, color: POSITION_COLORS[p.position] || "#9B4F96", sound: flashSound });

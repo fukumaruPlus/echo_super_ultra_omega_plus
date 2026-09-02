@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Card from "../components/Card";
 import Button from "../components/Button";
 import { socket } from "../socket";
-import { clickSound, playSfx, videoVolume, onVolumeChange, DOOM_WEAPON_SOUNDS } from "../audio";
+import { clickSound, playSfx, startLoopSfx, stopLoopSfx, videoVolume, onVolumeChange, DOOM_WEAPON_SOUNDS } from "../audio";
 
 const P_DISPLAY = "var(--font-p-display)";
 const TEAM_COLORS = { A: "#22d3ee", B: "#f97316", C: "#a3e635" };
@@ -2730,6 +2730,13 @@ function ConnorPredictModal({ me, players, onSubmit, onClose }) {
   const [target, setTarget] = useState(null);
   const [order, setOrder] = useState([]);   // ลำดับที่กดไว้
   const [none, setNone] = useState(false);  // ทายว่า "ไม่ได้ทำอะไรเลย"
+  // เพลงคิด conner_think.m4a — เล่นวนตลอด "ระหว่างกำลังเรียงลำดับ" เท่านั้น
+  //  ผูกกับวงจรชีวิตของโมดัล (mount/unmount) จึงหยุดครบทุกทางออก: ยืนยัน · ยกเลิก · กดนอกกล่อง
+  //  · เอฟเฟกต์ปิดอัตโนมัติเมื่อหมดเฟส · ออกจากหน้าจอเกม
+  useEffect(() => {
+    startLoopSfx("conner_think");
+    return () => stopLoopSfx();
+  }, []);
   const targets = players.filter((p) => p.alive && p.id !== me.id && !p.isBoss);
   const toggle = (key) => {
     clickSound();

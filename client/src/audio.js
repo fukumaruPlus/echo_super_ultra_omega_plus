@@ -177,8 +177,13 @@ const MUSIC_TRACK_SCALE = {
   final_normal: 0.6, // สวมเกราะราชัน
   ex_guts: 0.6,       // Beat Mode
 };
+// "หรี่เพลงหลัก" (patch 3.4.2 — เพลงคิดของคอนเนอร์): ระหว่างมีลูปเสียงเฉพาะกิจเล่นอยู่
+//  เพลง BGM ปกติจะถูกหรี่ลงแทนที่จะหยุด เพราะเอฟเฟกต์เพลงใน App.jsx สั่งเล่นซ้ำทุกครั้งที่ state เปลี่ยน
+//  (ถ้าใช้ pause จะถูกสั่ง play() กลับมาทันทีในบรอดแคสต์ถัดไป)
+let musicDuck = 1;
+let loopSfx = null; // ลูปเสียงเฉพาะกิจที่เล่นอยู่ (ดู startLoopSfx ท้ายไฟล์)
 function trackVolume(name) {
-  return MUSIC_BASE * (MUSIC_TRACK_SCALE[name] ?? 1) * vcurve();
+  return MUSIC_BASE * (MUSIC_TRACK_SCALE[name] ?? 1) * vcurve() * musicDuck;
 }
 
 // ---------- master volume (จำค่าไว้ใน localStorage) ----------
@@ -199,6 +204,7 @@ export function setMasterVolume(v) {
   masterVolume = Math.max(0, Math.min(1, v));
   try { localStorage.setItem("echo_vol", String(masterVolume)); } catch {}
   if (currentMusic) getMusic(currentMusic).volume = trackVolume(currentMusic);
+  if (loopSfx) loopSfx.volume = SFX_BASE * vcurve(); // ลูปเสียงเฉพาะกิจต้องตามหลอดเสียงด้วย
   volListeners.forEach((fn) => fn(masterVolume));
 }
 
@@ -274,6 +280,7 @@ export function stopMusic() {
 }
 // เริ่มเกมใหม่ / จบแมตช์: รีเซ็ตตำแหน่งเพลงทุกเพลง -> ครั้งถัดไปเริ่มจากต้นทั้งหมด
 export function resetMusicPositions() {
+  stopLoopSfx();
   for (const [name, a] of Object.entries(musicCache)) {
     a.pause();
     const sequence = MUSIC_SEQUENCES[name];
@@ -296,6 +303,31 @@ export function playSfx(name) {
   return a;
 }
 export function clickSound() { playSfx("action_button"); }
+
+// ---------- ลูปเสียงเฉพาะกิจ (ช่องอิสระ ไม่ยุ่งกับ BGM หลัก) ----------
+//  ใช้กับเสียงที่ต้องเล่น "ตราบใดที่ UI ฝั่งเราเปิดอยู่" เท่านั้น — ไม่ได้ผูกกับ state ของ server
+//  (เพลงคิดของคอนเนอร์: เล่นระหว่างกำลังเรียงลำดับในโมดัล แล้วหยุดทันทีที่ปิด)
+//  ระหว่างเล่น เพลงหลักจะถูกหรี่ลงเหลือ DUCK_LEVEL แทนการหยุด — ดูคอมเมนต์ที่ musicDuck
+const DUCK_LEVEL = 0.25;
+export function startLoopSfx(name) {
+  if (!FILES[name]) return null;
+  stopLoopSfx();
+  const a = new Audio(FILES[name]);
+  a.loop = true;
+  a.volume = SFX_BASE * vcurve();
+  a.play().catch(() => {});
+  loopSfx = a;
+  musicDuck = DUCK_LEVEL;
+  if (currentMusic) getMusic(currentMusic).volume = trackVolume(currentMusic);
+  return a;
+}
+export function stopLoopSfx() {
+  if (!loopSfx) return;
+  try { loopSfx.pause(); loopSfx.currentTime = 0; } catch { /* element อาจถูกทิ้งไปแล้ว */ }
+  loopSfx = null;
+  musicDuck = 1;
+  if (currentMusic) getMusic(currentMusic).volume = trackVolume(currentMusic);
+}
 
 // DoomGuy (patch 2.2 full): อาวุธ id (ตาม server) -> ชื่อไฟล์เสียงยิง/เสียงสกิลใน FILES ด้านบน
 export const DOOM_WEAPON_SOUNDS = {
