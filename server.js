@@ -2798,6 +2798,8 @@ function buildStateFor(viewerId) {
         muimiEmergencyMax: p.characterId === "muimi" ? CHAR_HOOKS.muimi.EMERGENCY_USES : undefined,
         muimiEmergencyUsed: p.characterId === "muimi" ? p.muimiEmergencyUsedRound === roundNumber : undefined,
         muimiLoseStreak: p.characterId === "muimi" ? (p.muimiLoseStreak || 0) : undefined,
+        muimiLoseStreakMax: p.characterId === "muimi" ? CHAR_HOOKS.muimi.HEART_LOSSES : undefined,
+        muimiUltCd: mine && p.characterId === "muimi" ? CHAR_HOOKS.muimi.ultCooldownLeft(engine, p) : undefined,
         tepeuCookTurns: p.tepeuCookTurns || 0,     // เทเปา: วันนี้อากาศดีจัง — เทิร์นที่เหลือก่อนได้ "มื้อที่สุข" (0 = กดใช้ได้)
         tepeuPonderTurns: p.tepeuPonderTurns || 0, // เทเปา: เป็นแบบนี้นี่เอง — ครุ่นคิดเหลือกี่เทิร์น (0 = กดใช้ได้/จั่วไพ่ได้)
         // ---------- ฟุจิตะ โคโตเนะ (rework 2.3) ----------
@@ -5756,6 +5758,7 @@ function doAttack(byId, targetId) {
       const ultImg = (TRANSFORMS[ultKey] && TRANSFORMS[ultKey].img)
         || (isBardDim ? TRANSFORMS.bardDim.img : ultKey === "ashen" ? TRANSFORMS.oguriAshen.img : displayImg(attacker));
       delete attacker.statuses[ultKey];
+      if (ultKey === "muimiTower") CHAR_HOOKS.muimi.onUltExpire(engine, attacker);
       if (ultKey === "wither") clearWitherLines(attacker.id);       // ลบเฉพาะเส้นชีวิตที่ท่าของเจ้าของคนนี้แจกไว้
       if (ultKey === "anata") { attacker.anataTargets = null; anataMusicSeq = 0; } // ANATA WAAAAAAAA (patch 2.0.8)
       if (ultKey === "riddheguard") { const rb = riddheAllied(attacker); if (rb) delete rb.statuses.riddheward; } // ริดดี้ ท่า 2: ถอดเกราะฝั่งบานาจด้วย
@@ -6067,6 +6070,7 @@ function doAttack(byId, targetId) {
         const isBardDim = purgeKey === "bloodDim" || purgeKey === "soulDim";
         const ultName = shikiUltNameOf(target, purgeKey);
         delete target.statuses[purgeKey];
+        if (purgeKey === "muimiTower") CHAR_HOOKS.muimi.onUltExpire(engine, target);
         if (target.statusAmt) delete target.statusAmt[purgeKey];
         if (purgeKey === "wither") clearWitherLines(target.id);
         if (purgeKey === "anata") { target.anataTargets = null; anataMusicSeq = 0; }
@@ -6505,6 +6509,8 @@ function endTurn() {
         if (k === "eijiSwift" && p.characterId === "eiji") CHAR_HOOKS.eiji.onSwiftExpire(engine, p);
         // เอจิ: "ไม่ว่ายังก็ตาม" หมดเวลา -> ติดคูลดาวน์ห้ามกดซ้ำ 3 เทิร์น (เก็บเป็นเลขรอบ ไม่ใช่สถานะ)
         if (k === "eijiUlt" && p.characterId === "eiji") CHAR_HOOKS.eiji.onUltExpire(engine, p);
+        // มุยมิ: “ดาบสะบั้น” หมดเวลา -> เริ่มคูลดาวน์ท่าไม้ตาย 3 เทิร์น
+        if (k === "muimiTower" && p.characterId === "muimi") CHAR_HOOKS.muimi.onUltExpire(engine, p);
         // Sleeping time หมดเวลาเอง (โคโตเนะ rework 2.3): ตื่นนอนอย่างสดชื่น (ไม่มีผลต่อเนื่องแล้ว)
         if (k === "ksleep" && p.characterId === "kotone") {
           lastLog.push(`🌅 ${p.name} ตื่นนอนอย่างสดชื่น — พร้อมลุยต่อแล้ว!`);
@@ -7001,7 +7007,7 @@ io.on('connection', (socket) => {
       sunriseDrop: 0, sleepFresh: false,
       appleItem: "drink", appleAtkBuffs: [], chillDodge: 100, appleGiveUses: CHAR_HOOKS.appleguy.GIVE_USES,
       muimiEmergencyUses: CHAR_HOOKS.muimi.EMERGENCY_USES, muimiEmergencyUsedRound: 0,
-      muimiLoseStreak: 0, muimiHeartRound: 0, muimiForcedBustRound: 0, muimiUltCasts: 0, muimiUltCastRound: 0,
+      muimiLoseStreak: 0, muimiHeartRound: 0, muimiForcedBustRound: 0, muimiUltCasts: 0, muimiUltCastRound: 0, muimiUltLock: 0,
       tepeuCookTurns: 0, tepeuPonderTurns: 0, tepeuEyeTurns: 0, tepeuLoseStreak: 0, tepeuKillTargetId: null,
       piggy: 0, senaNext: false, kotoneExtraAtk: false,
       contractPartner: null, contractWith: null, contractOffer: null,

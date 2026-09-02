@@ -9,6 +9,7 @@ const RUSTY_TURNS = 3;
 const TOWER_TURNS = 2;
 const RESIST_TURNS = 3;
 const TOWER_ATK_BONUS = 3;
+const ULT_COOLDOWN_TURNS = 3;
 const HEART_LOSSES = 3;
 const HEART_CHANCE = 0.5;
 
@@ -45,6 +46,7 @@ module.exports = {
   TOWER_TURNS,
   RESIST_TURNS,
   TOWER_ATK_BONUS,
+  ULT_COOLDOWN_TURNS,
   HEART_LOSSES,
   HEART_CHANCE,
 
@@ -59,6 +61,7 @@ module.exports = {
     p.muimiForcedBustRound = 0;
     p.muimiUltCasts = 0;
     p.muimiUltCastRound = 0;
+    p.muimiUltLock = 0;
   },
 
   displayImg(p) { return towerActive(p) ? IMG.ultimate : null; },
@@ -73,8 +76,20 @@ module.exports = {
       return (p.muimiEmergencyUses || 0) > 0 && p.muimiEmergencyUsedRound !== engine.roundNumber;
     }
     if (tier === "secondary") return !towerActive(p);
-    if (tier === "ultimate") return !rustyActive(p);
+    if (tier === "ultimate") return !rustyActive(p) && this.ultCooldownLeft(engine, p) <= 0;
     return true;
+  },
+
+  onUltExpire(engine, p) {
+    if (!isMuimi(p)) return;
+    p.muimiUltLock = Math.max(p.muimiUltLock || 0, engine.roundNumber + ULT_COOLDOWN_TURNS);
+    engine.log(`⏳ ${p.name} ดาบสะบั้นหมดเวลาแล้ว — ใช้ดาบสะบั้นหอคอยสวรรค์ซ้ำไม่ได้อีก ${ULT_COOLDOWN_TURNS} เทิร์น`);
+  },
+
+  ultCooldownLeft(engine, p) {
+    if (!isMuimi(p)) return 0;
+    // สถานะหมดตอนท้ายรอบ จึงบวก 1 เพื่อให้สามรอบถัดไปแสดง 3 -> 2 -> 1 และกดได้ในรอบต่อจากนั้น
+    return Math.max(0, (p.muimiUltLock || 0) - engine.roundNumber + 1);
   },
 
   applyInstantSkill(engine, p, tier) {
