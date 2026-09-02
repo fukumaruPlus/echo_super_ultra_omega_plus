@@ -6158,6 +6158,9 @@ function doAttack(byId, targetId) {
   const doomPierceAtk = attacker.characterId === "doomguy" && !((attacker.statuses.doomCrucible || 0) > 0) &&
     !!(DOOM_WEAPONS[attacker.doomWeapon] || DOOM_WEAPONS.shotgun).pierce;
   const ippoArmorBefore = target.armor; // อิปโป Uper Cut: ตัดสินจากเกราะ "ก่อน" โดนหมัดนี้
+  // ผู้วิงวอน (patch 3.4.3): หมัดที่ถูก "คุ้มครอง" ของเกราะศรัทธากันจนเหลือ 0 ก็ยังกร่อนเกราะศรัทธา 1 หน่วย
+  //  ไม่งั้นดาเมจไม่เคยไหลถึง loseHp() -> เกราะไม่มีวันแตก (ดูคอมเมนต์เต็มที่ characters/the_supplicant.js)
+  const supBlocked = CHAR_HOOKS.the_supplicant.absorbBlockedHit(engine, target, base + ntdBonus, dmg);
   if (attackerBeat || profitAtk > 0 || phenexPurgeAtk || doomPierceAtk) dealDirect(target, dmg, true); // ประกายเขี้ยวปฏิปักษ์ / กำไรเท่าตัวโว้ย / อย่าอยู่เลย แกน่ะ!: ทะลุเกราะเข้าเลือดจริง
   else dealMixed(target, dmg, true);               // กฎปกติ: ลดเกราะก่อน ถ้าไม่มีเกราะจึงเข้าเลือดจริง
   CHAR_HOOKS.escanor.onNormalAttackReceived(engine, attacker, target, escanorFormBeforeHit);

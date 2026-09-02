@@ -177,6 +177,30 @@ test('เกราะศรัทธา/ลูกแกะน้อยรู้�
   assert.equal(a.statuses.supPunish, 3);
 });
 
+test('เกราะศรัทธา: หมัดที่ถูก "คุ้มครอง" กันจนเหลือ 0 ก็ยังกร่อนเกราะศรัทธา (บั๊ก 3.4.3)', () => {
+  const { s, a } = setup();
+  sup.grantFaith(engine, s, 3);
+  // พลังโจมตีปกติ = 1 · คุ้มครองของเกราะศรัทธา = 1 -> ดาเมจสุทธิ 0 (ไม่มีอะไรไหลถึง loseHp)
+  //  ถ้าไม่มีตาข่ายนี้ เกราะศรัทธาจะไม่มีวันแตก = อมตะต่อการโจมตีปกติถาวร
+  assert.equal(sup.absorbBlockedHit(engine, s, 1, 0), true);
+  assert.equal(sup.faithOf(s), 2);
+  sup.absorbBlockedHit(engine, s, 1, 0);
+  sup.absorbBlockedHit(engine, s, 1, 0);
+  assert.equal(sup.faithOf(s), 0, 'สามหมัดแล้วโล่ต้องแตก');
+  assert.equal(sup.statusAmtBonus(s, 'guard'), 0, 'คุ้มครองหายไปพร้อมโล่');
+});
+
+test('เกราะศรัทธา: หมัดที่ลงดาเมจได้จริงไม่ถูกหักซ้ำสองทาง', () => {
+  const { s } = setup();
+  sup.grantFaith(engine, s, 2);
+  // finalDmg > 0 = ดาเมจไหลไปถึง loseHp แล้ว (faithAbsorb กินเอง) ตาข่ายนี้ต้องไม่ทำงานซ้ำ
+  assert.equal(sup.absorbBlockedHit(engine, s, 3, 2), false);
+  assert.equal(sup.faithOf(s), 2);
+  // ไม่มีเกราะศรัทธาอยู่แล้ว ก็ไม่ต้องทำอะไร
+  const { a } = setup();
+  assert.equal(sup.absorbBlockedHit(engine, a, 1, 0), false);
+});
+
 // ---------------------------------------------------------------- ตราพิพากษา
 test('ตราพิพากษา (ศัตรู): ครบ 3 ครั้งแล้วติดลงทัณฑ์ · ระหว่างทางรับดาเมจครั้งละ 1', () => {
   const { s, a } = setup();
