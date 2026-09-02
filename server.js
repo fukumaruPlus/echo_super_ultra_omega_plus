@@ -37,6 +37,10 @@ const {
   SOFT_DEBUFF_STEP,
   cleanseDebuffs,
   coolReduction,
+  MEND_MAX_TURNS,
+  applyMend,
+  tickMend,
+  blindActive,
   noHealActive,
   invertActive,
   tickBurn,
@@ -403,6 +407,8 @@ function maxHpOf(p) {
   if (p && p.characterId === "eiji") return Math.max(1, CHAR_HOOKS.eiji.maxHp() - ((p.maxHpPenalty) || 0));
   // มาคุโนะอุจิ อิปโป (patch 3.3 new): พลังชีวิตพื้นฐาน 5 หน่วย
   if (p && p.characterId === "ippo") return Math.max(1, CHAR_HOOKS.ippo.maxHp() - ((p.maxHpPenalty) || 0));
+  // ผู้วิงวอน (patch 3.4 new): พลังชีวิตพื้นฐาน 5 หน่วย
+  if (p && p.characterId === "the_supplicant") return Math.max(1, CHAR_HOOKS.the_supplicant.maxHp() - ((p.maxHpPenalty) || 0));
   return Math.max(1, MAX_HP - ((p && p.maxHpPenalty) || 0));
 }
 // ฟื้นเลือดจริงแบบเคารพสถานะ "ไม่ใช้งานต่อ" / "ไร้ทางเยียวยา" — คืนจำนวนที่ฟื้นได้จริง
@@ -1515,6 +1521,7 @@ function maxArmorOf(p) {
     : (escanorArmor != null) ? escanorArmor
     : (p && p.characterId === "eva13") ? 0
     : (p && p.characterId === "ippo") ? CHAR_HOOKS.ippo.maxArmor() // อิปโป (patch 3.3 new): "โล่ 4" = เพดานเกราะ 4
+    : (p && p.characterId === "the_supplicant") ? CHAR_HOOKS.the_supplicant.maxArmor() // ผู้วิงวอน (patch 3.4 new): เพดานเกราะ 5
     : (p && p.characterId === "eiji") ? CHAR_HOOKS.eiji.maxArmor() // เอจิ (patch 2.4 new): เกราะพื้นฐาน 4 หน่วย
     : MAX_ARMOR;
   return armorBase
@@ -1583,6 +1590,8 @@ function instantDeath(p, force) {
   if (!force && p.characterId === "phenex" && CHAR_HOOKS.phenex.tryRebirth(engine, p)) return;
   // อาจารย์ ไบเลธ (สกิลติดตัว 2 sothis, characters/byleth.js): ตายครั้งแรก -> ย้อนเวลากลับมาด้วยเลือด 1 เกราะ 0 (ครั้งเดียวต่อเกม)
   if (!force && p.characterId === "byleth" && CHAR_HOOKS.byleth.tryRevive(engine, p)) return;
+  // มหาเทพ อรชุน (ตะเกียงไฟที่ดับมอด, characters/arjuna.js): ตายระหว่าง "ฟื้นคืนชีพ" ยังไม่หมดเวลา -> ฟื้นทันที (เลือด 1 เกราะ 0)
+  if (!force && p.characterId === "arjuna" && CHAR_HOOKS.arjuna.tryRevive(engine, p)) return;
   // ริต้า เบอร์นัล (สกิลติดตัว 2 patch 2.1.7, characters/phenex.js): ตกรอบจริงขณะท่าไม้ตาย 2 ยังทำงานอยู่ -> ปลดปล่อยความเจ็บปวดที่สะสมทั้งหมดก่อนตาย
   if (p.characterId === "phenex") CHAR_HOOKS.phenex.maybeReleasePainOnDeath(engine, p);
   p.hp = 0; p.alive = false; p.result = "dead"; p.locked = true;
@@ -1596,6 +1605,12 @@ function instantDeath(p, force) {
   CHAR_HOOKS.yui.onDeath(engine, p);
   CHAR_HOOKS.shido.onDeath(engine, p);
   CHAR_HOOKS.dan.onDeath(engine, p);
+  // ผู้วิงวอน (characters/the_supplicant.js): ผู้ถือตราพิพากษา/ผู้วิงวอนตกรอบ -> ล้างตราที่ค้างอยู่ทั้งสองฝั่ง
+  CHAR_HOOKS.the_supplicant.onDeath(engine, p);
+  // มหาเทพ อรชุน (สกิลติดตัว หัวใจที่เที่ยงธรรม): จำไว้ว่าใครเคยสังหารผู้เล่นอื่น — ธงถาวรทั้งเกม
+  //  อ่านจาก effectSourceId (ต้นตอของเอฟเฟกต์ที่กำลังทำงาน) เพราะ instantDeath ไม่มีพารามิเตอร์ผู้สังหาร
+  const arjunaKiller = players[effectSourceId];
+  if (arjunaKiller && arjunaKiller.id !== p.id) arjunaKiller.hasKilled = true;
   CHAR_HOOKS.kai.pruneOverhaulSlots(engine); // ไค ชิซากิ: ผู้ถือรังสรรค์/ลงทัณฑ์ตกรอบ -> ลบออกจาก Overhaul tracker
   // ยูนะ: เป้าหมายที่ได้รับพร (Delete/Smile for You/Longing) ตาย/หมดสภาพ -> เพลง+บัฟยูนะปิดลงทันที
   //  ยกเว้น Break Beat Bark เพราะมีผลทั้งสนาม ไม่ผูกกับผู้เล่นคนใดคนหนึ่งโดยเฉพาะ
@@ -1939,6 +1954,10 @@ function loseHp(p) {
   //  ต้องอยู่บนสุดของ loseHp เพราะนี่คือจุดคอขวดเดียวที่ hp จะลดได้ ทำให้ครอบคลุมทั้งดาเมจทะลุเกราะ
   //  (dealDirect = สกิลติดตัว 2 "รถคู่ใจ") และดาเมจที่ทะลุเกราะมาเพราะเกราะหมดพอดี
   if (CHAR_HOOKS.bat_ben.carAbsorb(engine, p)) { hisakawaSyncOut(p); return; }
+  // ผู้วิงวอน "เกราะศรัทธา" (characters/the_supplicant.js): เกราะชั้นที่ 2 ที่อยู่หลังเกราะหลัก
+  //  เกราะหลักถูกหักที่ dealMixed/damageSoft ไปก่อนแล้ว ดาเมจที่มาถึง loseHp คือส่วนที่ทะลุเกราะหลักมา
+  //  จึงเป็นจุดที่ถูกต้องของ "ชั้นหลัง" — และครอบคลุมดาเมจเจาะเกราะ (dealDirect) ด้วยโดยอัตโนมัติ
+  if (CHAR_HOOKS.the_supplicant.faithAbsorb(engine, p)) { hisakawaSyncOut(p); return; }
   if ((p.tempHp || 0) > 0) { p.tempHp--; hisakawaSyncOut(p); return; }
   if (isYuuki(p) && effectSourceId && effectSourceId !== YUUKI_ID && players[effectSourceId]) p.lastDamageSourceId = effectSourceId;
   // ฉันจะไม่ยอมสูญเสียใครไปอีก (ริดดี้ patch 2.1.1): ริดดี้เองตายไม่ได้ — เลือดค้างที่ 1
@@ -2294,6 +2313,10 @@ function resetCombat(p) {
   CHAR_HOOKS.byleth.resetCombat(p); // ความรู้/หลักสูตร/ผลทบทวนบทเรียนที่ค้าง + ธงสตั้น-ห้ามสกิลพื้นฐานที่หลักสูตรของไบเลธตั้งไว้ให้คนอื่น
   CHAR_HOOKS.haruka.resetCombat(p); // harukaBasicUses / harukaBleedProcs (โควตารายเทิร์น) + harukaStunPending (สตั้นค้างจากการสวนกลับ)
   CHAR_HOOKS.ippo.resetCombat(p);    // อิปโป: อัตราหลบสะสม / Dempsey Charge / คูลดาวน์รายสกิล
+  // ผู้วิงวอน: คลังคำวิงวอน/โควตาสกิล 2 ครั้ง/เทิร์น + ฟิลด์ "ผู้ถูกตราพิพากษา" ซึ่งอยู่ที่ตัวเป้าหมาย (จึงล้างให้ทุกคน)
+  CHAR_HOOKS.the_supplicant.resetCombat(p);
+  // อรชุน: ประวัติผู้ที่เคยโจมตีอรชุน / คูลดาวน์ Mahapralaya + ธง hasKilled ซึ่งใช้ร่วมกันทุกตัวละคร
+  CHAR_HOOKS.arjuna.resetCombat(p);
   CHAR_HOOKS.bat_ben.resetCombat(p); // แบทแมน: ร่างรถแบทโมบิล + โควตากดครั้งเดียวต่อเกม
   CHAR_HOOKS.yui.resetCombat(p);   // ยุย โยชิโอกะ: เพลงที่เล่นแล้ว / คิวชุบชีวิต / ธงกันลูปการจั่วตาม
   CHAR_HOOKS.shido.resetCombat(p); // อิสึกะ ชิโด: ดาเมจที่บันทึกไว้ / กับดักฝากด้วยนะตัวฉัน / คิวเกิดใหม่
@@ -2601,6 +2624,10 @@ function buildStateFor(viewerId) {
       const show = mine || revealAll;
       // ทาคุมิ ฟุจิวาระ: ถึงจะมองไม่เห็น แต่ฉันยังอยู่ ทำงานอยู่ — บังตากระดานทั้งหมด (score/cards/hp/armor/shield ของทุกคนรวมตัวเอง, แต้มสกิลของทุกคนยกเว้นตัวเอง)
       const takumiBlackout = takumiBlackoutActive();
+      // "ตาบอด" (สถานะ Universal patch 3.4 / ผลพ่วงของ "ลงทัณฑ์"): ผู้ที่ติดสถานะมองไม่เห็นอะไรเลย
+      //  ใช้ช่องทางบังตาเดียวกับท่าไม้ตายของทาคุมิ ต่างกันที่นี่บังเฉพาะ "ผู้ชม" คนที่ตาบอด ไม่ใช่ทั้งสนาม
+      const viewerBlind = !!viewer && (blindActive(viewer) || CHAR_HOOKS.the_supplicant.blindActive(viewer));
+      const blackout = takumiBlackout || viewerBlind;
       // ใบโปรโมทสินค้า (Apple guy): แต้มการ์ดของคนติดสถานะถูกเปิดเผยให้ทุกคนเห็น (1 เทิร์น)
       const promoShow = (p.statuses.promo || 0) > 0;
       // นายยังมีอนาคตอีกยาวไกล (ริดดี้ patch 2.0.9): คู่พันธมิตรเห็นแต้มการ์ดของกันและกันได้ตลอด
@@ -2737,17 +2764,17 @@ function buildStateFor(viewerId) {
         busted: (show || promoShow || allyShow || connorScan) ? bustedOf(p) : false,
         result: p.result,
         cardCount: p.cards.length,
-        cards: takumiBlackout ? null : ((mine || connorScan) ? p.cards : null),
-        score: takumiBlackout ? null : ((show || promoShow || allyShow || connorScan) ? scoreOf(p) : null),
+        cards: blackout ? null : ((mine || connorScan) ? p.cards : null),
+        score: blackout ? null : ((show || promoShow || allyShow || connorScan) ? scoreOf(p) : null),
         // Locacaca (ซาโตรุ): Max HP ลดถาวรได้ / ทาคุมิ: บังตาระหว่างท่าไม้ตายทำงาน (null = ซ่อนทั้งแถบ)
         // แบทแมนร่างรถแบทโมบิล: ส่ง 0/0 เพื่อให้ "ไม่มีพลังชีวิต เหลือแต่เกราะ" ตามสเปค
         //  (LifeBar วาดหัวใจตามจำนวน maxHp — 0 = ไม่มีหัวใจสักดวง แต่ยังไม่ใช่ null จึงไม่ขึ้น "???")
         //  ค่าจริงในเอนจินยังเต็มอยู่โดยตั้งใจ เพราะมีจุดกวาด `if (hp <= 0) instantDeath()` หลายที่
         //  ซึ่งจะฆ่าเขาทันทีทั้งที่รถยังไม่พัง — เกราะคือพลังชีวิตของรถตัวจริงอยู่แล้ว (ดู carAbsorb)
-        hp: takumiBlackout ? null : (CHAR_HOOKS.bat_ben.inCar(p) ? 0 : p.hp),
-        maxHp: takumiBlackout ? null : (CHAR_HOOKS.bat_ben.inCar(p) ? 0 : maxHpOf(p)),
-        armor: takumiBlackout ? null : p.armor, maxArmor: takumiBlackout ? null : maxArmorOf(p),
-        shield: takumiBlackout ? null : p.shield,
+        hp: blackout ? null : (CHAR_HOOKS.bat_ben.inCar(p) ? 0 : p.hp),
+        maxHp: blackout ? null : (CHAR_HOOKS.bat_ben.inCar(p) ? 0 : maxHpOf(p)),
+        armor: blackout ? null : p.armor, maxArmor: blackout ? null : maxArmorOf(p),
+        shield: blackout ? null : p.shield,
         tempHp: p.tempHp || 0, // เลือดชั่วคราว (แกมเบลอร์)
         // เอฟเฟครอบการ์ด (เห็นทุกคน): เขี้ยวปฏิปักษ์สีเขียว (ถาวร) / เกราะราชันสีแดง (ตอนสวม)
         beat: !!(p.seen && p.seen.beat),
@@ -2759,7 +2786,7 @@ function buildStateFor(viewerId) {
         // ซาโตรุ (patch 2.0.8.2): แต้มสกิลถูกซ่อนจากผู้เล่นอื่นเสมอ (-1 = ซ่อน) / ทาคุมิ: บังตาแต้มสกิลของทุกคนยกเว้นตัวเองระหว่างท่าไม้ตายทำงาน (sentinel -1 แบบเดียวกัน กลับด้าน)
         // อิสึกะ ชิโด (patch 2.9): ระหว่าง "ฝากด้วยนะตัวฉัน" เปิดอยู่ คนอื่นเห็นแต้มสกิลเต็มหลอดเหมือนเดิม
         //  (ไม่งั้นแต้มที่หายไป 8 หน่วยจะเป็นเบาะแสว่าเขากดท่าไม้ตายไปแล้ว — ทั้งท่านี้ต้องไม่มีใครรู้)
-        skillPoints: (takumiBlackout && !mine) ? -1 : ((p.characterId === "satoru" && !mine && !passiveSealed(p)) ? -1
+        skillPoints: viewerBlind ? -1 : (takumiBlackout && !mine) ? -1 : ((p.characterId === "satoru" && !mine && !passiveSealed(p)) ? -1
           : ((!mine && CHAR_HOOKS.shido.guardActive(p)) ? maxSkillOf(p) : p.skillPoints)),
         // ตัวนับถอยหลังกับดักของชิโด — ส่งให้เจ้าของคนเดียว ไม่ใช่สถานะจึงไม่โผล่ตอน revealAll
         shidoGuard: mine && p.characterId === "shido" ? (p.shidoGuardTurns || 0) : undefined,
@@ -2821,6 +2848,20 @@ function buildStateFor(viewerId) {
         ippoDodge: p.characterId === "ippo" ? CHAR_HOOKS.ippo.dodgeChance(p) : undefined,
         ippoCharge: p.characterId === "ippo" ? CHAR_HOOKS.ippo.chargeOf(p) : undefined,
         ippoChargeMax: p.characterId === "ippo" ? CHAR_HOOKS.ippo.DEMPSEY_MAX : undefined,
+        // ---------- ผู้วิงวอน (patch 3.4 new) ----------
+        //  คำวิงวอนเป็นข้อมูลสาธารณะ (ทุกคนเห็น) เพราะขั้นของมันเปลี่ยนพฤติกรรมทั้งสนาม
+        supPrayers: p.characterId === "the_supplicant" ? CHAR_HOOKS.the_supplicant.prayersOf(p) : undefined,
+        supPrayersMax: p.characterId === "the_supplicant" ? CHAR_HOOKS.the_supplicant.PRAYER_MAX : undefined,
+        supUltCd: mine && p.characterId === "the_supplicant" ? CHAR_HOOKS.the_supplicant.ultCooldownLeft(engine, p) : undefined,
+        supSkillUses: p.characterId === "the_supplicant" ? (p.supSkillUsesRound || 0) : undefined,
+        supSkillMax: p.characterId === "the_supplicant" ? CHAR_HOOKS.the_supplicant.SKILL_USES_PER_TURN : undefined,
+        // เกราะศรัทธา/ตราพิพากษา ติดกับ "ใครก็ได้" ไม่ใช่แค่ผู้วิงวอน — ส่งให้ทุกคนเสมอ (0/false = ไม่มี)
+        supFaith: CHAR_HOOKS.the_supplicant.faithOf(p) || undefined,
+        supFaithMax: CHAR_HOOKS.the_supplicant.faithOf(p) ? CHAR_HOOKS.the_supplicant.FAITH_MAX : undefined,
+        supJudge: CHAR_HOOKS.the_supplicant.judgeOn(p)
+          ? { n: p.supJudgeCount || 0, need: CHAR_HOOKS.the_supplicant.JUDGE_NEED, ally: !!p.supJudgeAlly, gif: CHAR_HOOKS.the_supplicant.ULT_GIF } : undefined,
+        // ---------- มหาเทพ อรชุน (patch 3.4 new) ----------
+        arjunaUltCd: mine && p.characterId === "arjuna" ? CHAR_HOOKS.arjuna.ultCooldownLeft(engine, p) : undefined,
         ippoCd: p.characterId === "ippo" ? {
           basic: CHAR_HOOKS.ippo.cooldownLeft(engine, p, "basic"),
           secondary: CHAR_HOOKS.ippo.cooldownLeft(engine, p, "secondary"),
@@ -3187,6 +3228,8 @@ function useInventoryItem(id, uid, opts = {}) {
   const p = players[id];
   if (!p || !p.alive) return;
   if (CHAR_HOOKS.conner.skillBlocked(engine, p)) return; // คอนเนอร์: ระหว่างการไล่ล่า ทุกคนใช้ไอเทมไม่ได้ (รวมคอนเนอร์กับเป้าหมาย)
+  // ผู้วิงวอน (patch 3.4): "ลูกแกะน้อยรู้แจ้ง" กันการเล็งผู้วิงวอนด้วยไอเทมด้วย (เช่นกระสุน GUTS Select)
+  if (opts && opts.targetId && CHAR_HOOKS.the_supplicant.targetBlocked(p, players[opts.targetId])) return;
   const idx = (p.inventory || []).findIndex((it) => it.uid === uid);
   if (idx < 0) return;
   const item = p.inventory[idx];
@@ -3593,6 +3636,11 @@ function dealRound() {
     // อิปโป (characters/ippo.js): Uper Cut ตั้งสตั้นไว้เมื่อเทิร์นก่อน -> เริ่มมีผลตอนนี้
     //  ต้องอยู่ "ก่อน" บล็อกเช็คสตั้นด้านล่าง ไม่งั้นสตั้นจะเลื่อนไปมีผลอีกเทิร์นหนึ่ง
     CHAR_HOOKS.ippo.applyPendingStun(engine, p);
+    // ---------- ผู้วิงวอน (characters/the_supplicant.js): รีเซ็ตโควตาสกิล 2 ครั้ง + ต่ออายุ "กระแสเวท" ถาวร ----------
+    CHAR_HOOKS.the_supplicant.onRoundStartTick(engine, p);
+    // ---------- "เยียวยา" (สถานะ Universal patch 3.4): ฟื้นพลังชีวิตต่อเทิร์นตามจำนวนหน่วย ----------
+    //  วางไว้ที่นี่ (ต้นเทิร์น) เหมือนลุกไหม้/เลือดไหล การลดเทิร์นทำที่ลูปกลางของ endTurn ตามปกติ
+    tickMend(engine, p);
     // อมาซอน (ฮารุกะ สกิลติดตัว): โดนสวนกลับเมื่อเทิร์นก่อน -> สตั้นเริ่มมีผลตอนนี้
     //  ต้องอยู่ "ก่อน" บล็อกเช็คสตั้นด้านล่างเหมือน Gargorgon Ray ไม่งั้นสตั้นจะเลื่อนไปอีกเทิร์นหนึ่ง
     if (p.harukaStunPending > 0) {
@@ -3707,7 +3755,8 @@ function hit(id) {
   }
   // สภาพชา (ดีบัฟ Universal — Thunder Bullet): กดจั่ว 1 ครั้ง ได้ไพ่ 2 ใบ
   //  ใบที่ 2 จั่วแบบสุ่มปกติเสมอ (โชคลาภช่วยแค่ใบแรก) และไม่เช็คเพดานแต้มซ้ำ — แตกได้ตามสภาพ
-  if ((p.statuses.chaa || 0) > 0) {
+  //  ผู้วิงวอน "ลงทัณฑ์" พ่วง "ชา" มาด้วย — เป็นผลพ่วงที่เช็คสด ไม่ใช่สถานะจริง (ล้างไม่ได้ตามสเปค)
+  if ((p.statuses.chaa || 0) > 0 || CHAR_HOOKS.the_supplicant.chaaActive(p)) {
     const extra = drawCardFor(p);
     if (extra) {
       p.cards.push(extra);
@@ -3767,6 +3816,9 @@ function useSkill(id, tier, targets, item) {
   if (!p || !p.alive) return;
   if (gameState !== "PLAYING") return;
   if (!["basic", "secondary", "ultimate"].includes(tier)) return;
+  // ผู้วิงวอน (patch 3.4): คนที่ติด "ลูกแกะน้อยรู้แจ้ง" เล็งผู้วิงวอนด้วยสกิลไม่ได้เลย
+  //  กันที่ปากทางจุดเดียว จึงครอบคลุมทุกท่าของทุกตัวละครที่ส่ง targets มา โดยไม่ต้องแก้ prepareXTarget ทีละตัว
+  if (Array.isArray(targets) && targets.some((tid) => CHAR_HOOKS.the_supplicant.targetBlocked(p, players[tid]))) return;
   // คู่แฝดฮิซากาว่า — สกิลพื้นฐาน 1 (สลับตัว/ชุบแฝด) คือ "ทางหนี" ประจำตัว: อะไรก็ตามที่ทำให้กดสกิลไม่ได้
   //  (สตั้น, หลับไหล, หอกลองกินัส, MOON*CELL ฯลฯ) จะไม่มีผลกับช่องนี้ช่องเดียว เพื่อให้ยังหนีไปคุมแฝดอีกคนได้เสมอ
   //  — แต่ยังต้องอยู่ในเฟสจั่วการ์ด และยังจำกัดสลับ 1 ครั้ง/เทิร์นตามเดิม (hisakawaSwitchedRound)
@@ -3991,6 +4043,9 @@ function useSkill(id, tier, targets, item) {
   //  งบรวม 2 ครั้งต่อเทิร์น ผสมกันได้อิสระ (เช่น รังสรรค์ 2 ครั้งใส่คนละเป้า, หรือ 1 รังสรรค์ + 1 ลงทัณฑ์)
   const isKaiPick = p.characterId === "kai" && (tier === "basic" || tier === "secondary");
   if (isKaiPick && (p.kaiSkillUsesRound || 0) >= 2) return;
+  // ผู้วิงวอน (patch 3.4): กดสกิลได้ 2 ครั้งต่อเทิร์น ผสมช่องไหนก็ได้ (แพทเทิร์นเดียวกับไค)
+  //  ประกาศไว้ตรงนี้เพราะด่านโควตาสกิลของเทิร์นด้านล่างต้องอ่านค่านี้ ส่วนเงื่อนไขเฉพาะท่าอยู่ที่ CHAR_HOOKS.the_supplicant.canUseSkill
+  const isSupPick = p.characterId === "the_supplicant";
   // ทาคุมิ ฟุจิวาระ: ขึ้นเกียร์ (พื้นฐาน) / ลงเกียร์ (รอง) / ถึงจะมองไม่เห็น แต่ฉันยังอยู่ (ท่าไม้ตาย) ไม่นับเป็นการใช้สกิลของเทิร์นร่วมกัน
   //  งบรวม 5 ครั้งต่อเทิร์น ผสมกันได้อิสระ (แพทเทิร์นเดียวกับไค กว้างขึ้นครอบคลุมท่าไม้ตายด้วย) — ท่าไม้ตายกดซ้ำไม่ได้ผ่านเช็คทั่วไปด้านล่าง (takumiBlackout บล็อกเอง)
   const isTakumiPick = p.characterId === "takumi" && (tier === "basic" || tier === "secondary" || tier === "ultimate");
@@ -4006,7 +4061,8 @@ function useSkill(id, tier, targets, item) {
   //  (แพทเทิร์นเดียวกับทาคุมิ กว้างขึ้นครอบคลุมทั้ง 3 ช่อง — เงื่อนไขเฉพาะท่าอยู่ที่ CHAR_HOOKS.byleth.canUseSkill)
   const isBylethPick = p.characterId === "byleth";
   if (isBylethPick && (p.bylethSkillUsesRound || 0) >= CHAR_HOOKS.byleth.SKILL_USES_PER_TURN) return;
-  if (p.skillUsedRound && !gambleRepeat && !isBylethPick && !isHarukaBasic && !isApplePick && !isMuimiBasic && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHisakawaFreeAction) return; // ใช้สกิลได้เพียง 1 อันต่อเทิร์น (ซ้ำ/ซ้อนไม่ได้)
+  if (isSupPick && (p.supSkillUsesRound || 0) >= CHAR_HOOKS.the_supplicant.SKILL_USES_PER_TURN) return;
+  if (p.skillUsedRound && !gambleRepeat && !isSupPick && !isBylethPick && !isHarukaBasic && !isApplePick && !isMuimiBasic && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHisakawaFreeAction) return; // ใช้สกิลได้เพียง 1 อันต่อเทิร์น (ซ้ำ/ซ้อนไม่ได้)
   // MOON*CELL (คิชินามิ ฮาคุโนะ): ต้องมีแต้มคำสาปแห่งดวงจันทร์ครบ 3 เท่านั้น
   if (st === "moonCell" && (p.hakunoMoonPoints || 0) < HAKUNO_MOONCELL_NEED) return;
   // ข้าขอบัญชา (ชาย/หญิง คิชินามิ ฮาคุโนะ): กดซ้ำไม่ได้จนกว่าผลเดิมจะหมด
@@ -4173,6 +4229,18 @@ function useSkill(id, tier, targets, item) {
   //  ทั้งสามช่องมีคูลดาวน์รายสกิล (เก็บเป็นเลขรอบ ไม่ใช่สถานะ) — ด่านเดียวกันทั้ง canUseSkill และปุ่มฝั่ง client
   const isIppoPick = p.characterId === "ippo";
   if (isIppoPick && !CHAR_HOOKS.ippo.canUseSkill(engine, p, tier)) return;
+  // ---------- ผู้วิงวอน (characters/the_supplicant.js) ----------
+  //  ทั้งสามช่องต้องเลือกเป้าหมาย 1 คน (เลือกตัวเองได้) — โควตา 2 ครั้ง/เทิร์นเช็คไปแล้วด้านบน (ดู isSupPick)
+  let supTarget = null;
+  if (isSupPick) {
+    if (!CHAR_HOOKS.the_supplicant.canUseSkill(engine, p, tier)) return;
+    supTarget = CHAR_HOOKS.the_supplicant.prepareTarget(engine, p, targets);
+    if (!supTarget) return;
+  }
+  // ---------- มหาเทพ อรชุน (characters/arjuna.js) ----------
+  //  ทุกช่องเป็น self-buff/ตีหมู่ ไม่ต้องเลือกเป้าหมาย — เงื่อนไขการกดซ้ำ/คูลดาวน์อยู่ที่ canUseSkill
+  const isArjunaPick = p.characterId === "arjuna";
+  if (isArjunaPick && !CHAR_HOOKS.arjuna.canUseSkill(engine, p, tier)) return;
   const isBatPick = p.characterId === "bat_ben";
   if (isBatPick && !CHAR_HOOKS.bat_ben.canUseSkill(engine, p, tier)) return;
   // ---------- บานาจ ลิงก์ (patch 2.1.2, characters/banagher.js): Absorb shield — เลือกเป้าหมาย 1 คน (เลือกตัวเองได้) ----------
@@ -4293,7 +4361,7 @@ function useSkill(id, tier, targets, item) {
     if (p.statuses.freecast <= 0) delete p.statuses.freecast;
     lastLog.push(`👸 ${p.name} การ์ดราชินี — ใช้สกิลนี้โดยไม่เสียแต้มสกิล`);
   }
-  if (!isApplePick && !isMuimiBasic && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHarukaBasic && !isBylethPick && !isHisakawaFreeAction && !isYuiBasic) p.skillUsedRound = true; // สกิลเลือก/สลับและเสบียงฉุกเฉินไม่นับโควตาสกิลหลัก
+  if (!isApplePick && !isMuimiBasic && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHarukaBasic && !isBylethPick && !isHisakawaFreeAction && !isYuiBasic && !isSupPick) p.skillUsedRound = true; // สกิลเลือก/สลับและเสบียงฉุกเฉินไม่นับโควตาสกิลหลัก
   if (isKaiPick) p.kaiSkillUsesRound = (p.kaiSkillUsesRound || 0) + 1;
   if (isTakumiPick) p.takumiSkillUsesRound = (p.takumiSkillUsesRound || 0) + 1;
 
@@ -4442,6 +4510,12 @@ function useSkill(id, tier, targets, item) {
   // ---------- แบทแมน (characters/bat_ben.js) ----------
   //  สกิลที่ไม่ได้ผูกกับสถานะ (รถแบทโมบิล + ทั้งสามช่องของร่างรถ) ลงผลผ่าน applyInstantSkill
   if (isIppoPick) flashSuffix = CHAR_HOOKS.ippo.applyInstantSkill(engine, p, tier) || flashSuffix;
+  // ---------- ผู้วิงวอน / มหาเทพ อรชุน (patch 3.4) ----------
+  if (isSupPick && supTarget) flashSuffix = CHAR_HOOKS.the_supplicant.applyInstantSkill(engine, p, tier, supTarget) || flashSuffix;
+  if (isArjunaPick && tier !== "ultimate") flashSuffix = CHAR_HOOKS.arjuna.applyInstantSkill(engine, p, tier) || flashSuffix;
+  // Mahapralaya: แจกเปราะบาง + คิววีดีโอตรงนี้ แล้วลงความเสียหายจริงหลังวีดีโอจบ (ดูท้ายฟังก์ชัน)
+  let arjunaPralayaPending = false;
+  if (isArjunaPick && tier === "ultimate") { flashSuffix = CHAR_HOOKS.arjuna.startPralaya(engine, p) || flashSuffix; arjunaPralayaPending = true; }
   if (isBatPick) flashSuffix = CHAR_HOOKS.bat_ben.applyInstantSkill(engine, p, tier) || flashSuffix;
   if (st === "batKarma") CHAR_HOOKS.bat_ben.activateKarma(engine, p);
   if (st === "batTaunt") CHAR_HOOKS.bat_ben.activateTaunt(engine, p);
@@ -4590,6 +4664,11 @@ function useSkill(id, tier, targets, item) {
       danWhipTarget = null;
       pausePlayingForCutscene(() => CHAR_HOOKS.dan.applyWhip(engine, p, dt));
     }
+    else if (arjunaPralayaPending) {
+      // มหาเทพ อรชุน: Mahapralaya — วีดีโอก่อน แล้วค่อยลงความเสียหายใส่ทุกคน (ลำดับตามสเปค)
+      arjunaPralayaPending = false;
+      pausePlayingForCutscene(() => CHAR_HOOKS.arjuna.applyPralaya(engine, p));
+    }
     else if (connerCloseCase) {
       const t = connerCloseCase;
       connerCloseCase = null;
@@ -4601,6 +4680,8 @@ function useSkill(id, tier, targets, item) {
   if (connerCloseCase) CHAR_HOOKS.conner.applyCloseCase(engine, p, connerCloseCase);
   // ตาข่ายสำรองเดียวกันของ "อย่าให้ฉันต้องเฆี่ยนตี" — ไม่ได้เข้าเส้นทางคัตซีน -> ลงดาเมจทันที
   if (danWhipTarget) CHAR_HOOKS.dan.applyWhip(engine, p, danWhipTarget);
+  // ตาข่ายสำรองเดียวกันของ Mahapralaya — ไม่ได้เข้าเส้นทางคัตซีน -> ลงความเสียหายทันที
+  if (arjunaPralayaPending) CHAR_HOOKS.arjuna.applyPralaya(engine, p);
   broadcastState();
   checkAllLocked();
 }
@@ -5485,9 +5566,21 @@ function goSummary() {
 
 // ---- โจมตี ----
 // เรจูอาคมบัญชา (อมตะ): ไม่ถูกเลือกเป็นเป้าโจมตีตลอดเทิร์น
+// ---------- เอฟเฟกต์ gif ทับไอคอนผู้เล่น (ระบบใหม่ patch 3.4 — ผู้วิงวอน) ----------
+//  ต่างจาก cutscene ตรงที่ "ไม่หยุดเกม": ยิงเป็น event ให้ client วาด gif ทับการ์ดของผู้เล่นคนนั้นแล้วหายไปเอง
+//  ทุกคนเห็นเหมือนกัน (เป็นข้อมูลสนาม) — client จัดคิว/ตั้งเวลาเองจาก ms ที่ส่งไป (ดู IconFxLayer ใน Game.jsx)
+function iconFx(target, kind) {
+  const fx = CHAR_HOOKS.the_supplicant.FX[kind];
+  if (!target || !fx) return;
+  io.emit("iconFx", { targetId: target.id, kind, gif: fx.gif, sound: fx.sound, ms: fx.ms, seq: ++iconFxSeq });
+}
+let iconFxSeq = 0;
+
 function attackableTargets(atkId) {
   const attacker = players[atkId];
-  return alivePlayers().filter((p) => p.id !== atkId && !sameTeam(attacker, p) && !sealActive(p));
+  // ผู้วิงวอน (patch 3.4): คนที่ติด "ลูกแกะน้อยรู้แจ้ง" เล็งผู้วิงวอนไม่ได้เลย — กรองออกจากรายชื่อเป้าหมายตั้งแต่ต้นทาง
+  return alivePlayers().filter((p) => p.id !== atkId && !sameTeam(attacker, p) && !sealActive(p)
+    && !CHAR_HOOKS.the_supplicant.targetBlocked(attacker, p));
 }
 function afterSummary() {
   // คอนเนอร์ RK800 (สกิลติดตัว 2): ระหว่างการไล่ล่า ทุกเทิร์นเหลือแค่ จั่ว -> สรุปแต้ม ไม่มีเฟสโจมตีเลย
@@ -5723,7 +5816,8 @@ function doAttack(byId, targetId) {
   const attacker = players[byId];
   if (!effectSourceId && attacker) return withEffectSource(attacker, () => doAttack(byId, targetId));
   let target = players[targetId];
-  if (!attacker || !target || !target.alive || target.id === attacker.id || sameTeam(attacker, target) || sealActive(target)) {
+  if (!attacker || !target || !target.alive || target.id === attacker.id || sameTeam(attacker, target) || sealActive(target)
+      || CHAR_HOOKS.the_supplicant.targetBlocked(attacker, target)) { // ลูกแกะน้อยรู้แจ้ง: เล็งผู้วิงวอนไม่ได้
     // เป้าหมายยูกิอาจตาย/หายหรือป้องกันการเลือกเป้าระหว่างคัตซีน ห้ามปล่อยเฟส ATTACK ค้าง
     if (isYuuki(attacker)) postAttackFollowup(attacker);
     return;
@@ -5892,6 +5986,10 @@ function doAttack(byId, targetId) {
   if (CHAR_HOOKS.oguri.tryFlowDodge(engine, attacker, target)) return;
   if (CHAR_HOOKS.escanor.tryNightDodge(engine, attacker, target)) return;
 
+  // มหาเทพ อรชุน (สกิลติดตัว หัวใจที่เที่ยงธรรม): จดจำว่าใครเป็นฝ่ายลงมือกับอรชุนก่อน
+  //  บันทึก "ตอนเลือกเป้า" ไม่ใช่ตอนดาเมจลง — การโจมตีที่ถูกหลบ/กันไว้ก็ยังนับว่าเคยลงมือแล้ว
+  //  จึงต้องอยู่ก่อนด่านหลบหลีกทั้งหมด
+  CHAR_HOOKS.arjuna.onAttacked(engine, attacker, target);
   // เอจิ (characters/eiji.js): อัตราหลบหลีกรวม (ว่องไว + ไม่ว่ายังก็ตาม + Ordinal Scale) — 1 ครั้งต่อเทิร์น
   if (CHAR_HOOKS.eiji.tryAttackDodge(engine, attacker, target)) return;
   // อิปโป (characters/ippo.js): หลบการโจมตีปกติ — หลบพ้นแล้วจบเทิร์นด้วยฉากหลบ
@@ -5940,14 +6038,17 @@ function doAttack(byId, targetId) {
   if (invertActive(attacker)) base = Math.max(0, 1 - (base - 1));
   let dmg = base + ntdBonus;
   // เสริมพลัง / อ่อนแอ (สถานะพื้นฐาน patch 2.0.8): เพิ่ม/ลดดาเมจที่ทำได้ตามจำนวนที่ระบุ
-  const mightAtk = attacker.characterId === "ultraman_trigger" ? 0 : statusAmtOf(attacker, "might");
+  //  ผู้วิงวอน (patch 3.4): "เกราะศรัทธา" ให้เสริมพลัง 1 · "ลูกแกะน้อยรู้แจ้ง" ให้อ่อนแอ 1 / เปราะบาง 1
+  //  คิดสดที่นี่แทนการใส่เป็นสถานะจริง เพราะสถานะแม่ทั้งสองตัวล้าง/ต้านไม่ได้ (ดูหัว characters/the_supplicant.js)
+  const mightAtk = attacker.characterId === "ultraman_trigger" ? 0
+    : statusAmtOf(attacker, "might") + CHAR_HOOKS.the_supplicant.statusAmtBonus(attacker, "might");
   if (mightAtk > 0) dmg += mightAtk;
   // ยูนะ: Longing (บัฟผู้ถูกฟื้นคืนชีพ +1 ถาวร 5 เทิร์น) / Break Beat Bark! (ทุกคน +1 เฉพาะโจมตีปกติ ไม่ใช่สกิล)
   const yunaLongingAtk = attacker.characterId === "ultraman_trigger" ? 0 : statusAmtOf(attacker, "yunaLonging");
   if (yunaLongingAtk > 0) dmg += yunaLongingAtk;
   const yunaBeatBark = attacker.characterId !== "ultraman_trigger" && yunaBeatBarkActive();
   if (yunaBeatBark) dmg += 1;
-  const weakAtk = statusAmtOf(attacker, "weak");
+  const weakAtk = statusAmtOf(attacker, "weak") + CHAR_HOOKS.the_supplicant.statusAmtBonus(attacker, "weak");
   if (weakAtk > 0) dmg = Math.max(0, dmg - weakAtk);
   // ความตายที่โรยรา (ชิกิ patch 2.0.8): เส้นชีวิตของเป้าหมายแปรเป็นดาเมจเสริม +1 ต่อเส้น
   //  แต่พลังโจมตีรวมฝั่งผู้โจมตีไม่เกิน 5 หน่วยต่อการโจมตี
@@ -5971,13 +6072,14 @@ function doAttack(byId, targetId) {
   if (contractGuard) dmg = Math.max(0, dmg - 1);
   // คุ้มครอง (Harmony / สถานะพื้นฐาน): ความเสียหายที่ได้รับลดลงตามจำนวนที่ระบุ (ไม่ระบุ = 1)
   const bardGuard = (target.statuses.guard || 0) > 0;
-  const guardAmt = bardGuard ? (statusAmtOf(target, "guard") || 1) : 0;
+  const guardAmt = (bardGuard ? (statusAmtOf(target, "guard") || 1) : 0)
+    + CHAR_HOOKS.the_supplicant.statusAmtBonus(target, "guard");
   if (guardAmt > 0) dmg = Math.max(0, dmg - guardAmt);
   // Discord (Bard): เป้าหมายติดขัดแย้ง — ความเสียหายที่ได้รับ +1
   const bardDiscord = (target.statuses.discord || 0) > 0;
   if (bardDiscord) dmg += 1;
   // เปราะบาง (สถานะพื้นฐาน patch 2.0.8): ความเสียหายที่ได้รับเพิ่มตามจำนวนที่ระบุ
-  const fragileAmt = statusAmtOf(target, "fragile");
+  const fragileAmt = statusAmtOf(target, "fragile") + CHAR_HOOKS.the_supplicant.statusAmtBonus(target, "fragile");
   if (fragileAmt > 0) dmg += fragileAmt;
   // ยูนะ: Delete (+1 ดาเมจที่ได้รับ) / Smile for You (-1 ดาเมจที่ได้รับ) — ต้าน/ลบไม่ได้ ซ้อนกับเปราะบางได้
   const yunaDeleteAmt = statusAmtOf(target, "yunaDelete");
@@ -6085,6 +6187,10 @@ function doAttack(byId, targetId) {
   const batGunFired = CHAR_HOOKS.bat_ben.consumeGun(engine, attacker);
   // อิปโป (characters/ippo.js): Uper Cut ลงผลตามว่าเป้าหมาย "มีเกราะก่อนโดนหมัดนี้" หรือไม่
   const ippoUpperFx = CHAR_HOOKS.ippo.resolveUpper(engine, attacker, target, ippoArmorBefore);
+  // ผู้วิงวอน (characters/the_supplicant.js): ตราพิพากษาเดินหน้า — "ถูกโจมตี" และ "เป็นฝ่ายโจมตี" นับแยกกัน
+  //  ยิงทีละฝั่งเพราะทั้งผู้โจมตีและผู้ถูกโจมตีอาจถือตราคนละใบพร้อมกันได้
+  const supJudgeDefFx = CHAR_HOOKS.the_supplicant.onJudgeTrigger(engine, target, "ถูกโจมตี");
+  const supJudgeAtkFx = CHAR_HOOKS.the_supplicant.onJudgeTrigger(engine, attacker, "เป็นฝ่ายโจมตี");
   // Dempsey Charge: เทหมดหน้าตัก -> จำนวนครั้งที่ต้องตีเพิ่ม (บัฟหายทั้งก้อนตรงนี้)
   if (CHAR_HOOKS.ippo.dempseyActive(attacker)) attacker.ippoExtraAtk = (attacker.ippoExtraAtk || 0) + CHAR_HOOKS.ippo.consumeCharge(engine, attacker);
   // Ginga Strium (ฮิคารุ, characters/hikaru.js): โจมตีโดนเป้าหมาย -> ติดลุกไหม้ให้เป้าหมาย / ถูกโจมตีขณะอยู่ในร่างนี้ -> ผู้โจมตีติดลุกไหม้สวนกลับ
@@ -6368,6 +6474,8 @@ function doAttack(byId, targetId) {
   // ---------- มิซึซาว่า ฮารุกะ (characters/haruka.js) ----------
   if (harukaPunishFx.punishStacks > 0) addFx({ name: `จงไปสู่สุขติ — ระเบิดเลือดไหล +${harukaPunishFx.punishStacks}`, img: CHAR_HOOKS.haruka.IMG.skill2, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
   if (ippoUpperFx) addFx({ name: ippoUpperFx.kind === "decay" ? "Uper Cut — ผุพัง 3 เทิร์น" : "Uper Cut — สตั้นเทิร์นหน้า", img: CHAR_HOOKS.ippo.IMG.skill2, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
+  if (supJudgeDefFx) addFx({ name: `${supJudgeDefFx.kind === "mercy" ? "ความเมตตา" : "คำพิพากษา"} ${supJudgeDefFx.n}/${CHAR_HOOKS.the_supplicant.JUDGE_NEED}`, img: CHAR_HOOKS.the_supplicant.IMG.skill3, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
+  if (supJudgeAtkFx) addFx({ name: `${supJudgeAtkFx.kind === "mercy" ? "ความเมตตา" : "คำพิพากษา"} ${supJudgeAtkFx.n}/${CHAR_HOOKS.the_supplicant.JUDGE_NEED}`, img: CHAR_HOOKS.the_supplicant.IMG.skill3, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
   if (batGunFired) addFx({ name: `ปืนติดรถ +${CHAR_HOOKS.bat_ben.GUN_BONUS}`, img: CHAR_HOOKS.bat_ben.IMG_GUN, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
   if (yuiCounterFx) addFx({ name: `เยอรมันซูเพล็ก — ทุ่มสวนกลับ -${yuiCounterFx.dmg}`, img: CHAR_HOOKS.yui.IMG.skill2, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (danCounterFx) addFx({ name: `นายทำให้ฉันผิดหวัง — สวนกลับศิษย์ -${danCounterFx.dmg}`, img: CHAR_HOOKS.dan.IMG.skill2, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
@@ -6511,6 +6619,9 @@ function endTurn() {
       // ---------- โอกูริ แคป (patch 2.0.8.1) ----------
       // อิปโป: Dempsey roll เป็น "ธงบัฟเปิดอยู่" ไม่ใช่ตัวนับเทิร์น — หายเมื่อโจมตีสำเร็จเท่านั้น
       if (k === "ippoDempsey") continue;
+      // ผู้วิงวอน: "เกราะศรัทธา" เก็บ "จำนวนหน่วย" ไว้ที่ statusAmt ส่วน statuses เป็นแค่ธง — ไม่ใช่ตัวนับเทิร์น
+      //  หายเมื่อถูกดาเมจกินจนหมดเท่านั้น (ดู faithAbsorb) ต้องตรงกับ NO_TICK_STATUS ใน _universal_status.js
+      if (k === "supFaith") continue;
       if (k === "graybeast") continue;  // ร่าง Zone: ถาวรจนกว่าจะเข้าร่างหมดแรง
       // burnout (ร่างหมดแรง): เดิมถูกยกเว้นไม่ลดเทิร์นตรงนี้ แต่ไม่มีจุดไหนในโค้ดเคลียร์ทิ้งเองเลย (ไม่มี delete p.statuses.burnout ที่ไหนทั้งไฟล์)
       //  ผลคือติดแล้วค้างถาวรทั้งแมตช์ ทั้งที่ตั้งใจให้เป็นดีบัฟ 2 เทิร์นตายตัว (ดู OGURI_BURNOUT_TURNS, characters/oguri.js) — เอาข้อยกเว้นออก ให้ลดเทิร์นตามปกติ
@@ -6531,6 +6642,8 @@ function endTurn() {
         // ไค ชิซากิ: เชื่อมต่อ/คู่ปรับ หมดอายุ -> ล้าง mirror ทั้งสองฝั่ง (โค้ดแยกจาก Resonance ของ Bard)
         // โมโรโบชิ ดัน: "จงหลบแต่อย่าหนี"/"ศิษย์" หมดเวลา -> ล้างธงฝั่งดันและฝั่งเป้าหมายให้ครบ
         if (k === "danChase" || k === "danDisciple") CHAR_HOOKS.dan.onStatusExpire(engine, p, k);
+        // ผู้วิงวอน: "ตราพิพากษา" หมดเวลา 5 เทิร์นโดยยังไม่ครบ 3 ครั้ง -> ผลปลายทางฝั่ง "ไม่สัมฤทธิ์"
+        if (k === "supJudge") CHAR_HOOKS.the_supplicant.onJudgeExpire(engine, p);
         if (k === "kaiLink") CHAR_HOOKS.kai.onExpireKaiLink(p);
         if (k === "kaiRival1" || k === "kaiRival2") CHAR_HOOKS.kai.onExpireKaiRival(p);
         // ทาคุมิ ฟุจิวาระ: ถึงจะมองไม่เห็น แต่ฉันยังอยู่ หมดเวลาเองตามธรรมชาติ (ไม่มีใครไพ่แตกใน 5 เทิร์น) -> รีเซ็ต guard ให้ใช้ท่าไม้ตายรอบหน้าได้ปกติ
@@ -7406,6 +7519,14 @@ const engine = {
   applyOverloadOverdrawPenalty,
   applyBuff: rawApplyBuff,
   applyDebuff,
+  MEND_MAX_TURNS,
+  applyMend, // "เยียวยา" (สถานะ Universal): จุดเดียวที่ทุกตัวละครใช้ใส่สถานะนี้ (เคารพเพดานเทิร์น)
+  tickMend,
+  blindActive,
+  // มหาเทพ อรชุน (Mahapralaya): พลังโจมตีปกติที่ attacker จะฟาดใส่ target ได้ — ใช้ท่อเดียวกับคอนเนอร์
+  attackPowerAgainst: estimateAttackOn,
+  // ผู้วิงวอน: เอฟเฟกต์ gif ทับไอคอนผู้เล่น (ระบบใหม่ patch 3.4) — kind = คีย์ใน CHAR_HOOKS.the_supplicant.FX
+  iconFx,
   setTurnsNoRefresh,
   applySpellburden,
   cleanseDebuffs,

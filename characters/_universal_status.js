@@ -81,7 +81,7 @@ function coolReduction(p, isNormalAttack) {
 }
 
 // ดีบัฟพื้นฐานที่ "ต้านสถานะผิดปกติ" ล้างออกได้ทั้งหมด
-const BASIC_DEBUFF_CLEAR = ["discord", "sleep", "stun", "nodraw", "noskill", "weak", "fragile", "spellburden", "oblada", "hburn", "hbleed", "phenexBanUlt", "nanayaSeal", "miyakoSeal", "invert", "nohealing", "manaSeal", "chaa",
+const BASIC_DEBUFF_CLEAR = ["discord", "sleep", "stun", "nodraw", "noskill", "weak", "fragile", "spellburden", "oblada", "hburn", "hbleed", "phenexBanUlt", "nanayaSeal", "miyakoSeal", "invert", "nohealing", "manaSeal", "chaa", "blind",
   // ผู้สังหารเมจ: ตราล่าเวท/ดูดซับเวท ถูกลบล้างได้ด้วย "ต้านทานสถานะผิดปกติ"
   //  (mageslayerMarkedId ฝั่งผู้ร่ายถูก reconcile ให้เองที่ tickWitchMark ท้ายเทิร์น — ดู characters/mageslayer.js)
   "mageslayerMark", "manaLeech",
@@ -108,6 +108,38 @@ function cleanseDebuffs(p) {
     }
   }
   return purged;
+}
+
+// ---------- "เยียวยา" (mend, สถานะ Universal patch 3.4) ----------
+//  บัฟฟื้นฟูต่อเนื่อง: ต้นเทิร์นฟื้นพลังชีวิตเท่ากับจำนวนหน่วยที่ระบุ (1 หน่วย = 1 พลังชีวิต)
+//  "ซ้อนทับจำนวนเทิร์นได้ สูงสุด 5 เทิร์น" — ใส่ซ้ำคือ "บวกเทิร์นเข้าไป" (ไม่ใช่รีเฟรช) เพดาน MEND_MAX_TURNS
+//  ส่วนจำนวนหน่วยไม่สะสม ใช้ค่ามากสุดที่เคยได้รับ (แพทเทิร์นเดียวกับ applyBuff ของสถานะ amount อื่น)
+//  ตัวละครไหนก็ให้/ติดได้ — ผู้วิงวอน (Prayer) และอรชุน (ตะเกียงไฟที่ดับมอด) เป็นสองเจ้าแรกที่ใช้
+const MEND_MAX_TURNS = 5;
+
+function applyMend(p, amount, turns) {
+  if (!p) return 0;
+  const before = p.statuses.mend || 0;
+  p.statuses.mend = Math.min(MEND_MAX_TURNS, before + Math.max(1, turns || 1));
+  p.statusAmt = p.statusAmt || {};
+  p.statusAmt.mend = Math.max(p.statusAmt.mend || 0, Math.max(1, amount || 1));
+  return p.statuses.mend - before;
+}
+
+// ติกต้นเทิร์นของ "เยียวยา" — ฟื้นพลังชีวิตตามจำนวนหน่วย (การลดเทิร์นทำที่ลูปกลางของ endTurn ตามปกติ)
+//  ใช้ engine.healHp จึงเคารพ "ไร้ทางเยียวยา"/"ผกผัน"/เลือดไหล ครบเหมือนการฟื้นเลือดช่องทางอื่น
+function tickMend(engine, p) {
+  if (!p || !p.alive || !(((p.statuses && p.statuses.mend) || 0) > 0)) return 0;
+  const amt = statusAmtOf(p, "mend") || 1;
+  const got = engine.healHp(p, amt);
+  if (got > 0) engine.log(`💚 ${p.name} เยียวยา — ฟื้นพลังชีวิต +${got} (เหลืออีก ${p.statuses.mend} เทิร์น)`);
+  return got;
+}
+
+// "ตาบอด" (blind, สถานะ Universal patch 3.4): มองไม่เห็นอะไรเลยทั้งเทิร์น — ไพ่ แต้ม พลังงาน พลังชีวิต ของทุกคนรวมทั้งของตัวเอง
+//  ตัวสถานะเป็นดีบัฟพื้นฐานธรรมดา (ต้าน/ล้างได้) — จุดทำงานจริงอยู่ที่ buildStateFor() ของ server.js
+function blindActive(p) {
+  return !!p && ((p.statuses && p.statuses.blind) || 0) > 0;
 }
 
 // "ไร้ทางเยียวยา" (สถานะ Universal): ฟื้นเลือดจริงไม่ได้
@@ -281,6 +313,8 @@ const NO_TICK_STATUS = new Set([
   "escanorNight", "escanorNoon", "escanorLastStand", "escanorSolar", "escanorFlare",
   "escanorFlareNoon", "escanorPunch", "escanorRhitta", "escanorRhittaNoon", "escanorSun",
   "graybeast", "grit", "healthfull", "overweight", "ntd", "beat", "eva3", "banagherPassive2",
+  // ผู้วิงวอน (patch 3.4): "เกราะศรัทธา" เป็นจำนวนหน่วย ไม่ใช่ตัวนับเทิร์น — หายเมื่อถูกทำลายจนหมดเท่านั้น
+  "supFaith",
 ]);
 
 module.exports = {
@@ -296,6 +330,10 @@ module.exports = {
   SOFT_DEBUFF_STEP,
   cleanseDebuffs,
   coolReduction,
+  MEND_MAX_TURNS,
+  applyMend,
+  tickMend,
+  blindActive,
   noHealActive,
   invertActive,
   tickBurn,

@@ -11,6 +11,7 @@ const danImg = require("./dan").IMG;       // โมโรโบชิ ดัน
 const shidoImg = require("./shido").IMG;   // อิสึกะ ชิโด: เหตุผลเดียวกัน
 const yuiImg = require("./yui").IMG;       // ยุย โยชิโอกะ: เหตุผลเดียวกัน
 const ippoImg = require("./ippo").IMG;     // มาคุโนะอุจิ อิปโป: เหตุผลเดียวกัน
+const arjunaImg = require("./arjuna").IMG; // มหาเทพ อรชุน: เหตุผลเดียวกัน
 const muimiImg = require("./muimi").IMG;   // มุยมิ: ใช้ path รูปจาก hook กลาง
 const BAT_CAR_IMG = "/characters/bat_ben/bat_update/bat_ben_car.webp";
 const BAT_SHOT_IMG = "/characters/bat_ben/bat_update/skill1.2/bat_ben_skill1.2.jpg";
@@ -23,6 +24,9 @@ module.exports = function buildTransforms(img) {
     // ปัดขึ้นเผื่อเวลาตัดฉากเพื่อให้วิดีโอเล่นจบครบ และ queueCutscene ทำให้เล่นทุกครั้งที่กด
     muimiUltimateFull:  { img: muimiImg.skill3, video: "/characters/muimi/muimi_skill3.mp4",       title: "ดาบสะบั้นหอคอยสวรรค์", label: "ปล่อยท่าไม้ตาย", seconds: 24, music: "muimi", afterReveal: false },
     muimiUltimateShort: { img: muimiImg.skill3, video: "/characters/muimi/muimi_skill3_short.mp4", title: "ดาบสะบั้นหอคอยสวรรค์", label: "ปล่อยท่าไม้ตาย", seconds: 12, music: "muimi", afterReveal: false },
+    // ---------- มหาเทพ อรชุน (patch 3.4 new) ----------
+    //  seconds วัดจาก mvhd จริง (16.38) แล้วปัดขึ้นเผื่อเวลาตัดฉาก — queueCutscene = เล่นทุกครั้งที่กดท่าไม้ตาย
+    arjunaPralaya: { img: arjunaImg.skill3, video: "/characters/arjuna/arjuna_skill3.mp4", title: "MAHAPRALAYA", label: "มหาประลัย", seconds: 17, music: null, afterReveal: false },
     // ---------- มาคุโนะอุจิ อิปโป (patch 3.3 new) ----------
     //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก (หลบหลีก 4.69 -> 6 · Dempsey 10.96 -> 12 · อัลติ 2.88 -> 4)
     //  ทุกคลิปเรียกผ่าน queueCutscene = เล่นทุกครั้งที่ทำงาน (การหลบเกิดบ่อย จึงตั้งเวลาให้กระชับ)

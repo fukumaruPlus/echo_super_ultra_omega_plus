@@ -46,6 +46,8 @@ const dan = require("./dan");
 const shido = require("./shido");
 const yui = require("./yui");
 const ippo = require("./ippo");
+const arjuna = require("./arjuna");
+const the_supplicant = require("./the_supplicant");
 const muimi = require("./muimi");
 
 const CHARACTER_MODULES = [
@@ -92,6 +94,8 @@ const CHARACTER_MODULES = [
   yui,
   muimi,
   ippo,
+  arjuna,
+  the_supplicant,
 ];
 
 const CHAR_HOOKS = {};
