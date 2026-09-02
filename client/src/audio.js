@@ -130,6 +130,8 @@ const FILES = {
   sup_heal: "/characters/the_supplicant/sup_heal.mp3",
   sup_shield: "/characters/the_supplicant/sup_shield.mp3",
   sup_strike: "/characters/the_supplicant/sup_strike.mp3",
+  // คอนเนอร์: เพลงคิดตอนกด "วิเคราะห์สถานการณ์" (เล่นครั้งเดียวจบ ไม่ใช่เพลงประจำตัวที่เล่นค้าง)
+  conner_think: "/characters/connor/conner_think.m4a",
   byleth_hit: "/characters/byleth/hit_sound.mp3", // เสียงโจมตีของ "ดาบต้องสาป"
   action_button: "/effect_sound/action_button.wav",
   trun_change: "/effect_sound/trun_change.wav",

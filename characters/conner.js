@@ -31,13 +31,30 @@ const STRESS_CRIMINAL = 9;          // 9-10 = อาชญากร
 const STRESS_PER_ACTION = 1;        // กดสกิล / ใช้ไอเทม / ชนะ / จั่วไพ่ (จั่วนับ 1 ครั้งต่อเทิร์นไม่ว่ากี่ใบ)
 const STRESS_ON_HIT_CONNOR = 2;     // โจมตีปกติใส่คอนเนอร์ -> ผู้โจมตีเครียด +2
 const STRESS_DECAY_TURN = 1;        // ลดลง 1 หน่วยต่อเทิร์น
-const STRESS_DECAY_BUST = 1;        // ไพ่แตกในเทิร์นนั้นลดเพิ่มอีก 1
+// balance 3.4.2: เดิมไพ่แตกลดความเครียดเพิ่มอีก 1 (STRESS_DECAY_BUST) — ตัดทิ้งแล้ว
+//  เพราะเปิดช่องให้เป้าหมายที่โดนไล่บี้ "ยอมไพ่แตกทิ้งเทิร์น" เพื่อกดความเครียดเป็นลบสุทธิ
+//  = จับกุมไม่ได้ตลอดเกม และมันย้อนแก่นตัวละครด้วย (คนที่พิรุธควรเครียดขึ้น ไม่ใช่ลง)
 
-// ---------- สกิลพื้นฐาน วิเคราะห์สถานการณ์ ----------
-const ANALYZE_HEAL = 2;             // ฟื้นพลังชีวิต — ได้ต่อเมื่อ "ชนะการจั่ว" เท่านั้น (แทนเทิร์นโจมตีที่เสียไป)
+// ---------- สกิลพื้นฐาน วิเคราะห์สถานการณ์ (rework 3.4.2) ----------
+//  คาดการณ์ "ลำดับการกระทำของเป้าหมายในเทิร์นที่แล้ว" — ยิ่งทายถูกมาก ผลยิ่งเยอะเป็นขั้นๆ
+//  กติกาที่ตกลงไว้ (ถามผู้เล่นแล้ว):
+//   · นับแบบ "เทียบช่องต่อช่อง" — ทายผิดกลางทางแล้วช่องหลังยังมีสิทธิ์ถูกได้
+//   · รางวัลเป็นเส้นตรง N:N — ถูก N ข้อ ได้พลังชีวิต +N และแต้มสกิล +N
+//   · ลำดับจริงนับ "เฉพาะครั้งแรก" ของแต่ละประเภท จึงยาวสุด 4 ช่อง (ตรงกับสเปคที่ให้เลือก 4 ข้อ)
+//   · ทายว่า "ไม่ได้ทำอะไรเลย" ได้ (ส่งลำดับว่าง) — ถูกก็นับเป็นถูกทุกข้อ แต่ได้ 0 ข้อจึงไม่มีเลือด/แต้มสกิล
+const PREDICT_ORDER = ["draw", "item", "skill", "shop"]; // เลข 1-4 ที่ผู้เล่นเห็นบนปุ่ม
+const PREDICT_LABEL = { draw: "จั่วการ์ด", item: "ใช้ไอเทม", skill: "ใช้สกิล", shop: "ซื้อของ" };
+const PREDICT_HEAL_PER = 1;         // ถูก 1 ข้อ = ฟื้นพลังชีวิต 1
+const PREDICT_SKILL_PER = 1;        // ถูก 1 ข้อ = ฟื้นแต้มสกิล 1
+const PREDICT_PERFECT_STRESS = 5;   // ทายถูกทุกข้อ = ความเครียดเป้าหมาย +5
+const PREDICT_MUSIC = "conner_think"; // conner_think.m4a — เล่นตอนกดใช้งาน
 
 // ---------- สกิลรอง ข่มขวัญ/จับกุม ----------
-const INTIMIDATE_STRESS = 1;        // ความเครียดที่เพิ่มให้เป้าหมาย
+const INTIMIDATE_STRESS = 1;        // ความเครียดที่เพิ่มให้เป้าหมาย (ระดับผู้ต้องสงสัย)
+// balance 3.4.2: ยิ่งคดีแน่นหนา ยิ่งบีบได้แรงขึ้น — ที่ระดับผู้กระทำความผิดขึ้นไปเพิ่มทีละ 2
+//  แก้ปัญหาที่สกิลรอง +1 หักล้างพอดีกับดีเคย์ -1 จนความเครียดไต่ไม่ขึ้น
+//  คิดจากระดับ "ก่อน" กดครั้งนี้ (ระดับหลังกดยังใช้ตัดสินโบนัสอื่นเหมือนเดิม)
+const INTIMIDATE_STRESS_HIGH = 2;
 const INTIMIDATE_SKILL_DRAIN = 1;   // แต้มสกิลที่ดูดออกจากเป้าหมาย
 const INTIMIDATE_SELF_REFUND = 1;   // ระดับผู้กระทำความผิดขึ้นไป: ฟื้นแต้มสกิลให้ตัวเอง
 
@@ -63,7 +80,9 @@ const REVIVE_ARMOR = 2;
 
 // ---------- สกิลติดตัว 4 การป้องกันตัว ----------
 const ACCUSED_ATK_BONUS = 2;        // โจมตีปกติใส่คนที่ติด "ผู้ต้องหา" แรงขึ้น +2
-const COUNTER_CHANCE = 0.15;        // ถูกโจมตีโดยคนที่ไม่ใช่คนเดิมติดต่อกัน -> 15%
+// balance 3.4.2: 15% -> 35% · เงื่อนไข "คนที่ไม่ใช่คนเดิม" กรองไปครึ่งหนึ่งอยู่แล้ว
+//  โอกาสจริงที่ผู้เล่นได้เห็นท่านี้จึงต่ำกว่า 15% มาก (มีคลิปเตรียมไว้แต่แทบไม่เคยได้เล่น)
+const COUNTER_CHANCE = 0.35;
 const COUNTER_DMG = 1;              // สร้างความเสียหายคืนใส่ผู้โจมตีทั้ง 2 คน คนละ 1
 
 const IMG = {
@@ -124,6 +143,11 @@ module.exports = {
   REVIVE_DELAY,
   CLOSE_CASE_DMG,
   COUNTER_CHANCE,
+  PREDICT_ORDER,
+  PREDICT_LABEL,
+  PREDICT_PERFECT_STRESS,
+  INTIMIDATE_STRESS,
+  INTIMIDATE_STRESS_HIGH,
   ACCUSED_ATK_BONUS,
   isConner,
   stressOf,
@@ -150,18 +174,39 @@ module.exports = {
     return diff;
   },
 
+  // ============================================================
+  //  บันทึก "ลำดับการกระทำต่อเทิร์น" — วัตถุดิบของสกิลพื้นฐาน วิเคราะห์สถานการณ์
+  // ============================================================
+  //  p.connorActions     = ลำดับของเทิร์นนี้ (กำลังสะสม)
+  //  p.connorActionsPrev = ลำดับของเทิร์นที่แล้ว (สิ่งที่คอนเนอร์ต้องทาย)
+  //  บันทึก "เฉพาะครั้งแรก" ของแต่ละประเภท ลำดับจึงยาวสุด 4 ช่อง — ตรงกับปุ่ม 4 ข้อที่ผู้เล่นเห็น
+  //  ⚠️ บันทึกเสมอแม้ไม่มีคอนเนอร์ในสนาม (ต่างจาก addStress) เพราะคอนเนอร์ฟื้นคืนชีพกลับมาได้
+  //  ด้วยสกิลติดตัว 3 — ถ้าหยุดบันทึกตอนเขาตาย เทิร์นแรกที่กลับมาจะไม่มีข้อมูลให้ทาย
+  recordAction(engine, p, kind) {
+    if (!p || !PREDICT_ORDER.includes(kind)) return;
+    p.connorActions = p.connorActions || [];
+    if (p.connorActions.includes(kind)) return; // นับเฉพาะครั้งแรกของแต่ละประเภท
+    p.connorActions.push(kind);
+  },
+  // เรียกต้นเทิร์นจาก dealRound() — ต้องอยู่ "ก่อน" การกระทำใดๆ ของเทิร์นใหม่
+  rotateActions(p) {
+    if (!p) return;
+    p.connorActionsPrev = p.connorActions || [];
+    p.connorActions = [];
+  },
+  actionsPrevOf(p) { return Array.isArray(p && p.connorActionsPrev) ? p.connorActionsPrev : []; },
+
   // ---- ทริกเกอร์ที่ทำให้ความเครียดเพิ่ม (เรียกจาก server.js จุดละ 1 บรรทัด) ----
-  onSkillUsed(engine, p) { this.addStress(engine, p, STRESS_PER_ACTION, "ใช้สกิล"); },
-  onItemUsed(engine, p) { this.addStress(engine, p, STRESS_PER_ACTION, "ใช้ไอเทม"); },
+  onSkillUsed(engine, p) { this.recordAction(engine, p, "skill"); this.addStress(engine, p, STRESS_PER_ACTION, "ใช้สกิล"); },
+  onItemUsed(engine, p) { this.recordAction(engine, p, "item"); this.addStress(engine, p, STRESS_PER_ACTION, "ใช้ไอเทม"); },
+  // ซื้อของจากร้านค้ามายา — ไม่เพิ่มความเครียด (ไม่อยู่ในสเปคสกิลติดตัว) แต่เข้าลำดับการกระทำ
+  onShopBuy(engine, p) { this.recordAction(engine, p, "shop"); },
   onRoundWin(engine, p) {
     this.addStress(engine, p, STRESS_PER_ACTION, "ชนะการจั่ว");
-    // วิเคราะห์สถานการณ์: ผลบวกมาทีหลัง — ต้องชนะการจั่วก่อนถึงจะได้ฟื้นเลือดแทนเทิร์นโจมตีที่เสียไป
-    if (!this.analyzeActive(p)) return;
-    const heal = engine.healHp(p, ANALYZE_HEAL);
-    if (heal > 0) engine.log(`🧠 ${p.name} วิเคราะห์สถานการณ์ — ชนะการจั่วแต่ไม่โจมตี จึงฟื้นพลังชีวิต +${heal}`);
   },
   // การจั่วไพ่นับแค่ +1 ต่อเทิร์น ไม่ว่าจะจั่วกี่ใบ (ธงรีเซ็ตต้นเทิร์นที่ onRoundStartTick)
   onCardDraw(engine, p) {
+    this.recordAction(engine, p, "draw"); // เข้าลำดับการกระทำเสมอ แม้โควตาความเครียดของเทิร์นจะเต็มแล้ว
     if (!p || p.connorStressDrewRound) return;
     p.connorStressDrewRound = true;
     this.addStress(engine, p, STRESS_PER_ACTION, "จั่วการ์ด");
@@ -175,8 +220,7 @@ module.exports = {
   onEndTurnDecay(engine, p) {
     if (!p || !p.alive || isConner(p) || stressOf(p) <= 0) return;
     if (!connerOf(engine)) return;
-    const busted = !!p.busted;
-    this.addStress(engine, p, -(STRESS_DECAY_TURN + (busted ? STRESS_DECAY_BUST : 0)), busted ? "ตั้งสติหลังไพ่แตก" : "ผ่อนคลายลง");
+    this.addStress(engine, p, -STRESS_DECAY_TURN, "ผ่อนคลายลง");
   },
 
   // ============================================================
@@ -184,7 +228,8 @@ module.exports = {
   // ============================================================
   canUseSkill(engine, p, tier) {
     // สกิลพื้นฐานกดไม่ได้ระหว่างอยู่ในโหมดจับกุมขั้นเด็ดขาด (สเปคระบุชัด)
-    if (tier === "basic") return !this.chaseActive(engine);
+    //  และกดไม่ได้ในเทิร์นแรก เพราะยังไม่มี "เทิร์นที่แล้ว" ให้คาดการณ์
+    if (tier === "basic") return !this.chaseActive(engine) && engine.roundNumber > 1;
     // ท่าไม้ตายต้องมีเป้าหมายระดับอาชญากรอย่างน้อย 1 คน (เช็คตัวเป้าหมายจริงที่ prepareTarget อีกชั้น)
     if (tier === "ultimate") return this.criminalTargets(engine, p).length > 0;
     return true;
@@ -197,6 +242,7 @@ module.exports = {
   criminalTargets(engine, p) {
     return this.legalTargets(engine, p).filter((o) => levelKeyOf(o) === "criminal");
   },
+  //  สกิลพื้นฐาน (rework 3.4.2) ก็ต้องเลือกเป้าหมาย 1 คนแล้ว — ใช้ด่านเดียวกับสกิลรอง/ท่าไม้ตาย
   prepareTarget(engine, p, tier, targets) {
     const tgs = Array.isArray(targets) ? [...new Set(targets)] : [];
     const t = tgs.length === 1 ? engine.players[tgs[0]] : null;
@@ -211,26 +257,71 @@ module.exports = {
   //  ผลของสกิล (instant — ทำงานก่อนเปิดการ์ดทุกช่อง)
   // ============================================================
   applyInstantSkill(engine, p, tier, target) {
-    if (tier === "basic") return this.applyAnalyze(engine, p);
+    if (tier === "basic") return this.applyPredict(engine, p, target);
     if (tier === "secondary") return this.applyIntimidate(engine, p, target);
     if (tier === "ultimate") return target ? ` — ปิดคดี ${target.name}` : "";
     return "";
   },
 
-  // ---------- สกิลพื้นฐาน: วิเคราะห์สถานการณ์ ----------
-  //  เห็นไพ่/แต้มของทุกคน + ประเมินดาเมจที่พวกเขาจะตีใส่คอนเนอร์ได้ (เปิดเผยที่ buildStateFor)
-  //  แลกกับการสละเทิร์นโจมตีของเทิร์นนี้ (แม้ชนะการจั่ว) แต่ฟื้นเลือดทันที 2 หน่วย
-  applyAnalyze(engine, p) {
-    p.connorAnalyze = true;
-    engine.log(`🧠 ${p.name} วิเคราะห์สถานการณ์ — มองเห็นแต้มการ์ดของทุกคน พร้อมประเมินความเสียหายที่จะถูกโจมตี`);
-    engine.log(`🧠 ${p.name} ทุ่มกำลังประมวลผลทั้งหมด — เทิร์นนี้ชนะการจั่วก็จะไม่ได้โจมตี แต่จะฟื้นพลังชีวิต +${ANALYZE_HEAL} แทน`);
-    return " — สแกนสนาม";
+  // ---------- สกิลพื้นฐาน: วิเคราะห์สถานการณ์ (rework 3.4.2) ----------
+  //  คาดการณ์ลำดับการกระทำของเป้าหมายในเทิร์นที่แล้ว
+  //  ทำความสะอาดลำดับที่ผู้เล่นส่งมา: เอาเฉพาะคีย์ที่ถูกต้อง ตัดตัวซ้ำ และยาวไม่เกิน 4 ช่อง
+  //  คืน array (อาจว่าง = ทายว่า "ไม่ได้ทำอะไรเลย") หรือ null ถ้า payload ผิดรูปจนใช้ไม่ได้
+  sanitizeGuess(raw) {
+    if (raw == null) return null;
+    const arr = Array.isArray(raw) ? raw : [raw];
+    const out = [];
+    for (const k of arr) {
+      if (!PREDICT_ORDER.includes(k)) return null; // มีคีย์แปลกปลอม = payload ผิดรูป ไม่เดาใจให้
+      if (!out.includes(k)) out.push(k);
+    }
+    return out.slice(0, PREDICT_ORDER.length);
   },
-  // เรียกจาก afterSummary(): ผู้ชนะที่วิเคราะห์สถานการณ์ในเทิร์นนี้ โจมตีไม่ได้
-  blocksAttack(engine, winner) {
-    return isConner(winner) && !!winner.connorAnalyze;
+
+  // เทียบช่องต่อช่อง — ทายผิดกลางทางแล้วช่องหลังยังมีสิทธิ์ถูกได้
+  //  perfect = ความยาวเท่ากันและตรงทุกช่อง (รวมกรณีทั้งคู่ว่าง = ทาย "ไม่ได้ทำอะไรเลย" ถูก)
+  scorePrediction(truth, guess) {
+    const t = Array.isArray(truth) ? truth : [];
+    const g = Array.isArray(guess) ? guess : [];
+    let correct = 0;
+    for (let i = 0; i < Math.max(t.length, g.length); i++) if (t[i] && g[i] && t[i] === g[i]) correct++;
+    return { correct, perfect: t.length === g.length && correct === t.length };
   },
-  analyzeActive(p) { return isConner(p) && !!p.connorAnalyze; },
+
+  applyPredict(engine, p, target) {
+    const guess = p.connorGuess || [];
+    p.connorGuess = null;
+    if (!target || !target.alive) {
+      engine.log(`🧠 ${p.name} วิเคราะห์สถานการณ์ — ไม่มีเป้าหมาย`);
+      return " — ไม่มีเป้าหมาย";
+    }
+    const truth = this.actionsPrevOf(target);
+    const { correct, perfect } = this.scorePrediction(truth, guess);
+    const fmt = (a) => (a.length ? a.map((k, i) => `${i + 1}.${PREDICT_LABEL[k]}`).join(" → ") : "ไม่ได้ทำอะไรเลย");
+    engine.log(`🧠 ${p.name} วิเคราะห์สถานการณ์ ${target.name} — คาดการณ์ "${fmt(guess)}" · ความจริงคือ "${fmt(truth)}"`);
+
+    if (correct > 0) {
+      const heal = engine.healHp(p, correct * PREDICT_HEAL_PER);
+      const before = p.skillPoints;
+      engine.addSkill(p, correct * PREDICT_SKILL_PER, "passive");
+      engine.log(`🧠 ตรงกัน ${correct} ข้อ — ${p.name} ฟื้นพลังชีวิต +${heal} และแต้มสกิล +${p.skillPoints - before}`);
+    } else if (!perfect) {
+      engine.log(`🧠 ไม่ตรงสักข้อ — ${p.name} ประมวลผลพลาด ไม่ได้อะไรเลย`);
+    }
+
+    if (perfect) {
+      this.addStress(engine, target, PREDICT_PERFECT_STRESS, `ถูก ${p.name} อ่านขาดทุกการกระทำ`);
+      p.connorReadId = target.id; // เปิดแต้มการ์ดของเป้าหมายให้คอนเนอร์เห็นตลอดเทิร์นนี้
+      engine.log(`🧠✨ ${p.name} อ่านขาดทั้งลำดับ! — ความเครียดของ ${target.name} +${PREDICT_PERFECT_STRESS} และมองเห็นแต้มการ์ดของเขาตลอดเทิร์นนี้`);
+      return ` — อ่านขาด ${target.name}!`;
+    }
+    return ` — ตรงกัน ${correct}/${truth.length || guess.length || 0} ข้อ`;
+  },
+
+  // แต้มการ์ดของ p ถูกเปิดให้ viewer (คอนเนอร์) เห็นอยู่ไหม — เรียกจาก buildStateFor
+  readsScoreOf(viewer, p) {
+    return isConner(viewer) && !!viewer.connorReadId && viewer.connorReadId === p.id;
+  },
 
   // ---------- สกิลรอง: ข่มขวัญ / จับกุม ----------
   applyIntimidate(engine, p, target) {
@@ -238,11 +329,13 @@ module.exports = {
       engine.log(`🚔 ${p.name} ข่มขวัญ/จับกุม — ไม่มีเป้าหมาย`);
       return " — พลาดเป้า";
     }
-    this.addStress(engine, target, INTIMIDATE_STRESS, `ถูก ${p.name} ข่มขวัญ`);
+    const lvBefore = levelKeyOf(target);
+    const gain = lvBefore === "suspect" ? INTIMIDATE_STRESS : INTIMIDATE_STRESS_HIGH;
+    this.addStress(engine, target, gain, `ถูก ${p.name} ข่มขวัญ`);
     const drained = Math.min(INTIMIDATE_SKILL_DRAIN, target.skillPoints || 0);
     if (drained > 0) target.skillPoints -= drained; // การโอนแต้มระหว่างผู้เล่น ไม่ผ่าน addSkill (ไม่ใช่ "ช่องทางฟื้นฟู")
     const lv = levelKeyOf(target); // ระดับถูกประเมินหลังบวกความเครียดแล้ว
-    engine.log(`🚔 ${p.name} ข่มขวัญ/จับกุม ${target.name} — ความเครียด +${INTIMIDATE_STRESS}${drained > 0 ? ` · แต้มสกิล -${drained}` : ""} (${LEVELS[lv].icon} ${LEVELS[lv].name})`);
+    engine.log(`🚔 ${p.name} ข่มขวัญ/จับกุม ${target.name} — ความเครียด +${gain}${drained > 0 ? ` · แต้มสกิล -${drained}` : ""} (${LEVELS[lv].icon} ${LEVELS[lv].name})`);
 
     // โบนัสสะสมขึ้นตามระดับ: อาชญากรได้ผลของผู้กระทำความผิดด้วย
     if (lv === "offender" || lv === "criminal") {
@@ -559,7 +652,8 @@ module.exports = {
   // ============================================================
   onRoundStartTick(engine, p) {
     p.connorStressDrewRound = false; // โควตา "จั่วไพ่ = เครียด +1 ต่อเทิร์น" เต็มใหม่
-    if (isConner(p)) p.connorAnalyze = false;
+    this.rotateActions(p);           // ลำดับการกระทำของเทิร์นที่แล้วถูกล็อกไว้ให้คอนเนอร์ทาย
+    if (isConner(p)) { p.connorReadId = null; p.connorGuess = null; }
   },
   // เรียกท้ายลูปต้นเทิร์นของ dealRound() — แช่คนนอกวงไล่ล่าใหม่ทุกเทิร์น
   //  (ต้องอยู่หลังลูป เพราะในลูป dealRound จะตั้ง locked=false / แจกไพ่ใบแรกให้ทุกคนก่อน)
@@ -578,7 +672,10 @@ module.exports = {
     p.connorStressDrewRound = false; // เทิร์นนี้นับความเครียดจากการจั่วไปแล้วหรือยัง
     p.connorArrestAsk = null;        // คำขาดจับกุมที่รอเราตอบ ({ fromId })
     p.connorFrozen = false;          // ถูกแช่เพราะอยู่นอกวงไล่ล่า (บังคับไพ่แตก)
-    p.connorAnalyze = false;         // คอนเนอร์: กดวิเคราะห์สถานการณ์ในเทิร์นนี้แล้ว (= ไม่โจมตี)
+    p.connorActions = [];            // ลำดับการกระทำของเทิร์นนี้ (วัตถุดิบของวิเคราะห์สถานการณ์)
+    p.connorActionsPrev = [];         // ลำดับการกระทำของเทิร์นที่แล้ว (สิ่งที่คอนเนอร์ต้องทาย)
+    p.connorGuess = null;            // คอนเนอร์: ลำดับที่เพิ่งทายไว้ รอ applyPredict อ่าน
+    p.connorReadId = null;           // คอนเนอร์: id เป้าหมายที่อ่านขาด (เห็นแต้มการ์ดตลอดเทิร์นนี้)
     p.connorChase = null;            // คอนเนอร์: สถานะการไล่ล่า { targetId, round, mine, theirs }
     p.connorRevives = 0;             // คอนเนอร์: ใช้ฟื้นคืนชีพไปแล้วกี่ครั้ง (สูงสุด 2)
     p.connorReviveRound = 0;         // คอนเนอร์: เทิร์นที่จะฟื้นคืนชีพ (0 = ไม่ได้รอฟื้น)

@@ -98,17 +98,28 @@ test('ความเครียด: โจมตีปกติใส่คอ
   assert.equal(conner.stressOf(c), 0);
 });
 
-test('ความเครียด: ลดลง 1 ต่อเทิร์น และลดเพิ่มอีก 1 ถ้าไพ่แตกในเทิร์นนั้น (พื้นล่างที่ 0)', () => {
+test('ความเครียด: ลดลง 1 ต่อเทิร์น และไพ่แตกไม่ช่วยลดเพิ่ม (พื้นล่างที่ 0)', () => {
   const { a } = setup();
   a.connorStress = 5;
   conner.onEndTurnDecay(engine, a);
   assert.equal(conner.stressOf(a), 4);
+  // balance 3.4.2: ไพ่แตกเคยลดความเครียดเพิ่มอีก 1 — เปิดช่องให้เป้าหมายยอมไพ่แตกทิ้งเทิร์น
+  //  เพื่อกดความเครียดเป็นลบสุทธิจนจับกุมไม่ได้ตลอดเกม
   a.busted = true;
   conner.onEndTurnDecay(engine, a);
-  assert.equal(conner.stressOf(a), 2);
+  assert.equal(conner.stressOf(a), 3, 'ไพ่แตกแล้วก็ยังลดแค่ 1 เท่าเดิม');
   a.connorStress = 1;
   conner.onEndTurnDecay(engine, a);
   assert.equal(conner.stressOf(a), 0);
+});
+
+test('ข่มขวัญ: ระดับผู้กระทำความผิดขึ้นไป บีบความเครียดได้ทีละ 2 (คิดจากระดับก่อนกด)', () => {
+  const { c, a } = setup();
+  a.connorStress = 3; // ผู้ต้องสงสัย -> +1 (ข้ามไปเป็นผู้กระทำความผิดพอดี)
+  conner.applyIntimidate(engine, c, a);
+  assert.equal(conner.stressOf(a), 4);
+  conner.applyIntimidate(engine, c, a); // คราวนี้เริ่มจากผู้กระทำความผิด -> +2
+  assert.equal(conner.stressOf(a), 6);
 });
 
 test('ระดับ: 0-3 ผู้ต้องสงสัย · 4-8 ผู้กระทำความผิด · 9-10 อาชญากร (เพดาน 10)', () => {
@@ -140,30 +151,101 @@ test('ความเครียด: การเติมโน้ตของ
 
 // ---------- สกิลพื้นฐาน วิเคราะห์สถานการณ์ ----------
 
-test('วิเคราะห์สถานการณ์: ตัดเทิร์นโจมตี และยังไม่ฟื้นเลือดตอนกด', () => {
-  const { c } = setup();
-  c.hp = 3;
-  conner.applyInstantSkill(engine, c, 'basic');
-  assert.equal(c.hp, 3);                     // ฟื้นตอนชนะการจั่วเท่านั้น ไม่ใช่ตอนกด
-  assert.equal(conner.analyzeActive(c), true);
-  assert.equal(conner.blocksAttack(engine, c), true);
-  conner.onRoundStartTick(engine, c); // เทิร์นใหม่ = กลับมาโจมตีได้
-  assert.equal(conner.blocksAttack(engine, c), false);
+// ยิงคาดการณ์ 1 ครั้ง: ตั้งลำดับที่ทายไว้แล้วเรียกผ่านท่อจริงของ useSkill (applyInstantSkill)
+function predict(c, target, guess) {
+  c.connorGuess = conner.sanitizeGuess(guess);
+  return conner.applyInstantSkill(engine, c, 'basic', target);
+}
+
+test('บันทึกลำดับการกระทำ: เก็บเฉพาะครั้งแรกของแต่ละประเภท และหมุนเป็น "เทิร์นที่แล้ว" ตอนขึ้นเทิร์นใหม่', () => {
+  const { c, a } = setup();
+  conner.onCardDraw(engine, a);
+  conner.onSkillUsed(engine, a);
+  conner.onCardDraw(engine, a);   // จั่วซ้ำ — ไม่เข้าลำดับอีก
+  conner.onShopBuy(engine, a);
+  assert.deepEqual(a.connorActions, ['draw', 'skill', 'shop']);
+  conner.onRoundStartTick(engine, a);
+  assert.deepEqual(conner.actionsPrevOf(a), ['draw', 'skill', 'shop']);
+  assert.deepEqual(a.connorActions, []);
 });
 
-test('วิเคราะห์สถานการณ์: ได้ฟื้นเลือด 2 ต่อเมื่อชนะการจั่ว (ไม่ชนะ = ไม่ได้อะไร)', () => {
-  const { c } = setup();
-  c.hp = 3;
-  conner.onRoundWin(engine, c);              // ยังไม่ได้กดสกิล -> ไม่ฟื้น
-  assert.equal(c.hp, 3);
-  conner.applyInstantSkill(engine, c, 'basic');
-  conner.onRoundWin(engine, c);
-  assert.equal(c.hp, 5);
+test('วิเคราะห์สถานการณ์: นับแบบเทียบช่องต่อช่อง — ผิดกลางทางแล้วช่องหลังยังถูกได้', () => {
+  // จริง [draw, item, skill] · ทาย [draw, skill, skill] -> ช่อง 1 ถูก, ช่อง 2 ผิด, ช่อง 3 ถูก = 2
+  const r = conner.scorePrediction(['draw', 'item', 'skill'], ['draw', 'skill', 'skill']);
+  assert.equal(r.correct, 2);
+  assert.equal(r.perfect, false);
+  // ยาวไม่เท่ากัน = ไม่มีทาง perfect แม้ช่องที่ทายมาจะถูกหมด
+  const r2 = conner.scorePrediction(['draw', 'item', 'skill'], ['draw']);
+  assert.equal(r2.correct, 1);
+  assert.equal(r2.perfect, false);
 });
 
-test('วิเคราะห์สถานการณ์: กดไม่ได้ระหว่างอยู่ในโหมดจับกุมขั้นเด็ดขาด', () => {
+test('วิเคราะห์สถานการณ์: รางวัลเป็นเส้นตรง N:N (เลือด +N · แต้มสกิล +N)', () => {
+  const { c, a } = setup();
+  a.connorActionsPrev = ['draw', 'item', 'skill'];
+  c.hp = 2; c.skillPoints = 0;
+  predict(c, a, ['draw', 'item']);   // ถูก 2 ช่องแรก
+  assert.equal(c.hp, 4, 'ถูก 2 ข้อ = เลือด +2');
+  assert.equal(c.skillPoints, 2, 'ถูก 2 ข้อ = แต้มสกิล +2');
+  assert.equal(conner.stressOf(a), 0, 'ยังไม่ครบทั้งลำดับ = ไม่มีความเครียด +5');
+  assert.ok(!c.connorReadId, 'ยังไม่ได้สิทธิ์เห็นแต้มการ์ด');
+});
+
+test('วิเคราะห์สถานการณ์: ทายผิดหมด ไม่ได้อะไรเลย', () => {
+  const { c, a } = setup();
+  a.connorActionsPrev = ['draw', 'item'];
+  c.hp = 2; c.skillPoints = 0;
+  predict(c, a, ['shop', 'skill']);
+  assert.equal(c.hp, 2);
+  assert.equal(c.skillPoints, 0);
+  assert.equal(conner.stressOf(a), 0);
+});
+
+test('วิเคราะห์สถานการณ์: ถูกครบทั้งลำดับ -> ความเครียด +5 และเห็นแต้มการ์ดของเป้าหมาย', () => {
+  const { c, a } = setup();
+  a.connorActionsPrev = ['draw', 'skill'];
+  c.hp = 1; c.skillPoints = 0;
+  predict(c, a, ['draw', 'skill']);
+  assert.equal(c.hp, 3, 'ถูก 2 ข้อ = เลือด +2');
+  assert.equal(c.skillPoints, 2);
+  assert.equal(conner.stressOf(a), conner.PREDICT_PERFECT_STRESS);
+  assert.equal(conner.readsScoreOf(c, a), true);
+  assert.equal(conner.readsScoreOf(c, engine.players.B), false, 'เห็นของเป้าหมายคนเดียว');
+  conner.onRoundStartTick(engine, c);
+  assert.equal(conner.readsScoreOf(c, a), false, 'หมดสิทธิ์เมื่อขึ้นเทิร์นใหม่');
+});
+
+test('วิเคราะห์สถานการณ์: ทาย "ไม่ได้ทำอะไรเลย" ถูก = นับเป็นถูกทุกข้อ แต่ได้ 0 ข้อจึงไม่มีเลือด/แต้มสกิล', () => {
+  const { c, a } = setup();
+  a.connorActionsPrev = [];
+  c.hp = 2; c.skillPoints = 0;
+  predict(c, a, []);
+  assert.equal(c.hp, 2, 'ถูก 0 ข้อ = ไม่ได้เลือด');
+  assert.equal(c.skillPoints, 0);
+  assert.equal(conner.stressOf(a), conner.PREDICT_PERFECT_STRESS, 'แต่ยังนับเป็นถูกทั้งลำดับ');
+  assert.equal(conner.readsScoreOf(c, a), true);
+});
+
+test('วิเคราะห์สถานการณ์: ทายว่างทั้งที่เป้าหมายทำอะไรไป = ผิด ไม่ได้อะไร', () => {
+  const { c, a } = setup();
+  a.connorActionsPrev = ['draw'];
+  predict(c, a, []);
+  assert.equal(conner.stressOf(a), 0);
+  assert.ok(!c.connorReadId);
+});
+
+test('วิเคราะห์สถานการณ์: payload ผิดรูปถูกปฏิเสธ · ตัวซ้ำถูกยุบเหลือครั้งแรก', () => {
+  assert.equal(conner.sanitizeGuess(['draw', 'ระเบิด']), null, 'คีย์แปลกปลอม = ไม่รับ');
+  assert.deepEqual(conner.sanitizeGuess(['draw', 'skill', 'draw']), ['draw', 'skill']);
+  assert.deepEqual(conner.sanitizeGuess([]), []);
+});
+
+test('วิเคราะห์สถานการณ์: กดไม่ได้ในเทิร์นแรก และระหว่างอยู่ในโหมดจับกุมขั้นเด็ดขาด', () => {
   const { c, a } = setup();
   assert.equal(conner.canUseSkill(engine, c, 'basic'), true);
+  engine.setRoundNumber(1);
+  assert.equal(conner.canUseSkill(engine, c, 'basic'), false, 'เทิร์นแรกยังไม่มี "เทิร์นที่แล้ว" ให้ทาย');
+  engine.setRoundNumber(5);
   c.connorChase = { targetId: a.id, round: 0, mine: 0, theirs: 0 };
   assert.equal(conner.canUseSkill(engine, c, 'basic'), false);
 });

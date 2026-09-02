@@ -2633,7 +2633,6 @@ function buildStateFor(viewerId) {
       // นายยังมีอนาคตอีกยาวไกล (ริดดี้ patch 2.0.9): คู่พันธมิตรเห็นแต้มการ์ดของกันและกันได้ตลอด
       const allyShow = !!(viewer && viewer.alive && p.alive && p.allyId === viewer.id && viewer.allyId === p.id);
       // คอนเนอร์ RK800 (สกิลพื้นฐาน วิเคราะห์สถานการณ์): เทิร์นนี้เห็นไพ่และแต้มของทุกคน (เห็นคนเดียว ไม่แชร์ให้ใคร)
-      const connorScan = !!(viewer && viewer.alive && CHAR_HOOKS.conner.analyzeActive(viewer));
       const ch = CHAR_BY_ID[p.characterId] || {};
       const pub = (s) => (s ? { name: s.name, desc: s.desc, cost: s.cost, img: s.img, ammo: s.ammo } : null);
       // สกิลพื้นฐานสลับกลางคืน (โคโตเนะ) + Apple guy: ปกสกิลพื้นฐานเปลี่ยนตามของส่งมอบที่เลือกอยู่
@@ -2746,6 +2745,9 @@ function buildStateFor(viewerId) {
         SKILL_COST_MAX,
         Math.max(0, Math.max(0, pub.cost - CHAR_HOOKS.byleth.costDiscount(engine, tierName)) - spellflowAmt) + spellburdenAmt + (p.nightTaxTier === tierName ? 1 : 0),
       );
+      // คอนเนอร์ (วิเคราะห์สถานการณ์ rework 3.4.2): "อ่านขาด" ทั้งลำดับแล้ว = เห็นแต้มการ์ดของเป้าหมาย
+      //  คนนั้นคนเดียวตลอดเทิร์นนี้ (เดิมเปิดไพ่ + แต้ม + ประเมินดาเมจของทุกคนพร้อมกัน)
+      const connorReads = !!viewer && CHAR_HOOKS.conner.readsScoreOf(viewer, p);
       if (basicPub) basicPub.cost = showCost(basicPub, "basic");
       if (secondaryPub) secondaryPub.cost = showCost(secondaryPub, "secondary");
       if (ultimatePub) ultimatePub.cost = showCost(ultimatePub, "ultimate");
@@ -2761,11 +2763,11 @@ function buildStateFor(viewerId) {
         teamConfirmed: !!p.teamConfirmed,
         modeVote: p.modeVote || null,
         locked: p.locked,
-        busted: (show || promoShow || allyShow || connorScan) ? bustedOf(p) : false,
+        busted: (show || promoShow || allyShow || connorReads) ? bustedOf(p) : false,
         result: p.result,
         cardCount: p.cards.length,
-        cards: blackout ? null : ((mine || connorScan) ? p.cards : null),
-        score: blackout ? null : ((show || promoShow || allyShow || connorScan) ? scoreOf(p) : null),
+        cards: blackout ? null : (mine ? p.cards : null),
+        score: blackout ? null : ((show || promoShow || allyShow || connorReads) ? scoreOf(p) : null),
         // Locacaca (ซาโตรุ): Max HP ลดถาวรได้ / ทาคุมิ: บังตาระหว่างท่าไม้ตายทำงาน (null = ซ่อนทั้งแถบ)
         // แบทแมนร่างรถแบทโมบิล: ส่ง 0/0 เพื่อให้ "ไม่มีพลังชีวิต เหลือแต่เกราะ" ตามสเปค
         //  (LifeBar วาดหัวใจตามจำนวน maxHp — 0 = ไม่มีหัวใจสักดวง แต่ยังไม่ใช่ null จึงไม่ขึ้น "???")
@@ -2894,10 +2896,10 @@ function buildStateFor(viewerId) {
         danWhip: p.characterId === "dan" ? CHAR_HOOKS.dan.whipReady(engine, p) : undefined,
         connorReviveIn: p.characterId === "conner" && !p.alive && p.connorReviveRound
           ? Math.max(0, p.connorReviveRound - roundNumber) : undefined,                         // เหลือกี่เทิร์นก่อนกลับมา
-        connorAnalyze: p.characterId === "conner" ? !!p.connorAnalyze : undefined,              // เทิร์นนี้กดวิเคราะห์แล้ว (= ไม่โจมตี)
+        // ลำดับการกระทำ "เทิร์นที่แล้ว" ของผู้เล่นคนนี้ — ส่งให้เจ้าตัวเท่านั้น (คอนเนอร์ต้องทายเอง ห้ามเห็น)
+        connorActionsPrev: mine ? CHAR_HOOKS.conner.actionsPrevOf(p) : undefined,
         // ประเมินความเสียหายที่ผู้เล่นคนนี้จะฟาดใส่คอนเนอร์ได้ — เห็นเฉพาะคอนเนอร์ที่กำลังวิเคราะห์สถานการณ์
-        connorEstDmg: (connorScan && !mine && p.alive) ? estimateAttackOn(p, viewer) : undefined,
-        connorScanned: (connorScan && !mine) ? true : undefined, // แต้มของคนนี้ถูกเปิดให้เราเห็นจาก "วิเคราะห์สถานการณ์"
+        connorScanned: connorReads ? true : undefined, // แต้มของคนนี้ถูกเปิดให้เราเห็นจาก "วิเคราะห์สถานการณ์"
         harukaBasicUses: p.characterId === "haruka" ? (p.harukaBasicUses || 0) : undefined,
         harukaBasicMax: p.characterId === "haruka" ? CHAR_HOOKS.haruka.BASIC_USES_PER_TURN : undefined,
         shradeForm: !!p.shradeForm,        // ชเรด เอลัน: รวมร่างทำนองเพลงแล้ว (อควาเรียน สปาด้า — ถาวร)
@@ -3215,6 +3217,8 @@ function buyShopItem(id, itemId) {
   p.gold -= item.price;
   p.inventory.push({ uid: `${item.id}_${p.inventory.length}_${Date.now()}`, type: item.type, value: item.value, size: item.size, ammo: item.ammo });
   lastLog.push(`🛍️ ${p.name} ซื้อ ${shopItemName(item)} จากร้านค้ามายา (-${item.price} เหรียญ)`);
+  // คอนเนอร์ (วิเคราะห์สถานการณ์): "ซื้อของ" เป็น 1 ใน 4 การกระทำที่คอนเนอร์ต้องคาดการณ์
+  CHAR_HOOKS.conner.onShopBuy(engine, p);
   broadcastState();
 }
 // ใช้ของในคลัง
@@ -4150,9 +4154,13 @@ function useSkill(id, tier, targets, item) {
   let connerCloseCase = null; // เป้าหมายของ "จัดการปิดคดี" ที่รอลงดาเมจหลังวีดีโอจบ
   if (isConnerPick) {
     if (!CHAR_HOOKS.conner.canUseSkill(engine, p, tier)) return;
-    if (tier === "secondary" || tier === "ultimate") {
-      connerTarget = CHAR_HOOKS.conner.prepareTarget(engine, p, tier, targets);
-      if (!connerTarget) return;
+    connerTarget = CHAR_HOOKS.conner.prepareTarget(engine, p, tier, targets);
+    if (!connerTarget) return; // ทั้งสามช่องต้องเลือกเป้าหมาย 1 คนแล้ว (rework 3.4.2)
+    if (tier === "basic") {
+      // วิเคราะห์สถานการณ์: item = ลำดับการกระทำที่คาดการณ์ (array ว่างได้ = ทายว่า "ไม่ได้ทำอะไรเลย")
+      const guess = CHAR_HOOKS.conner.sanitizeGuess(item);
+      if (!guess) return; // payload ผิดรูป — ไม่หักแต้มสกิลทิ้ง
+      p.connorGuess = guess;
     }
   }
   // ---------- ยุย โยชิโอกะ (characters/yui.js) ----------
@@ -4638,7 +4646,9 @@ function useSkill(id, tier, targets, item) {
     const flashImg = isApplePick ? CHAR_HOOKS.appleguy.ITEMS[item].img
       : (skill.img || null);
     // เทเปา (ชิกิ): กดสกิลพื้นฐาน/สกิลรอง ให้เล่นเสียง tepeu_skill1_2 ก่อนเสมอ
-    const flashSound = (isTepeuCook || isTepeuPonder) ? "tepeu_skill1_2" : isHisakawaSkill ? CHAR_HOOKS.hisakawa_sister.skillVoice(p, tier, skill) : null;
+    // คอนเนอร์: วิเคราะห์สถานการณ์เล่นเพลงคิด conner_think.m4a ทุกครั้งที่กด
+    const flashSound = (isConnerPick && tier === "basic") ? "conner_think"
+      : (isTepeuCook || isTepeuPonder) ? "tepeu_skill1_2" : isHisakawaSkill ? CHAR_HOOKS.hisakawa_sister.skillVoice(p, tier, skill) : null;
     // อิสึกะ ชิโด "ฝากด้วยนะตัวฉัน": สกิลเงียบ — ห้ามมีแบนเนอร์ให้ใครเห็นว่าเขากดอะไรไป
     if (!CHAR_HOOKS.shido.silentSkill(p, tier)) {
       io.emit("skillFlash", { name: skill.name + flashSuffix, img: flashImg, by: p.name, color: POSITION_COLORS[p.position] || "#9B4F96", sound: flashSound });
@@ -5607,13 +5617,6 @@ function afterSummary() {
   // อาจารย์ ไบเลธ หลักสูตร "พิเศษ" (characters/byleth.js): คนที่กดสกิลรองในเทิร์นนี้จะโจมตีไม่ได้
   if (winner && winner.alive && CHAR_HOOKS.byleth.blocksAttack(engine, winner)) {
     lastLog.push(`📕 ${winner.name} กดสกิลรองระหว่าง "หลักสูตร พิเศษ" — ไม่มีเทิร์นโจมตี`);
-    endTurn();
-    return;
-  }
-
-  // คอนเนอร์ RK800 (สกิลพื้นฐาน วิเคราะห์สถานการณ์): ทุ่มกำลังไปกับการประมวลผล -> เทิร์นนี้ชนะก็ไม่ได้โจมตี
-  if (winner && winner.alive && CHAR_HOOKS.conner.blocksAttack(engine, winner)) {
-    lastLog.push(`🧠 ${winner.name} ใช้กำลังประมวลผลไปกับการวิเคราะห์สถานการณ์ — ไม่มีเทิร์นโจมตี`);
     endTurn();
     return;
   }

@@ -1029,9 +1029,6 @@ function ConnorStressBar({ p }) {
       <div className="h-1.5 rounded-full bg-white/12 overflow-hidden border border-black/30">
         <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: lv.bar, boxShadow: `0 0 6px ${lv.bar}` }} />
       </div>
-      {p.connorEstDmg != null && (
-        <div className="text-[9px] font-black text-echo-cyan mt-0.5">🧠 ประเมินดาเมจ ~{p.connorEstDmg}</div>
-      )}
     </div>
   );
 }
@@ -2720,6 +2717,112 @@ function QtePanel({ qte }) {
   );
 }
 
+// ---------- คอนเนอร์: วิเคราะห์สถานการณ์ — เลือกเป้าหมาย + เรียงลำดับการกระทำของเทิร์นที่แล้ว ----------
+//  ต้องเป็นโมดัลเพราะการ "เรียงลำดับ" ทำบนกระดานไม่ได้ จึงรวมการเลือกเป้าหมายมาไว้ในนี้ด้วยทีเดียว
+const CONNOR_ACTIONS = [
+  { key: "draw", n: 1, icon: "🃏", label: "จั่วการ์ด" },
+  { key: "item", n: 2, icon: "🎒", label: "ใช้ไอเทม" },
+  { key: "skill", n: 3, icon: "✨", label: "ใช้สกิล" },
+  { key: "shop", n: 4, icon: "🛍️", label: "ซื้อของ" },
+];
+
+function ConnorPredictModal({ me, players, onSubmit, onClose }) {
+  const [target, setTarget] = useState(null);
+  const [order, setOrder] = useState([]);   // ลำดับที่กดไว้
+  const [none, setNone] = useState(false);  // ทายว่า "ไม่ได้ทำอะไรเลย"
+  const targets = players.filter((p) => p.alive && p.id !== me.id && !p.isBoss);
+  const toggle = (key) => {
+    clickSound();
+    setNone(false);
+    setOrder((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]));
+  };
+  const ready = !!target && (none || order.length > 0);
+  return (
+    <div className="fixed inset-0 z-40 bg-black/60 grid place-items-center p-4" onClick={onClose}>
+      <div className="bg-echo-navy rounded-2xl p-5 max-w-lg w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="text-lg font-black text-echo-cyan mb-1">🧠 วิเคราะห์สถานการณ์</div>
+        <div className="text-xs opacity-70 mb-3">
+          เลือกผู้เล่น 1 คน แล้วคาดการณ์ว่า <b>เทิร์นที่แล้ว</b> เขาทำอะไรไปบ้าง <b>ตามลำดับก่อน-หลัง</b> —
+          ข้อไหนเขาไม่ได้ทำก็ไม่ต้องเลือกเข้ามา · ถูกกี่ข้อ ได้พลังชีวิตและแต้มสกิลเท่านั้น ·
+          ถูกครบทั้งลำดับ = ความเครียดเป้าหมาย +5 และเห็นแต้มการ์ดของเขาตลอดเทิร์นนี้
+        </div>
+
+        <div className="text-xs font-bold opacity-80 mb-1">เป้าหมาย</div>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {targets.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => { clickSound(); setTarget(p.id); }}
+              className={`text-sm font-bold rounded-lg border-2 px-3 py-1.5 transition ${
+                target === p.id ? "border-white/70 bg-white/10" : "border-white/15 hover:border-white/40"
+              }`}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+
+        <div className="text-xs font-bold opacity-80 mb-1">ลำดับการกระทำ (กดเรียงตามลำดับที่คิดว่าเขาทำ)</div>
+        <div className="grid grid-cols-2 gap-2">
+          {CONNOR_ACTIONS.map((a) => {
+            const idx = order.indexOf(a.key);
+            return (
+              <button
+                key={a.key}
+                onClick={() => toggle(a.key)}
+                className={`relative text-left rounded-lg border-2 px-3 py-2 transition ${
+                  idx >= 0 ? "border-echo-cyan bg-white/10" : "border-white/15 hover:border-white/40"
+                }`}
+              >
+                <span className="text-sm font-bold">{a.icon} {a.n} {a.label}</span>
+                {idx >= 0 && (
+                  <span className="absolute -top-2 -right-2 w-6 h-6 grid place-items-center rounded-full bg-echo-cyan text-gray-900 text-xs font-black border-2 border-echo-navy">
+                    {idx + 1}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-2 mt-3">
+          <button
+            onClick={() => { clickSound(); setNone((v) => !v); setOrder([]); }}
+            className={`text-xs font-bold rounded-full px-3 py-1.5 border-2 transition ${
+              none ? "border-echo-gold bg-echo-gold text-gray-900" : "border-white/20 hover:border-white/50"
+            }`}
+          >
+            🚫 ไม่ได้ทำอะไรเลย
+          </button>
+          <button
+            onClick={() => { clickSound(); setOrder([]); setNone(false); }}
+            className="text-xs font-bold rounded-full px-3 py-1.5 border-2 border-white/20 hover:border-white/50"
+          >
+            ล้างลำดับ
+          </button>
+        </div>
+
+        <div className="text-xs mt-3 opacity-80 min-h-[1.25rem]">
+          คำตอบ: <b>{none ? "ไม่ได้ทำอะไรเลย" : order.length
+            ? order.map((k, i) => `${i + 1}.${CONNOR_ACTIONS.find((a) => a.key === k).label}`).join(" → ")
+            : "—"}</b>
+        </div>
+
+        <div className="flex gap-2 mt-3">
+          <button
+            disabled={!ready}
+            onClick={() => { clickSound(); onSubmit(target, none ? [] : order); }}
+            className={`flex-1 rounded-lg py-2 font-black ${ready ? "bg-echo-cyan text-gray-900" : "bg-white/10 opacity-50 cursor-not-allowed"}`}
+          >
+            {!target ? "เลือกเป้าหมายก่อน" : !ready ? "เลือกลำดับก่อน" : "ยืนยันการคาดการณ์"}
+          </button>
+          <button onClick={onClose} className="rounded-lg py-2 px-4 font-bold bg-black/50 border border-white/25">ยกเลิก</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------- ยุย: เลือกเพลงก่อนเริ่ม QTE (เพลงชุบชีวิตต้องเลือกคนตายด้วย) ----------
 function YuiSongModal({ me, onPick, onClose }) {
   const [pick, setPick] = useState(null);
@@ -3041,6 +3144,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
   const [bardSel, setBardSel] = useState([]);        // Bard: เป้าหมายบทเพลงที่เลือกไว้ (บทเพลงต้องการ 1-2 คน)
   const [nanayaSel, setNanayaSel] = useState(false);  // นานายะ ชิกิ: โหมดเลือกเป้าหมาย อันนี้ของนายรึเปล่า (เลือกตัวเองไม่ได้)
   const [tpSel, setTpSel] = useState(false);          // เทเปา: โหมดเลือกเป้าหมาย นายเป็นคนทำตัวเองนะ (เลือกตัวเองไม่ได้)
+  const [connorPredictOpen, setConnorPredictOpen] = useState(false); // คอนเนอร์: โมดัลวิเคราะห์สถานการณ์ (เลือกเป้าหมาย + เรียงลำดับ)
   const [supSel, setSupSel] = useState(null);                // ผู้วิงวอน: tier ที่กำลังรอจิ้มเป้าหมาย (ทั้งสามช่อง เลือกตัวเองได้)
   const [kaiCreateSel, setKaiCreateSel] = useState(false);   // ไค: โหมดเลือกเป้าหมายมือซ้ายแห่งการรังสรรค์ (เลือกตัวเองได้)
   const [kaiPunishSel, setKaiPunishSel] = useState(false);   // ไค: โหมดเลือกเป้าหมายมือขวาแห่งการลงทัณฑ์ (เลือกตัวเองได้)
@@ -3213,6 +3317,9 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
   const arjunaUltCd = isArjuna ? (me?.arjunaUltCd || 0) : 0;
   const arjunaBasicLocked = isArjuna && (me?.statuses?.arjunaRevive || 0) > 0 && (me?.statuses?.mend || 0) > 0;
   const arjunaSecLocked = isArjuna && (me?.statuses?.arjunaSlay || 0) > 0;
+  // คอนเนอร์: วิเคราะห์สถานการณ์กดไม่ได้ในเทิร์นแรก เพราะยังไม่มี "เทิร์นที่แล้ว" ให้คาดการณ์
+  //  (server กันซ้ำที่ CHAR_HOOKS.conner.canUseSkill — ตรงนี้แค่ทำให้ปุ่มเป็นสีเทาไม่ให้กดเสียเที่ยว)
+  const connorPredictLocked = ch?.id === "conner" && state.roundNumber <= 1;
   const isShido = ch?.id === "shido";
   const shidoUltCd = isShido ? ((me?.shidoGuard || 0) > 0 ? me.shidoGuard : (me?.shidoCd || 0)) : 0;
   const shidoUltLocked = isShido && shidoUltCd > 0;
@@ -3389,6 +3496,8 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
     if (tier === "basic" && ch?.id === "nanaya") { setNanayaSel(true); setSkillOpen(false); return; }
     // อาจารย์ ไบเลธ: สกิลรองเปิดหน้าต่างเลือกแบบ (ฟาดทันที/เสริมดาบ) · ท่าไม้ตายเปิดหน้าต่างเลือกหลักสูตร
     // คอนเนอร์ RK800: สกิลรอง/ท่าไม้ตายเข้าโหมดเลือกเป้าหมายก่อนส่งไป server
+    // คอนเนอร์: สกิลพื้นฐานเปิดโมดัลคาดการณ์ (เลือกเป้าหมาย + เรียงลำดับในหน้าต่างเดียว)
+    if (tier === "basic" && ch?.id === "conner") { setConnorPredictOpen(true); setSkillOpen(false); return; }
     if ((tier === "secondary" || tier === "ultimate") && ch?.id === "conner") { setConnorSel(tier); setSkillOpen(false); return; }
     // ยุย: ท่าไม้ตายต้องเลือกเพลงก่อน แล้วค่อยเข้า QTE
     if (tier === "ultimate" && ch?.id === "yui") { setYuiSongOpen(true); setSkillOpen(false); return; }
@@ -3521,6 +3630,12 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
     setBylethSwordOpen(false);
     if (mode === "strike") { setBylethStrikeSel(true); return; } // แบบที่ 1 ต้องเลือกเป้าหมายก่อน
     socket.emit("useSkill", { tier: "secondary", item: "buff" });
+  };
+  // คอนเนอร์ วิเคราะห์สถานการณ์: ส่งทั้งเป้าหมายและลำดับที่คาดการณ์ไปพร้อมกัน
+  //  guess = [] คือคำตอบ "ไม่ได้ทำอะไรเลย" ซึ่งเป็นคำตอบที่ถูกต้องได้ ไม่ใช่การยกเลิก
+  const submitConnorPredict = (targetId, guess) => {
+    socket.emit("useSkill", { tier: "basic", targets: [targetId], item: guess });
+    setConnorPredictOpen(false);
   };
   // เลือกเป้าหมาย ข่มขวัญ/จับกุม หรือ จัดการปิดคดี (คอนเนอร์) -> ส่งไป server ทันที
   const pickConnor = (id) => {
@@ -3676,6 +3791,9 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
   useEffect(() => {
     if (tpSel && (phase !== "PLAYING" || me?.skillUsed || done)) setTpSel(false);
   }, [tpSel, phase, me?.skillUsed, done]);
+  useEffect(() => {
+    if (connorPredictOpen && (phase !== "PLAYING" || me?.skillUsed || done)) setConnorPredictOpen(false);
+  }, [connorPredictOpen, phase, me?.skillUsed, done]);
   useEffect(() => {
     // ผู้วิงวอนกดสกิลได้ 2 ครั้ง/เทิร์น จึงเช็คโควตาของตัวเอง ไม่ใช่ me.skillUsed แบบตัวอื่น
     if (supSel && (phase !== "PLAYING" || done || (me?.supSkillUses || 0) >= (me?.supSkillMax || 2))) setSupSel(null);
@@ -4061,7 +4179,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
               {/* ช่องสกิล 3 อัน — ทรงพัด: ช่องกลาง (สกิลรอง) ยกสูงกว่าอีก 2 ช่อง */}
               <div className="grid grid-cols-3 gap-2 mt-3 items-end">
                 <div className="translate-y-1.5">
-                  <SkillSlot label="สกิลพื้นฐาน" tier="basic" skill={ch?.basic} points={me.skillPoints} disabled={!me.alive || phase !== "PLAYING" || (!isHisakawa && (done || noSkill || moonCellOn)) || hisakawaSwitchLocked || miyakoHealPending || hakunoSecondaryPending || beatBasicLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || witchMarkCooldown || (me.skillUsed && !gambleRepeat && !isByleth && !isHaruka && !isApple && !isMuimi && !isBard && !isTohno && !isHakuno && !isDoomguy && !isKai && !isTakumi && !isHisakawa && !isSup) || harukaBasicLocked || muimiBasicLocked || bylethBasicLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || cassiusLocked || veilLocked || ktBasicLocked || (isHakuno && me.hakunoGenderSwitched) || doomBasicLocked || takutoBasicPending || tepeuCookLocked || tepeuPonderLocked || psBladeLocked || ippoBasicCd > 0 || supBudgetLocked || arjunaBasicLocked} onUse={requestSkillUse} cooldown={witchMarkCd || ippoBasicCd} ammo={isGambler ? me.gamblerUses : isMuimi ? me.muimiEmergencyUses : undefined} cost={isGambler && goldenOn ? halfCost(ch?.basic) : undefined} />
+                  <SkillSlot label="สกิลพื้นฐาน" tier="basic" skill={ch?.basic} points={me.skillPoints} disabled={!me.alive || phase !== "PLAYING" || (!isHisakawa && (done || noSkill || moonCellOn)) || hisakawaSwitchLocked || miyakoHealPending || hakunoSecondaryPending || beatBasicLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || witchMarkCooldown || (me.skillUsed && !gambleRepeat && !isByleth && !isHaruka && !isApple && !isMuimi && !isBard && !isTohno && !isHakuno && !isDoomguy && !isKai && !isTakumi && !isHisakawa && !isSup) || harukaBasicLocked || muimiBasicLocked || bylethBasicLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || cassiusLocked || veilLocked || ktBasicLocked || (isHakuno && me.hakunoGenderSwitched) || doomBasicLocked || takutoBasicPending || tepeuCookLocked || tepeuPonderLocked || psBladeLocked || ippoBasicCd > 0 || supBudgetLocked || arjunaBasicLocked || connorPredictLocked} onUse={requestSkillUse} cooldown={witchMarkCd || ippoBasicCd} ammo={isGambler ? me.gamblerUses : isMuimi ? me.muimiEmergencyUses : undefined} cost={isGambler && goldenOn ? halfCost(ch?.basic) : undefined} />
                 </div>
                 <div className="-translate-y-2">
                   <SkillSlot label="สกิลรอง" tier="secondary" skill={ch?.secondary} points={me.skillPoints} disabled={done || phase !== "PLAYING" || noSkill || moonCellOn || miyakoComboPending || hakunoSecondaryPending || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || (me.skillUsed && !isByleth && !isBard && !isDoomguy && !isKai && !isTakumi && !isSup) || bylethSecLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || ohgerLocked || lanLocked || ktSecLocked || skSecLocked || banagherAssaultLocked || doomNoEffectLocked || takutoSecPending || takutoNotApprivoiseLocked || monsterMe || tepeuPonderLocked || tepeuCookLocked || batKarmaLocked || psSealLocked || harukaSecLocked || muimiSecLocked || burdenCooldown || ippoSecCd > 0 || supBudgetLocked || arjunaSecLocked} onUse={requestSkillUse} cooldown={burdenCd || ippoSecCd} ammo={isApple ? me.appleGiveUses : me.beamAmmo} cost={isGambler && goldenOn ? halfCost(ch?.secondary) : undefined} />
@@ -4260,6 +4378,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
           bagOpen={bagOpen} onCloseBag={() => setBagOpen(false)} players={state.players} gameState={state.gameState} roundNumber={state.roundNumber} onPickGunAmmo={startGunPick}
           skillConfirm={skillConfirm} onConfirmSkill={confirmSkillUse} onCancelSkill={cancelSkillConfirm}
         />
+        {connorPredictOpen && me && <ConnorPredictModal me={me} players={state.players} onSubmit={submitConnorPredict} onClose={() => { clickSound(); setConnorPredictOpen(false); }} />}
         {yuiSongOpen && me && <YuiSongModal me={me} onPick={pickYuiSong} onClose={() => setYuiSongOpen(false)} />}
       </div>
     );
@@ -4638,7 +4757,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
               <div className="flex flex-col items-center gap-1.5">
                 <div className="flex items-end gap-2 sm:gap-3">
                   <div className="w-40 sm:w-48">
-                    <SkillSlot size="lg" label="พื้นฐาน" tier="basic" skill={ch?.basic} points={me.skillPoints} disabled={!me.alive || phase !== "PLAYING" || (!isHisakawa && (done || noSkill || moonCellOn)) || hisakawaSwitchLocked || miyakoHealPending || hakunoSecondaryPending || beatBasicLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || witchMarkCooldown || (me.skillUsed && !gambleRepeat && !isByleth && !isHaruka && !isApple && !isMuimi && !isBard && !isTohno && !isHakuno && !isDoomguy && !isKai && !isTakumi && !isHisakawa && !isSup) || harukaBasicLocked || muimiBasicLocked || bylethBasicLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || cassiusLocked || veilLocked || ktBasicLocked || (isHakuno && me.hakunoGenderSwitched) || doomBasicLocked || takutoBasicPending || tepeuCookLocked || tepeuPonderLocked || psBladeLocked || ippoBasicCd > 0 || supBudgetLocked || arjunaBasicLocked} onUse={requestSkillUse} cooldown={witchMarkCd || ippoBasicCd} ammo={isGambler ? me.gamblerUses : isMuimi ? me.muimiEmergencyUses : undefined} cost={isGambler && goldenOn ? halfCost(ch?.basic) : undefined} />
+                    <SkillSlot size="lg" label="พื้นฐาน" tier="basic" skill={ch?.basic} points={me.skillPoints} disabled={!me.alive || phase !== "PLAYING" || (!isHisakawa && (done || noSkill || moonCellOn)) || hisakawaSwitchLocked || miyakoHealPending || hakunoSecondaryPending || beatBasicLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || witchMarkCooldown || (me.skillUsed && !gambleRepeat && !isByleth && !isHaruka && !isApple && !isMuimi && !isBard && !isTohno && !isHakuno && !isDoomguy && !isKai && !isTakumi && !isHisakawa && !isSup) || harukaBasicLocked || muimiBasicLocked || bylethBasicLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || cassiusLocked || veilLocked || ktBasicLocked || (isHakuno && me.hakunoGenderSwitched) || doomBasicLocked || takutoBasicPending || tepeuCookLocked || tepeuPonderLocked || psBladeLocked || ippoBasicCd > 0 || supBudgetLocked || arjunaBasicLocked || connorPredictLocked} onUse={requestSkillUse} cooldown={witchMarkCd || ippoBasicCd} ammo={isGambler ? me.gamblerUses : isMuimi ? me.muimiEmergencyUses : undefined} cost={isGambler && goldenOn ? halfCost(ch?.basic) : undefined} />
                   </div>
                   <div className="w-40 sm:w-48">
                     <SkillSlot size="lg" label="รอง" tier="secondary" skill={ch?.secondary} points={me.skillPoints} disabled={done || phase !== "PLAYING" || noSkill || moonCellOn || miyakoComboPending || hakunoSecondaryPending || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || (me.skillUsed && !isByleth && !isBard && !isDoomguy && !isKai && !isTakumi && !isSup) || bylethSecLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || ohgerLocked || lanLocked || ktSecLocked || skSecLocked || banagherAssaultLocked || doomNoEffectLocked || takutoSecPending || takutoNotApprivoiseLocked || monsterMe || tepeuPonderLocked || tepeuCookLocked || batKarmaLocked || psSealLocked || harukaSecLocked || muimiSecLocked || burdenCooldown || ippoSecCd > 0 || supBudgetLocked || arjunaSecLocked} onUse={requestSkillUse} cooldown={burdenCd || ippoSecCd} ammo={isApple ? me.appleGiveUses : me.beamAmmo} cost={isGambler && goldenOn ? halfCost(ch?.secondary) : undefined} />
@@ -4782,7 +4901,8 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
         bagOpen={bagOpen} onCloseBag={() => setBagOpen(false)} players={state.players} gameState={state.gameState} roundNumber={state.roundNumber} onPickGunAmmo={startGunPick}
         skillConfirm={skillConfirm} onConfirmSkill={confirmSkillUse} onCancelSkill={cancelSkillConfirm}
       />
-      {yuiSongOpen && me && <YuiSongModal me={me} onPick={pickYuiSong} onClose={() => setYuiSongOpen(false)} />}
+      {connorPredictOpen && me && <ConnorPredictModal me={me} players={state.players} onSubmit={submitConnorPredict} onClose={() => { clickSound(); setConnorPredictOpen(false); }} />}
+        {yuiSongOpen && me && <YuiSongModal me={me} onPick={pickYuiSong} onClose={() => setYuiSongOpen(false)} />}
       </div>
     </div>
   );
