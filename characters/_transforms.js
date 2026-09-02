@@ -10,6 +10,7 @@ const connorImg = require("./conner").IMG; // คอนเนอร์ RK800: �
 const danImg = require("./dan").IMG;       // โมโรโบชิ ดัน: เหตุผลเดียวกัน
 const shidoImg = require("./shido").IMG;   // อิสึกะ ชิโด: เหตุผลเดียวกัน
 const yuiImg = require("./yui").IMG;       // ยุย โยชิโอกะ: เหตุผลเดียวกัน
+const muimiImg = require("./muimi").IMG;   // มุยมิ: ใช้ path รูปจาก hook กลาง
 const BAT_CAR_IMG = "/characters/bat_ben/bat_update/bat_ben_car.webp";
 const BAT_SHOT_IMG = "/characters/bat_ben/bat_update/skill1.2/bat_ben_skill1.2.jpg";
 const BAT_GUN_IMG = "/characters/bat_ben/bat_update/skill2.2/bat_ben_skill2.2.png";
@@ -17,6 +18,10 @@ const BAT_DOOM_IMG = "/characters/bat_ben/bat_update/skill3.2/bat_ben_skill3.2.p
 
 module.exports = function buildTransforms(img) {
   return {
+    // มุยมิ: ครั้งแรกเล่นคลิปเต็ม 23.803 วิ ครั้งถัดไปเล่นคลิปสั้น 11.078 วิ
+    // ปัดขึ้นเผื่อเวลาตัดฉากเพื่อให้วิดีโอเล่นจบครบ และ queueCutscene ทำให้เล่นทุกครั้งที่กด
+    muimiUltimateFull:  { img: muimiImg.skill3, video: "/characters/muimi/muimi_skill3.mp4",       title: "ดาบสะบั้นหอคอยสวรรค์", label: "ปล่อยท่าไม้ตาย", seconds: 24, music: "muimi", afterReveal: false },
+    muimiUltimateShort: { img: muimiImg.skill3, video: "/characters/muimi/muimi_skill3_short.mp4", title: "ดาบสะบั้นหอคอยสวรรค์", label: "ปล่อยท่าไม้ตาย", seconds: 12, music: "muimi", afterReveal: false },
     // ---------- แบทแมน ร่างรถแบทโมบิล (patch 3.1) ----------
     //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก (7.88/9.46/8.64/6.37/5.53)
     //  ทุกคลิปเรียกผ่าน queueCutscene = เล่นทุกครั้งที่ทำงาน

@@ -673,7 +673,8 @@ const SHIKI_CANCELABLE_ULTS = ["gingastrium", "rachan", "paradise", "golden", "f
   "phenexNtd", "phenexTaunt", // patch 2.1.6: ท่าไม้ตายริต้า เบอร์นัล ทั้งสองท่า
   "batTaunt",                 // patch 2.2.7: เข้ามาเลย (แบทแมน)
   "pshikiUlt",                // patch 2.2.7: ทุกอย่างจะต้องราบรื่น (เจ้าหญิงราก)
-  "harukaOmega"];             // patch 2.5: New Omega (มิซึซาว่า ฮารุกะ) — สถานะล้วน ลบทิ้งได้ตรงๆ ไม่มี mirror ต้องเก็บกวาด
+  "harukaOmega",               // patch 2.5: New Omega (มิซึซาว่า ฮารุกะ) — สถานะล้วน ลบทิ้งได้ตรงๆ ไม่มี mirror ต้องเก็บกวาด
+  "muimiTower"];               // มุยมิ: สถานะ “ดาบสะบั้น” จากดาบสะบั้นหอคอยสวรรค์
 // ชื่อท่าไม้ตายจาก status (ใช้ตอนยกเลิกย้อนหลัง — บางท่าไม่มีใน TRANSFORMS/ข้อมูลสกิล)
 function shikiUltNameOf(p, key) {
   if (key === "shradecharge") return "แด่เพื่อนรักของฉัน";
@@ -1337,6 +1338,8 @@ function bustedOf(p) {
   // มิซึซาว่า ฮารุกะ (characters/haruka.js): New Omega ระเบิดแต้มการ์ด — บังคับแตกทันทีต่อให้เปิดไพ่ไปแล้ว
   //  ต้องอยู่ก่อน overloadForceActive เพราะเป็นการ "สั่งให้แตก" ตรงๆ ไม่ใช่ผลการคิดแต้มที่สนามปลดเพดานได้
   if (CHAR_HOOKS.haruka.forcedBust(p)) return true;
+  // มุยมิ: ดาบสะบั้นหอคอยสวรรค์ / หัวใจนักสู้ สั่งให้ไพ่แตกโดยตรง ต้านสถานะป้องกันไม่ได้
+  if (CHAR_HOOKS.muimi.forcedBust(engine, p)) return true;
   if (overloadForceActive) return false;
   if (p.statuses && (p.statuses.upg || p.statuses.fiber)) return false;
   return calculateScore(p.cards) + (p.cardBonus || 0) > 21;
@@ -1677,6 +1680,8 @@ function displayImg(p) {
   if (p.characterId === "eiji") { const eimg = CHAR_HOOKS.eiji.displayImg(p); if (eimg) return eimg; }
   // ฮารุกะ: ระหว่างสถานะ "โอเมก้า" จากท่าไม้ตาย New Omega = ภาพ new_omega.jpg (null = ใช้ภาพปกติ)
   if (p.characterId === "haruka") { const himg = CHAR_HOOKS.haruka.displayImg(p); if (himg) return himg; }
+  // มุยมิ: ระหว่างสถานะ “ดาบสะบั้น” ใช้ภาพท่าไม้ตาย
+  if (p.characterId === "muimi") { const mimg = CHAR_HOOKS.muimi.displayImg(p); if (mimg) return mimg; }
   // แบทแมน: ระหว่างอยู่บนรถแบทโมบิล = ภาพรถ (null = ใช้ภาพปกติ)
   if (p.characterId === "bat_ben") { const bimg = CHAR_HOOKS.bat_ben.displayImg(p); if (bimg) return bimg; }
   // โอเบรอน: ร่างสลับตามช่วงเวลากลางวัน/กลางคืนเสมอ
@@ -1761,6 +1766,14 @@ function activeSkillMusic() {
     }
   }
   if (bestBeat) return bestBeat;
+  // มุยมิ: เพลงประจำท่าไม้ตายเล่นค้างตลอดช่วง “ดาบสะบั้น”
+  let bestMuimi = null;
+  for (const p of alivePlayers()) {
+    if (CHAR_HOOKS.muimi.towerActive(p)) {
+      if (!bestMuimi || (p.transformAt || 0) > bestMuimi.at) bestMuimi = { music: "muimi", at: p.transformAt || 0 };
+    }
+  }
+  if (bestMuimi) return bestMuimi;
   let bestHisakawa = null;
   for (const p of alivePlayers()) {
     if (p.characterId === "hisakawa_sister" && (p.statuses.hisakawaDream || 0) > 0) {
@@ -2279,6 +2292,7 @@ function resetCombat(p) {
   CHAR_HOOKS.shido.resetCombat(p); // อิสึกะ ชิโด: ดาเมจที่บันทึกไว้ / กับดักฝากด้วยนะตัวฉัน / คิวเกิดใหม่
   CHAR_HOOKS.dan.resetCombat(p); // โมโรโบชิ ดัน: เป้าหมาย "จงหลบแต่อย่าหนี" / ศิษย์ / สตรีคแพ้แต้มติดกัน
   CHAR_HOOKS.eiji.resetCombat(p); // eijiOrdinal (สแตค Ordinal Scale ของเทิร์นนี้) + eijiDodgeUsedRound (โควตาหลบ 1 ครั้ง/เทิร์น)
+  CHAR_HOOKS.muimi.resetCombat(p); // มุยมิ: โควตาเสบียง / สตรีคหัวใจนักสู้ / จำนวนครั้งท่าไม้ตาย
   // ---------- เจ้าแห่งเน็ตบ้าน (patch 1.9) ----------
   p.contractPartner = null; // เจ้าแห่งเน็ตบ้าน: id คู่สัญญาปัจจุบัน (มีได้ 1 คน)
   p.contractWith = null;    // ฝั่งคู่สัญญา: id เจ้าแห่งเน็ตบ้านที่ทำสัญญาด้วย
@@ -2780,6 +2794,10 @@ function buildStateFor(viewerId) {
         appleItem: p.appleItem || "drink", // Apple guy: ของส่งมอบที่เลือกอยู่
         appleAtk: p.appleAtkBuffs ? p.appleAtkBuffs.length : 0, // Apple guy: บัฟพลังโจมตีจากการมอบของ (ซ้อนทับได้สูงสุด 2 หน่วย)
         appleGiveUses: p.appleGiveUses != null ? p.appleGiveUses : CHAR_HOOKS.appleguy.GIVE_USES, // Apple guy: จำนวนใช้ เอาไปสิ คงเหลือ
+        muimiEmergencyUses: p.characterId === "muimi" ? (p.muimiEmergencyUses != null ? p.muimiEmergencyUses : CHAR_HOOKS.muimi.EMERGENCY_USES) : undefined,
+        muimiEmergencyMax: p.characterId === "muimi" ? CHAR_HOOKS.muimi.EMERGENCY_USES : undefined,
+        muimiEmergencyUsed: p.characterId === "muimi" ? p.muimiEmergencyUsedRound === roundNumber : undefined,
+        muimiLoseStreak: p.characterId === "muimi" ? (p.muimiLoseStreak || 0) : undefined,
         tepeuCookTurns: p.tepeuCookTurns || 0,     // เทเปา: วันนี้อากาศดีจัง — เทิร์นที่เหลือก่อนได้ "มื้อที่สุข" (0 = กดใช้ได้)
         tepeuPonderTurns: p.tepeuPonderTurns || 0, // เทเปา: เป็นแบบนี้นี่เอง — ครุ่นคิดเหลือกี่เทิร์น (0 = กดใช้ได้/จั่วไพ่ได้)
         // ---------- ฟุจิตะ โคโตเนะ (rework 2.3) ----------
@@ -3328,6 +3346,8 @@ function dealRound() {
 
   for (const p of Object.values(players)) {
     resetRoundDisplay(p);
+    // ธงบังคับไพ่แตกของมุยมิผูกกับเลขเทิร์นอยู่แล้ว แต่ล้างค่าค้างไว้ให้ state อ่านง่ายและกัน snapshot เก่า
+    if (p.muimiForcedBustRound !== roundNumber) p.muimiForcedBustRound = 0;
     p.shield = 0;
     // บานาจ (patch 2.1.2): Absorb shield — โล่ฟื้นให้ทุกต้นเทิร์นที่ผลยังอยู่ (คงอยู่ 2 เทิร์นตามสถานะ bshield)
     if ((p.statuses.bshield || 0) > 0) p.shield += BANAGHER_SHIELD_AMT;
@@ -3587,6 +3607,8 @@ function dealRound() {
   // ---------- ยุย (characters/yui.js): girl don't cry — คนแต้มสกิลน้อยสุดในวงได้ +1 ----------
   //  ต้องอยู่หลังลูปต้นเทิร์น ไม่งั้นการเทียบ "ใครแต้มน้อยสุด" จะใช้ค่าคนละเทิร์นกันตามลำดับที่นั่ง
   CHAR_HOOKS.yui.onRoundStartAfterLoop(engine);
+  // มุยมิ: ครบแพ้ต่อเนื่อง 3 ครั้งแล้วสุ่มหัวใจนักสู้ที่ต้นเทิร์นถัดไป หลังแจกไพ่ครบทั้งสนาม
+  CHAR_HOOKS.muimi.onRoundStartAfterLoop(engine);
 
   // ความตายที่โรยรา (ชิกิ patch 2.0.8, characters/shiki.js): ทุกเทิร์นที่ท่าไม้ตายยังทำงาน มอบเส้นชีวิต +1 ให้ทุกคนยกเว้นตัวเอง
   CHAR_HOOKS.shiki.onRoundStartWitherTick(engine);
@@ -3931,6 +3953,10 @@ function useSkill(id, tier, targets, item) {
   //  (ใช้แล้วยังเลือกใช้สกิลอื่นได้อีก 1 ครั้ง)
   const isApplePick = p.characterId === "appleguy" && tier === "basic";
   if (isApplePick && !CHAR_HOOKS.appleguy.validateBasicItem(item)) return; // ต้องเลือกของที่มีจริงเท่านั้น (characters/appleguy.js)
+  // มุยมิ: เสบียงฉุกเฉินไม่นับโควตาสกิลหลัก แต่มีโควตา 1 ครั้ง/เทิร์น และ 2 ครั้ง/เกมของตัวเอง
+  const isMuimi = p.characterId === "muimi";
+  const isMuimiBasic = isMuimi && tier === "basic";
+  if (isMuimi && !CHAR_HOOKS.muimi.canUseSkill(engine, p, tier)) return;
   // มีดพับประจำตระกูล (โทโนะ ชิกิ สกิลพื้นฐาน): เลือกระดับ 1-5 — ไม่นับเป็นการใช้สกิลของเทิร์น (กดเปลี่ยนกี่ครั้งก็ได้)
   const isTohnoPick = p.characterId === "tohno" && tier === "basic";
   if (isTohnoPick && !CHAR_HOOKS.tohno.validateBasicItem(item)) return; // ต้องเลือกระดับ 1-5 เท่านั้น (characters/tohno.js)
@@ -3959,7 +3985,7 @@ function useSkill(id, tier, targets, item) {
   //  (แพทเทิร์นเดียวกับทาคุมิ กว้างขึ้นครอบคลุมทั้ง 3 ช่อง — เงื่อนไขเฉพาะท่าอยู่ที่ CHAR_HOOKS.byleth.canUseSkill)
   const isBylethPick = p.characterId === "byleth";
   if (isBylethPick && (p.bylethSkillUsesRound || 0) >= CHAR_HOOKS.byleth.SKILL_USES_PER_TURN) return;
-  if (p.skillUsedRound && !gambleRepeat && !isBylethPick && !isHarukaBasic && !isApplePick && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHisakawaFreeAction) return; // ใช้สกิลได้เพียง 1 อันต่อเทิร์น (ซ้ำ/ซ้อนไม่ได้)
+  if (p.skillUsedRound && !gambleRepeat && !isBylethPick && !isHarukaBasic && !isApplePick && !isMuimiBasic && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHisakawaFreeAction) return; // ใช้สกิลได้เพียง 1 อันต่อเทิร์น (ซ้ำ/ซ้อนไม่ได้)
   // MOON*CELL (คิชินามิ ฮาคุโนะ): ต้องมีแต้มคำสาปแห่งดวงจันทร์ครบ 3 เท่านั้น
   if (st === "moonCell" && (p.hakunoMoonPoints || 0) < HAKUNO_MOONCELL_NEED) return;
   // ข้าขอบัญชา (ชาย/หญิง คิชินามิ ฮาคุโนะ): กดซ้ำไม่ได้จนกว่าผลเดิมจะหมด
@@ -4242,7 +4268,7 @@ function useSkill(id, tier, targets, item) {
     if (p.statuses.freecast <= 0) delete p.statuses.freecast;
     lastLog.push(`👸 ${p.name} การ์ดราชินี — ใช้สกิลนี้โดยไม่เสียแต้มสกิล`);
   }
-  if (!isApplePick && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHarukaBasic && !isBylethPick && !isHisakawaFreeAction && !isYuiBasic) p.skillUsedRound = true; // สลับ/ชุบแฝด, เอาแบบนี้ได้ไหม, มีดพับ, สลับเพศ, Quick Swap-Weapon, รังสรรค์-ลงทัณฑ์, ขึ้น-ลงเกียร์ และไข่ต้ม-อาหารเสริม ไม่นับโควตาสกิลหลัก
+  if (!isApplePick && !isMuimiBasic && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHarukaBasic && !isBylethPick && !isHisakawaFreeAction && !isYuiBasic) p.skillUsedRound = true; // สกิลเลือก/สลับและเสบียงฉุกเฉินไม่นับโควตาสกิลหลัก
   if (isKaiPick) p.kaiSkillUsesRound = (p.kaiSkillUsesRound || 0) + 1;
   if (isTakumiPick) p.takumiSkillUsesRound = (p.takumiSkillUsesRound || 0) + 1;
 
@@ -4300,6 +4326,8 @@ function useSkill(id, tier, targets, item) {
   if (isEiji) flashSuffix = CHAR_HOOKS.eiji.applyInstantSkill(engine, p, tier) || flashSuffix;
   // ---------- มิซึซาว่า ฮารุกะ (characters/haruka.js): ไข่ต้ม และอาหารเสริม / amazon punish / New Omega ----------
   if (isHaruka) flashSuffix = CHAR_HOOKS.haruka.applyInstantSkill(engine, p, tier) || flashSuffix;
+  // ---------- มุยมิ: เสบียงฉุกเฉิน / ดาบสนิม / ดาบสะบั้นหอคอยสวรรค์ ----------
+  if (isMuimi) flashSuffix = CHAR_HOOKS.muimi.applyInstantSkill(engine, p, tier) || flashSuffix;
   // ---------- ยุย โยชิโอกะ (characters/yui.js): ปากแจ๋ว / เยอรมันซูเพล็ก / ทำนองเพลงร็อก ----------
   if (isYuiPick) flashSuffix = CHAR_HOOKS.yui.applyInstantSkill(engine, p, tier, item) || flashSuffix;
   // ---------- อิสึกะ ชิโด (characters/shido.js): ภูติ / Sandalphon / ฝากด้วยนะตัวฉัน ----------
@@ -5181,7 +5209,7 @@ function resolveRound() {
   if (best >= 0) {
     const tied = combatants.filter((p) => val(p) === best);
     // สนาม Overload ต้องสุ่มก่อน Rip and Tear ของ DoomGuy เสมอ และเกิดได้เฉพาะตอนแต้มสูงสุดเสมอกันจริง
-    if (!overloadForceActive && tied.length >= 2 && Math.random() < OVERLOAD_FORCE_CHANCE) {
+    if (!overloadForceActive && !CHAR_HOOKS.muimi.blocksOverloadForce(engine) && tied.length >= 2 && Math.random() < OVERLOAD_FORCE_CHANCE) {
       triggerOverloadForce();
       return;
     }
@@ -5313,6 +5341,8 @@ function resolveRound() {
     }
   }
   for (const p of combatants) if (!p.result) p.result = "safe";
+  // มุยมิ: นับแพ้/ไพ่แตกต่อเนื่องหลังผลของทุกคนถูกกำหนดครบแล้ว
+  CHAR_HOOKS.muimi.onAfterRoundScores(engine, combatants);
   CHAR_HOOKS.hisakawa_sister.onAfterRoundScores(engine, combatants, roundWinnerId, val);
 
   // เทเปา (characters/tepeu.js): มีเทเปายังอยู่ในสนาม -> ใครแพ้ติดกันเกิน 3 เทิร์น เส้นชีวิตลดลง 1 หน่วย
@@ -5605,6 +5635,7 @@ function nanayaCancelReattack(id) {
 function attackSoundOf(attacker) {
   if (!attacker) return undefined;
   if (attacker.characterId === "mageslayer") return "mageslayer_attack";           // BA.mp3
+  if (attacker.characterId === "muimi") return CHAR_HOOKS.muimi.towerActive(attacker) ? "muimi_ub_hit" : "muimi_normal_hit";
   if (CHAR_HOOKS.haruka.omegaActive(attacker)) return "haruka_attack";             // hit_haruka.mp3
   if (CHAR_HOOKS.byleth.swordActive(attacker)) return "byleth_hit";                // hit_sound.mp3 (ดาบต้องสาป)
   return undefined;
@@ -5872,7 +5903,7 @@ function doAttack(byId, targetId) {
     riddheAvAtk, phenexPurgeAtk, miyakoUltAtk, hakunoInvertAtk, hakunoNoRegenAtk,
     rachanAtk, fourthAtk, doomLockonAtk, cardAtkBonus, heroSwordAtk,
     triggerCircleAtk, triggerMultiAtk, triggerZeperionAtk, triggerLightBonus, triggerMultiHighestHp, triggerMultiLowHpPenalty,
-    triggerDarkAtk,
+    triggerDarkAtk, muimiTowerAtk,
   } = computeAttackBase(engine, attacker, target);
   // ผกผัน (สถานะ Universal patch 2.2.1): โบนัสพลังโจมตีที่ควรได้ กลับกลายเป็นลดพลังโจมตีแทน (คำนวณรอบเพดานฐาน 1 หน่วย)
   if (invertActive(attacker)) base = Math.max(0, 1 - (base - 1));
@@ -6005,6 +6036,8 @@ function doAttack(byId, targetId) {
   CHAR_HOOKS.eiji.onAttackLanded(engine, attacker, target);
   // ฮารุกะ (characters/haruka.js): โอเมก้า — การโจมตีปกติแปะ "เลือดไหล" ให้เป้าหมาย 2 หน่วย
   const harukaBleedApplied = CHAR_HOOKS.haruka.onAttackLanded(engine, attacker, target);
+  // มุยมิ: ดาบเก่าๆ/ดาบสะบั้นฟื้นฟูเมื่อโจมตีปกติ และใจที่ไม่ยอมแพ้ยืดเวลาท่าไม้ตาย
+  const muimiAttackFx = CHAR_HOOKS.muimi.onAttackLanded(engine, attacker);
   // อาจารย์ ไบเลธ (characters/byleth.js): ดาบต้องสาปใช้ได้ครั้งเดียว -> สลายหลังหมัดนี้ · และถ้าเป้าหมายคือไบเลธที่แต้มน้อยสุด เตรียมโจมตีตอบ
   const bylethSwordUsed = CHAR_HOOKS.byleth.onAttackLanded(engine, attacker);
   CHAR_HOOKS.byleth.onAttacked(engine, attacker, target);
@@ -6303,6 +6336,14 @@ function doAttack(byId, targetId) {
   if (connerCounterFired) addFx({ name: "การป้องกันตัว — สวนกลับผู้โจมตีทั้งสองคน", img: CHAR_HOOKS.conner.IMG.base, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (bylethSwordUsed > 0) addFx({ name: `ดาบต้องสาป +${bylethSwordUsed}`, img: CHAR_HOOKS.byleth.IMG.skill2, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
   if (harukaBleedApplied > 0) addFx({ name: `โอเมก้า — เลือดไหล +${harukaBleedApplied}`, img: CHAR_HOOKS.haruka.IMG.ult, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
+  if (muimiTowerAtk > 0) addFx({ name: `ดาบสะบั้น — พลังโจมตี +${muimiTowerAtk}`, img: CHAR_HOOKS.muimi.IMG.skill3, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
+  if (muimiAttackFx) addFx({
+    name: muimiAttackFx.mode === "tower"
+      ? `ดาบสะบั้น — ฟื้นพลังชีวิต +${muimiAttackFx.hp}${muimiAttackFx.extended ? " · ยืดเวลา +1 เทิร์น" : ""}`
+      : `ดาบเก่าๆ — ฟื้นพลังชีวิต +${muimiAttackFx.hp} · แต้มสกิล +${muimiAttackFx.sp}`,
+    img: muimiAttackFx.mode === "tower" ? CHAR_HOOKS.muimi.IMG.skill3 : CHAR_HOOKS.muimi.IMG.skill2,
+    by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888",
+  }, "atk");
   if (harukaCounterFx) addFx({ name: `อมาซอน — สวนกลับ -${harukaCounterFx.dmg}${harukaCounterFx.bled > 0 ? ` + เลือดไหล ${harukaCounterFx.bled}` : ""}${harukaCounterFx.stunned ? " + สตั้นเทิร์นหน้า" : ""}`, img: CHAR_HOOKS.haruka.IMG.base, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (pshikiBladeHeal > 0) addFx({ name: `อืม ฉันเข้าใจแล้ว (ฟื้นเลือด +${pshikiBladeHeal})`, img: "/characters/princess_shiki/p_shiki_skill1.jpg", by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
 
@@ -6959,6 +7000,8 @@ io.on('connection', (socket) => {
       gamblerUses: GAMBLER_USES, profit: 0, tempHp: 0, tempHpTurns: 0, noSkillNext: 0,
       sunriseDrop: 0, sleepFresh: false,
       appleItem: "drink", appleAtkBuffs: [], chillDodge: 100, appleGiveUses: CHAR_HOOKS.appleguy.GIVE_USES,
+      muimiEmergencyUses: CHAR_HOOKS.muimi.EMERGENCY_USES, muimiEmergencyUsedRound: 0,
+      muimiLoseStreak: 0, muimiHeartRound: 0, muimiForcedBustRound: 0, muimiUltCasts: 0, muimiUltCastRound: 0,
       tepeuCookTurns: 0, tepeuPonderTurns: 0, tepeuEyeTurns: 0, tepeuLoseStreak: 0, tepeuKillTargetId: null,
       piggy: 0, senaNext: false, kotoneExtraAtk: false,
       contractPartner: null, contractWith: null, contractOffer: null,

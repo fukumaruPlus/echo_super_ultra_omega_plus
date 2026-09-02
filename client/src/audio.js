@@ -13,6 +13,9 @@ const FILES = {
   new_morning: "/theme_song/new_morning.mp3", // เพลงช่วงกลางวัน (patch พิเศษ)
   new_night: "/theme_song/new_night.mp3",     // เพลงช่วงกลางคืน (patch พิเศษ)
   overload_force: "/overload_force/overload_force_connect.m4a",
+  muimi: "/overload_force/overload_force_theme.mp3",
+  muimi_normal_hit: "/characters/muimi/mumi_normal_hit.mp3",
+  muimi_ub_hit: "/characters/muimi/mumi_ub_hit.mp3",
   shrade: "/characters/shrade_elan/shrade_theme.mp3", // เพลงระหว่างชาร์จ แด่เพื่อนรักของฉัน (ชเรด เอลัน)
   shiki: "/characters/shiki/shiki_theme.mp3",         // เพลงระหว่างท่าไม้ตาย ฉันมองเห็นมันแล้ว (ชิกิ)
   shiki2: "/characters/shiki/shiki_theme2.mp3",       // เพลงระหว่างท่าไม้ตาย 2 ความตายที่โรยรา (ชิกิ patch 2.0.6)
