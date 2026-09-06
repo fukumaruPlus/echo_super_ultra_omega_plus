@@ -249,6 +249,37 @@ test('การแข่ง: แช่คนนอก (บังคับไพ�
   assert.equal(engine.bustedOf(c), true, 'คนนอกถูกนับว่าไพ่แตก');
 });
 
+test('การแข่ง: ไบรอันกับคู่แข่งยังจั่วการ์ดได้ — บล็อกเฉพาะคนนอกวง', () => {
+  const { b, a, c } = setup();
+  brian.startCar(engine, b);
+  brian.startDuel(engine, b, a);
+  assert.equal(brian.actionBlocked(engine, b), false, 'ไบรอันต้องจั่วได้');
+  assert.equal(brian.actionBlocked(engine, a), false, 'คู่แข่งต้องจั่วได้');
+  assert.equal(brian.actionBlocked(engine, c), true, 'คนนอกวงจั่วไม่ได้');
+  assert.equal(b.locked, false, 'คู่แข่งทั้งสองไม่ถูกล็อกมือ');
+  assert.equal(a.locked, false);
+  assert.equal(c.locked, true, 'คนนอกถูกล็อกมือ');
+});
+
+test('[integration] ระหว่างการแข่ง คู่แข่งจั่วไพ่เพิ่มได้จริงผ่านท่อ hit()', () => {
+  const { b, a, c } = setup();
+  engine.setCentralDeck(Array.from({ length: 40 }, (_, i) => ({ value: (i % 9) + 1, color: 'red' })));
+  b.skillPoints = 8;
+  brian.startCar(engine, b);
+  engine.setGameState('PLAYING');
+  engine.useSkill('B', 'ultimate', ['A']);
+  engine.setGameState('PLAYING');
+  const bBefore = b.cards.length;
+  const aBefore = a.cards.length;
+  const cBefore = c.cards.length;
+  engine.hit('B');
+  engine.hit('A');
+  engine.hit('C');
+  assert.equal(b.cards.length, bBefore + 1, 'ไบรอันจั่วได้');
+  assert.equal(a.cards.length, aBefore + 1, 'คู่แข่งจั่วได้');
+  assert.equal(c.cards.length, cBefore, 'คนนอกวงจั่วไม่ได้');
+});
+
 test('การแข่ง: ระหว่างแข่ง ทุกคนกดสกิลไม่ได้ ยกเว้น N2O ของไบรอัน', () => {
   const { b, a, c } = setup();
   brian.startCar(engine, b);
