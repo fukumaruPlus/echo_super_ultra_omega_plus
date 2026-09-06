@@ -2,6 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { engine, resolveRound } = require('../../server.js');
 const conner = require('../../characters/conner.js');
+const CHARACTERS = require('../../characters.js');
+const BASIC_COST = CHARACTERS.CHAR_BY_ID.conner.basic.cost; // ผูกกับคอสจริง ไม่ใช่เลขตายตัว
 
 const saved = {
   startPhaseTimer: engine.startPhaseTimer,
@@ -257,8 +259,8 @@ test('[integration] useSkill พาลำดับที่ทายไปถึ
   a.connorActionsPrev = ['draw', 'skill'];
   c.skillPoints = 5; c.hp = 3;
   engine.useSkill('C', 'basic', ['A'], ['draw', 'skill']);
-  // จ่าย 3 แต้ม แล้วได้คืน 2 (ถูก 2 ข้อ) = 5 - 3 + 2
-  assert.equal(c.skillPoints, 4);
+  // จ่ายคอสสกิล แล้วได้คืน 2 (ถูก 2 ข้อ)
+  assert.equal(c.skillPoints, 5 - BASIC_COST + 2);
   assert.equal(c.hp, 5, 'ถูก 2 ข้อ = เลือด +2');
   assert.equal(conner.stressOf(a), conner.PREDICT_PERFECT_STRESS);
   assert.equal(c.skillUsedRound, true, 'นับเป็นการใช้สกิลของเทิร์นตามปกติ');
@@ -285,10 +287,10 @@ test('[integration] payload ลำดับผิดรูป = ไม่เส�
 test('[integration] แต้มสกิลไม่พอ = ไม่ลงผล และลำดับที่ค้างไว้ไม่ทำงานย้อนหลังในเทิร์นถัดไป', () => {
   const { c, a } = setup();
   a.connorActionsPrev = ['draw'];
-  c.skillPoints = 1; // ราคา 3
+  c.skillPoints = BASIC_COST - 1; // ขาดไป 1 แต้มพอดี
   engine.useSkill('C', 'basic', ['A'], ['draw']);
   assert.equal(conner.stressOf(a), 0, 'ไม่ลงผล');
-  assert.equal(c.skillPoints, 1);
+  assert.equal(c.skillPoints, BASIC_COST - 1);
   // ลำดับที่ค้างอยู่ต้องถูกล้างตอนขึ้นเทิร์นใหม่ ไม่ใช่ค้างไปโผล่ตอนกดครั้งหน้า
   conner.onRoundStartTick(engine, c);
   assert.equal(c.connorGuess, null);

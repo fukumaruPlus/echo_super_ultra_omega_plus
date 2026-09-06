@@ -2811,14 +2811,12 @@ function ConnorPredictModal({ me, players, onSubmit, onClose }) {
   return (
     <div className="fixed inset-0 z-40 bg-black/60 grid place-items-center p-4" onClick={onClose}>
       <div className="bg-echo-navy rounded-2xl p-5 max-w-lg w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="text-lg font-black text-echo-cyan mb-1">🧠 วิเคราะห์สถานการณ์</div>
-        <div className="text-xs opacity-70 mb-3">
-          เลือกผู้เล่น 1 คน แล้วคาดการณ์ว่า <b>เทิร์นที่แล้ว</b> เขาทำอะไรไปบ้าง <b>ตามลำดับก่อน-หลัง</b> —
-          ข้อไหนเขาไม่ได้ทำก็ไม่ต้องเลือกเข้ามา · ถูกกี่ข้อ ได้พลังชีวิตและแต้มสกิลเท่านั้น ·
-          ถูกครบทั้งลำดับ = ความเครียดเป้าหมาย +5 และเห็นแต้มการ์ดของเขาตลอดเทิร์นนี้
+        <div className="flex items-baseline gap-2 mb-3">
+          <span className="text-lg font-black text-echo-cyan">🧠 วิเคราะห์สถานการณ์</span>
+          <span className="text-xs opacity-60">เทิร์นที่แล้วเขาทำอะไรบ้าง?</span>
         </div>
 
-        <div className="text-xs font-bold opacity-80 mb-1">เป้าหมาย</div>
+        <div className="text-xs font-bold opacity-80 mb-1">1 · เป้าหมาย</div>
         <div className="flex flex-wrap gap-2 mb-3">
           {targets.map((p) => (
             <button
@@ -2833,7 +2831,7 @@ function ConnorPredictModal({ me, players, onSubmit, onClose }) {
           ))}
         </div>
 
-        <div className="text-xs font-bold opacity-80 mb-1">ลำดับการกระทำ (กดเรียงตามลำดับที่คิดว่าเขาทำ)</div>
+        <div className="text-xs font-bold opacity-80 mb-1">2 · กดเรียงตามลำดับ</div>
         <div className="grid grid-cols-2 gap-2">
           {CONNOR_ACTIONS.map((a) => {
             const idx = order.indexOf(a.key);
@@ -2863,7 +2861,7 @@ function ConnorPredictModal({ me, players, onSubmit, onClose }) {
               none ? "border-echo-gold bg-echo-gold text-gray-900" : "border-white/20 hover:border-white/50"
             }`}
           >
-            🚫 ไม่ได้ทำอะไรเลย
+            🚫 ไม่ได้ทำอะไร
           </button>
           <button
             onClick={() => { clickSound(); setOrder([]); setNone(false); }}
@@ -2873,10 +2871,14 @@ function ConnorPredictModal({ me, players, onSubmit, onClose }) {
           </button>
         </div>
 
-        <div className="text-xs mt-3 opacity-80 min-h-[1.25rem]">
-          คำตอบ: <b>{none ? "ไม่ได้ทำอะไรเลย" : order.length
-            ? order.map((k, i) => `${i + 1}.${CONNOR_ACTIONS.find((a) => a.key === k).label}`).join(" → ")
+        <div className="text-xs mt-3 min-h-[1.25rem]">
+          <span className="opacity-60">คำตอบ:</span>{" "}
+          <b>{none ? "ไม่ได้ทำอะไร" : order.length
+            ? order.map((k) => CONNOR_ACTIONS.find((a) => a.key === k).label).join(" → ")
             : "—"}</b>
+        </div>
+        <div className="text-[11px] opacity-55 mt-1">
+          ถูก 1 ข้อ = ❤️+1 ⚡+1 · ครบทั้งลำดับ = 🔍 ความเครียด +3 และเห็นแต้มการ์ดของเขาเทิร์นนี้
         </div>
 
         <div className="flex gap-2 mt-3">
