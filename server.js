@@ -1344,6 +1344,7 @@ function bustedOf(p) {
   // คอนเนอร์ RK800 (characters/conner.js): ระหว่างการไล่ล่า ผู้เล่นที่ไม่เกี่ยวข้องถูกบังคับให้ "ไพ่แตก" ทันที
   //  (ดาเมจไพ่แตก/ดาเมจแพ้ถูกระงับทั้งหมดในเทิร์นไล่ล่าอยู่แล้ว — ดู CHAR_HOOKS.conner.chaseResolveRound)
   if (p && p.connorFrozen) return true;
+  if (p && p.brianFrozen) return true; // ไบรอัน: คนนอกวง "การแข่งที่มีเดิมพัน" ถูกบังคับไพ่แตก (แต่ไม่รับความเสียหาย)
   // มิซึซาว่า ฮารุกะ (characters/haruka.js): New Omega ระเบิดแต้มการ์ด — บังคับแตกทันทีต่อให้เปิดไพ่ไปแล้ว
   //  ต้องอยู่ก่อน overloadForceActive เพราะเป็นการ "สั่งให้แตก" ตรงๆ ไม่ใช่ผลการคิดแต้มที่สนามปลดเพดานได้
   if (CHAR_HOOKS.haruka.forcedBust(p)) return true;
@@ -1608,6 +1609,8 @@ function instantDeath(p, force) {
   CHAR_HOOKS.dan.onDeath(engine, p);
   // ผู้วิงวอน (characters/the_supplicant.js): ผู้ถือตราพิพากษา/ผู้วิงวอนตกรอบ -> ล้างตราที่ค้างอยู่ทั้งสองฝั่ง
   CHAR_HOOKS.the_supplicant.onDeath(engine, p);
+  // ไบรอัน (characters/brian.js): คนขับหรือคู่แข่งตกรอบ -> ลงจากรถ / ยกเลิกการแข่ง
+  CHAR_HOOKS.brian.onDeath(engine, p);
   // มหาเทพ อรชุน (สกิลติดตัว หัวใจที่เที่ยงธรรม): จำไว้ว่าใครเคยสังหารผู้เล่นอื่น — ธงถาวรทั้งเกม
   //  อ่านจาก effectSourceId (ต้นตอของเอฟเฟกต์ที่กำลังทำงาน) เพราะ instantDeath ไม่มีพารามิเตอร์ผู้สังหาร
   const arjunaKiller = players[effectSourceId];
@@ -1703,6 +1706,8 @@ function displayImg(p) {
   if (p.characterId === "muimi") { const mimg = CHAR_HOOKS.muimi.displayImg(p); if (mimg) return mimg; }
   // แบทแมน: ระหว่างอยู่บนรถแบทโมบิล = ภาพรถ (null = ใช้ภาพปกติ)
   if (p.characterId === "bat_ben") { const bimg = CHAR_HOOKS.bat_ben.displayImg(p); if (bimg) return bimg; }
+  // ไบรอัน: ระหว่างอยู่ในร่างรถ = ภาพ brian_car.webp (null = ใช้ภาพปกติ)
+  if (p.characterId === "brian") { const rimg = CHAR_HOOKS.brian.displayImg(p); if (rimg) return rimg; }
   // โอเบรอน: ร่างสลับตามช่วงเวลากลางวัน/กลางคืนเสมอ
   if (p.characterId === "oberon") return isNightRound(roundNumber) ? OBERON_NIGHT_IMG : OBERON_MORNING_IMG;
   // ชเรด เอลัน: รวมร่างทำนองเพลงแล้ว = ร่างอควาเรียน สปาด้า ถาวร
@@ -1837,6 +1842,8 @@ function activeSkillMusic() {
   const bestByleth = CHAR_HOOKS.byleth.activeMusic(engine, isNightRound(roundNumber));
   if (bestByleth) return bestByleth;
   // อิปโป (characters/ippo.js): เพลงประจำท่า Dempsey roll — เล่นค้างตลอดที่บัฟยังอยู่
+  const bestBrian = CHAR_HOOKS.brian.activeMusic(engine);
+  if (bestBrian && (!best || bestBrian.at > best.at)) best = bestBrian;
   const bestIppo = CHAR_HOOKS.ippo.activeMusic(engine);
   if (bestIppo) return bestIppo;
   // ยุย (characters/yui.js): เพลงประจำท่าไม้ตายที่กำลังบรรเลงอยู่
@@ -2318,6 +2325,8 @@ function resetCombat(p) {
   CHAR_HOOKS.the_supplicant.resetCombat(p);
   // อรชุน: ประวัติผู้ที่เคยโจมตีอรชุน / คูลดาวน์ Mahapralaya + ธง hasKilled ซึ่งใช้ร่วมกันทุกตัวละคร
   CHAR_HOOKS.arjuna.resetCombat(p);
+  // ไบรอัน: น้ำมัน/ตัวสะสมน้ำมันที่รถกิน/ธงวีดีโอครั้งแรก + ธง "ถูกแช่" ที่อยู่ที่ผู้เล่นทุกคน
+  CHAR_HOOKS.brian.resetCombat(p);
   CHAR_HOOKS.bat_ben.resetCombat(p); // แบทแมน: ร่างรถแบทโมบิล + โควตากดครั้งเดียวต่อเกม
   CHAR_HOOKS.yui.resetCombat(p);   // ยุย โยชิโอกะ: เพลงที่เล่นแล้ว / คิวชุบชีวิต / ธงกันลูปการจั่วตาม
   CHAR_HOOKS.shido.resetCombat(p); // อิสึกะ ชิโด: ดาเมจที่บันทึกไว้ / กับดักฝากด้วยนะตัวฉัน / คิวเกิดใหม่
@@ -2601,6 +2610,7 @@ function buildStateFor(viewerId) {
     })(),
     // คอนเนอร์ RK800: ออร่าขอบจอแดงระหว่างการไล่ล่า + สกอร์ดวลให้ทุกคนเห็น (เกตเดียวกับผลจริงของโหมดไล่ล่า)
     connorFieldFx: CHAR_HOOKS.conner.fieldFx(engine),
+    brianFieldFx: CHAR_HOOKS.brian.fieldFx(engine), // ไบรอัน: ออร่าสนามระหว่างการแข่งที่มีเดิมพัน
     connorChase: (() => {
       const owner = CHAR_HOOKS.conner.chaseOwner(engine);
       if (!owner) return null;
@@ -2865,6 +2875,15 @@ function buildStateFor(viewerId) {
           ? { n: p.supJudgeCount || 0, need: CHAR_HOOKS.the_supplicant.JUDGE_NEED, ally: !!p.supJudgeAlly, gif: CHAR_HOOKS.the_supplicant.ULT_GIF } : undefined,
         // ---------- มหาเทพ อรชุน (patch 3.4 new) ----------
         arjunaUltCd: mine && p.characterId === "arjuna" ? CHAR_HOOKS.arjuna.ultCooldownLeft(engine, p) : undefined,
+        // ---------- ไบรอัน (GT-R34) (patch 3.5 new) ----------
+        //  น้ำมันเป็นข้อมูลสาธารณะ (ทุกคนเห็น) เพราะเป็นตัวจับเวลาของร่างรถที่ทุกคนต้องอ่านออก
+        brianFuel: p.characterId === "brian" ? CHAR_HOOKS.brian.fuelOf(p) : undefined,
+        brianFuelMax: p.characterId === "brian" ? CHAR_HOOKS.brian.FUEL_MAX : undefined,
+        brianCar: p.characterId === "brian" ? CHAR_HOOKS.brian.carOn(p) : undefined,
+        brianBoost: p.characterId === "brian" ? CHAR_HOOKS.brian.boostOn(p) : undefined,
+        // ช่องท่าไม้ตายตอนนี้เป็น N2O อยู่ไหม — client ใช้ตัดสินว่าต้องให้จิ้มเป้าหมายก่อนหรือไม่
+        brianN2O: p.characterId === "brian" ? CHAR_HOOKS.brian.n2oSlot(engine, p) : undefined,
+        brianFrozen: !!p.brianFrozen, // ถูกแช่เพราะอยู่นอกวงการแข่ง (บังคับไพ่แตก กดอะไรไม่ได้)
         ippoCd: p.characterId === "ippo" ? {
           basic: CHAR_HOOKS.ippo.cooldownLeft(engine, p, "basic"),
           secondary: CHAR_HOOKS.ippo.cooldownLeft(engine, p, "secondary"),
@@ -3233,6 +3252,7 @@ function useInventoryItem(id, uid, opts = {}) {
   const p = players[id];
   if (!p || !p.alive) return;
   if (CHAR_HOOKS.conner.skillBlocked(engine, p)) return; // คอนเนอร์: ระหว่างการไล่ล่า ทุกคนใช้ไอเทมไม่ได้ (รวมคอนเนอร์กับเป้าหมาย)
+  if (CHAR_HOOKS.brian.itemBlocked(engine)) return;      // ไบรอัน: ระหว่างการแข่ง ทุกคนใช้ไอเทมไม่ได้
   // ผู้วิงวอน (patch 3.4): "ลูกแกะน้อยรู้แจ้ง" กันการเล็งผู้วิงวอนด้วยไอเทมด้วย (เช่นกระสุน GUTS Select)
   if (opts && opts.targetId && CHAR_HOOKS.the_supplicant.targetBlocked(p, players[opts.targetId])) return;
   const idx = (p.inventory || []).findIndex((it) => it.uid === uid);
@@ -3648,6 +3668,8 @@ function dealRound() {
     CHAR_HOOKS.ippo.applyPendingStun(engine, p);
     // ---------- ผู้วิงวอน (characters/the_supplicant.js): รีเซ็ตโควตาสกิล 2 ครั้ง + ต่ออายุ "กระแสเวท" ถาวร ----------
     CHAR_HOOKS.the_supplicant.onRoundStartTick(engine, p);
+    // ---------- ไบรอัน (characters/brian.js): รถกินน้ำมัน (แปลงเป็นเลือด) หรือเติมน้ำมันประจำเทิร์น ----------
+    CHAR_HOOKS.brian.onRoundStartTick(engine, p);
     // ---------- "เยียวยา" (สถานะ Universal patch 3.4): ฟื้นพลังชีวิตต่อเทิร์นตามจำนวนหน่วย ----------
     //  วางไว้ที่นี่ (ต้นเทิร์น) เหมือนลุกไหม้/เลือดไหล การลดเทิร์นทำที่ลูปกลางของ endTurn ตามปกติ
     tickMend(engine, p);
@@ -3730,6 +3752,7 @@ function hit(id) {
   if ((p.statuses.phenexTaunt || 0) > 0) return; // ไม่อยากให้ใครต้องเจ็บปวด (ริต้า เบอร์นัล): ระหว่างล่อเป้าจั่วการ์ดเพิ่มไม่ได้
   if ((p.tepeuPonderTurns || 0) > 0) return; // ครุ่นคิด (เทเปา): จั่วไพ่ไม่ได้ระหว่างนี้ (ยังโจมตีได้ถ้าชนะ)
   if (CHAR_HOOKS.conner.actionBlocked(engine, p)) return; // คอนเนอร์: อยู่นอกวงไล่ล่า -> ถูกแช่ ทำอะไรไม่ได้
+  if (CHAR_HOOKS.brian.duelActive(engine)) return;        // ไบรอัน: ระหว่างการแข่ง ห้ามจั่วทุกคน (รวมคู่แข่งทั้งสอง)
   if (scoreOf(p) >= scoreCap(p)) return; // แต้มเต็มเพดาน (เช่น 21 พอดี) = จั่วไม่ได้ รอผู้ใช้ใช้สกิล/เปิดไพ่เอง
   // โชคลาภ (patch 2.2 new): จั่วปุ๊ป ถ้ามีบัฟสะสมอยู่ ใช้ 1 หน่วยทันทีแล้วหน่วยนั้นหายไป
   //  ปรับไพ่ที่จั่วให้แต้มรวมตกอยู่ 19-21 (สุ่มถ่วงน้ำหนัก มีเคสพิเศษถ้าแต้มปัจจุบันเป็น 19/20 อยู่แล้ว)
@@ -3837,6 +3860,8 @@ function useSkill(id, tier, targets, item) {
   // MOON*CELL (คิชินามิ ฮาคุโนะ): สกิลทั้งหมดของทุกคนใช้ไม่ได้เลย (รวมของฮาคุโนะเจ้าของท่าเองด้วย — เหลือแค่สกิลติดตัว)
   if (moonCellActive() && !isHisakawaEscape) return;
   if (CHAR_HOOKS.conner.skillBlocked(engine, p)) return; // คอนเนอร์: ระหว่างการไล่ล่า ทุกคนกดสกิลไม่ได้ (รวมคอนเนอร์กับเป้าหมาย)
+  // ไบรอัน: ระหว่างการแข่ง ทุกคนกดสกิลไม่ได้ — ยกเว้น N2O ของไบรอันเอง (สเปคระบุว่าไม่สนกฎของท่าไม้ตาย 1)
+  if (CHAR_HOOKS.brian.skillBlocked(engine, p, tier)) return;
   if (CHAR_HOOKS.shrade_elan.charging(p)) return; // แด่เพื่อนรักของฉัน: ระหว่างชาร์จใช้สกิลอื่นไม่ได้
   if ((p.statuses.riddheguard || 0) > 0) return; // ฉันจะไม่ยอมสูญเสียใครไปอีก (ริดดี้): ระหว่างทำงานกดสกิลไม่ได้
   if ((p.statuses.phenexTaunt || 0) > 0) return; // ไม่อยากให้ใครต้องเจ็บปวด (ริต้า เบอร์นัล): ระหว่างล่อเป้ากดสกิลไม่ได้เลย
@@ -3932,6 +3957,8 @@ function useSkill(id, tier, targets, item) {
   if (ch && ch.id === "oguri") {
     if (tier === "ultimate") skill = oguriAshenReady(p) ? ch.ultimate2 : ch.ultimate;
   }
+  // ไบรอัน: ระหว่าง "การแข่งที่มีเดิมพัน" ช่องท่าไม้ตายกลายเป็น N2O (0 แต้ม แต่เทน้ำมันทั้งถัง)
+  if (ch && ch.id === "brian" && tier === "ultimate" && CHAR_HOOKS.brian.n2oSlot(engine, p)) skill = ch.ultimate2;
   if (ch && ch.id === "escanor") {
     skill = CHAR_HOOKS.escanor.prepareSkill(engine, p, tier, targets);
     if (!skill) return;
@@ -4056,6 +4083,8 @@ function useSkill(id, tier, targets, item) {
   // ผู้วิงวอน (patch 3.4): กดสกิลได้ 2 ครั้งต่อเทิร์น ผสมช่องไหนก็ได้ (แพทเทิร์นเดียวกับไค)
   //  ประกาศไว้ตรงนี้เพราะด่านโควตาสกิลของเทิร์นด้านล่างต้องอ่านค่านี้ ส่วนเงื่อนไขเฉพาะท่าอยู่ที่ CHAR_HOOKS.the_supplicant.canUseSkill
   const isSupPick = p.characterId === "the_supplicant";
+  // ไบรอัน "กุญแจรถ": ไม่นับเป็นการใช้สกิลของเทิร์น (กดแล้วยังใช้สกิลอื่นได้อีก 1 ครั้ง)
+  const isBrianKey = p.characterId === "brian" && tier === "basic";
   // ทาคุมิ ฟุจิวาระ: ขึ้นเกียร์ (พื้นฐาน) / ลงเกียร์ (รอง) / ถึงจะมองไม่เห็น แต่ฉันยังอยู่ (ท่าไม้ตาย) ไม่นับเป็นการใช้สกิลของเทิร์นร่วมกัน
   //  งบรวม 5 ครั้งต่อเทิร์น ผสมกันได้อิสระ (แพทเทิร์นเดียวกับไค กว้างขึ้นครอบคลุมท่าไม้ตายด้วย) — ท่าไม้ตายกดซ้ำไม่ได้ผ่านเช็คทั่วไปด้านล่าง (takumiBlackout บล็อกเอง)
   const isTakumiPick = p.characterId === "takumi" && (tier === "basic" || tier === "secondary" || tier === "ultimate");
@@ -4072,7 +4101,7 @@ function useSkill(id, tier, targets, item) {
   const isBylethPick = p.characterId === "byleth";
   if (isBylethPick && (p.bylethSkillUsesRound || 0) >= CHAR_HOOKS.byleth.SKILL_USES_PER_TURN) return;
   if (isSupPick && (p.supSkillUsesRound || 0) >= CHAR_HOOKS.the_supplicant.SKILL_USES_PER_TURN) return;
-  if (p.skillUsedRound && !gambleRepeat && !isSupPick && !isBylethPick && !isHarukaBasic && !isApplePick && !isMuimiBasic && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHisakawaFreeAction) return; // ใช้สกิลได้เพียง 1 อันต่อเทิร์น (ซ้ำ/ซ้อนไม่ได้)
+  if (p.skillUsedRound && !gambleRepeat && !isBrianKey && !isSupPick && !isBylethPick && !isHarukaBasic && !isApplePick && !isMuimiBasic && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHisakawaFreeAction) return; // ใช้สกิลได้เพียง 1 อันต่อเทิร์น (ซ้ำ/ซ้อนไม่ได้)
   // MOON*CELL (คิชินามิ ฮาคุโนะ): ต้องมีแต้มคำสาปแห่งดวงจันทร์ครบ 3 เท่านั้น
   if (st === "moonCell" && (p.hakunoMoonPoints || 0) < HAKUNO_MOONCELL_NEED) return;
   // ข้าขอบัญชา (ชาย/หญิง คิชินามิ ฮาคุโนะ): กดซ้ำไม่ได้จนกว่าผลเดิมจะหมด
@@ -4255,6 +4284,17 @@ function useSkill(id, tier, targets, item) {
   //  ทุกช่องเป็น self-buff/ตีหมู่ ไม่ต้องเลือกเป้าหมาย — เงื่อนไขการกดซ้ำ/คูลดาวน์อยู่ที่ canUseSkill
   const isArjunaPick = p.characterId === "arjuna";
   if (isArjunaPick && !CHAR_HOOKS.arjuna.canUseSkill(engine, p, tier)) return;
+  // ---------- ไบรอัน (GT-R34) (characters/brian.js) ----------
+  //  พื้นฐาน: item = "off"/"boost" ตอนกดครั้งที่ 2 · ท่าไม้ตาย 1 ต้องเลือกเป้าหมาย · N2O ไม่ต้อง
+  const isBrianPick = p.characterId === "brian";
+  let brianTarget = null;
+  if (isBrianPick) {
+    if (!CHAR_HOOKS.brian.canUseSkill(engine, p, tier, item)) return;
+    if (tier === "ultimate" && !CHAR_HOOKS.brian.n2oSlot(engine, p)) {
+      brianTarget = CHAR_HOOKS.brian.prepareTarget(engine, p, targets);
+      if (!brianTarget) return;
+    }
+  }
   const isBatPick = p.characterId === "bat_ben";
   if (isBatPick && !CHAR_HOOKS.bat_ben.canUseSkill(engine, p, tier)) return;
   // ---------- บานาจ ลิงก์ (patch 2.1.2, characters/banagher.js): Absorb shield — เลือกเป้าหมาย 1 คน (เลือกตัวเองได้) ----------
@@ -4375,7 +4415,7 @@ function useSkill(id, tier, targets, item) {
     if (p.statuses.freecast <= 0) delete p.statuses.freecast;
     lastLog.push(`👸 ${p.name} การ์ดราชินี — ใช้สกิลนี้โดยไม่เสียแต้มสกิล`);
   }
-  if (!isApplePick && !isMuimiBasic && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHarukaBasic && !isBylethPick && !isHisakawaFreeAction && !isYuiBasic && !isSupPick) p.skillUsedRound = true; // สกิลเลือก/สลับและเสบียงฉุกเฉินไม่นับโควตาสกิลหลัก
+  if (!isApplePick && !isMuimiBasic && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHarukaBasic && !isBylethPick && !isHisakawaFreeAction && !isYuiBasic && !isSupPick && !isBrianKey) p.skillUsedRound = true; // สกิลเลือก/สลับและเสบียงฉุกเฉินไม่นับโควตาสกิลหลัก
   if (isKaiPick) p.kaiSkillUsesRound = (p.kaiSkillUsesRound || 0) + 1;
   if (isTakumiPick) p.takumiSkillUsesRound = (p.takumiSkillUsesRound || 0) + 1;
 
@@ -4526,6 +4566,7 @@ function useSkill(id, tier, targets, item) {
   if (isIppoPick) flashSuffix = CHAR_HOOKS.ippo.applyInstantSkill(engine, p, tier) || flashSuffix;
   // ---------- ผู้วิงวอน / มหาเทพ อรชุน (patch 3.4) ----------
   if (isSupPick && supTarget) flashSuffix = CHAR_HOOKS.the_supplicant.applyInstantSkill(engine, p, tier, supTarget) || flashSuffix;
+  if (isBrianPick) flashSuffix = CHAR_HOOKS.brian.applyInstantSkill(engine, p, tier, brianTarget, item) || flashSuffix;
   if (isArjunaPick && tier !== "ultimate") flashSuffix = CHAR_HOOKS.arjuna.applyInstantSkill(engine, p, tier) || flashSuffix;
   // Mahapralaya: แจกเปราะบาง + คิววีดีโอตรงนี้ แล้วลงความเสียหายจริงหลังวีดีโอจบ (ดูท้ายฟังก์ชัน)
   let arjunaPralayaPending = false;
@@ -5306,6 +5347,15 @@ function resolveRound() {
   // ---------- คอนเนอร์ RK800 (สกิลติดตัว 2 จับกุมขั้นเด็ดขาด, characters/conner.js) ----------
   //  ระหว่างการไล่ล่า: ไม่มีผู้ชนะ/ผู้แพ้ ไม่มีดาเมจแพ้จั่ว/ไพ่แตก ไม่มี Overload Force — นับแค่แต้มดวลกัน
   //  (roundWinnerId ค้างเป็น null -> afterSummary จะข้ามเฟสโจมตีให้เองอยู่แล้ว แต่ยังกันซ้ำอีกชั้นที่นั่น)
+  // ---------- ไบรอัน (ท่าไม้ตาย 1 การแข่งที่มีเดิมพัน, characters/brian.js) ----------
+  //  เหตุผลเดียวกับการไล่ล่าของคอนเนอร์ทุกประการ: ไม่มีผู้ชนะ/ผู้แพ้ของรอบ ไม่มีดาเมจแพ้จั่ว/ไพ่แตก
+  //  และต้องข้าม afterResolve() ทั้งก้อน ไม่งั้นเอฟเฟกต์ที่ยิงใส่ "คนไพ่แตก" จะกวาดโดนคนที่ถูกแช่ไว้
+  if (CHAR_HOOKS.brian.duelResolveRound(engine)) {
+    roundWinnerId = null;
+    roundTiedWin = false;
+    runCutsceneQueue(goSummary);
+    return;
+  }
   if (CHAR_HOOKS.conner.chaseResolveRound(engine)) {
     roundWinnerId = null;
     roundTiedWin = false;
@@ -5358,6 +5408,8 @@ function resolveRound() {
     CHAR_HOOKS.byleth.onRoundWinner(engine, w);
     // คอนเนอร์ RK800 (สกิลติดตัว 1 สืบสวน): การชนะการจั่ว = ความเครียด +1
     CHAR_HOOKS.conner.onRoundWin(engine, w);
+    // ไบรอัน (สกิลติดตัว น้ำมันรถ): ชนะการจั่วได้น้ำมัน +2 (ได้แม้อยู่ในร่างรถ)
+    CHAR_HOOKS.brian.onRoundWin(engine, w);
     // ระบบเหรียญ (patch 2.2 full): ชนะการจั่วได้เหรียญเพิ่ม +1 (เพดาน 30)
     if (!isYuuki(w)) addGold(w, GOLD_WIN_BONUS);
     // patch 2.1.3.5: ชนะจั่วการ์ดไม่ได้แต้มสกิลอีกต่อไป
@@ -5601,6 +5653,19 @@ function attackableTargets(atkId) {
 function afterSummary() {
   // คอนเนอร์ RK800 (สกิลติดตัว 2): ระหว่างการไล่ล่า ทุกเทิร์นเหลือแค่ จั่ว -> สรุปแต้ม ไม่มีเฟสโจมตีเลย
   if (CHAR_HOOKS.conner.chaseActive(engine)) { endTurn(); return; }
+  // ไบรอัน: ระหว่างการแข่ง เทิร์นนั้นไม่มีเฟสโจมตี (จบที่การวัดแต้มล้วนๆ)
+  if (CHAR_HOOKS.brian.duelActive(engine)) { endTurn(); return; }
+  // ไบรอัน (สกิลรอง หลีกทางไป): พุ่งชนคนที่แต้มสูงสุดที่มากกว่าเรา — วีดีโอก่อน แล้วค่อยลงความเสียหาย
+  //  ทำที่นี่ (หลังรู้แต้มทุกคนแล้ว ก่อนเข้าเฟสโจมตี) เพราะเงื่อนไขคือ "คนที่แต้มมากกว่าเรา"
+  {
+    const pusher = alivePlayers().find((p) => CHAR_HOOKS.brian.pushTargetOf(engine, p));
+    if (pusher) {
+      const pt = CHAR_HOOKS.brian.pushTargetOf(engine, pusher);
+      queueCutscene(pusher, "brianPush");
+      runCutsceneQueue(() => { CHAR_HOOKS.brian.applyPushHit(engine, pusher, pt); afterSummary(); });
+      return;
+    }
+  }
   const winner = players[roundWinnerId];
   // หลับไหล (Lie Like Vortigern): ผู้ชนะที่ยังหลับอยู่ ออกการกระทำไม่ได้ -> ไม่มีเทิร์นโจมตี
   //  (เทิร์นที่เพิ่งโดนกล่อม sleepFresh ยังโจมตีได้ — การหลับเริ่มเทิร์นถัดไป)
@@ -6570,6 +6635,7 @@ function endTurn() {
   // หลบหลีก (สถานะ Universal): แต่ละสแตคหมดอายุเองตามเทิร์นของตัวเอง / โชคลาภ (Bard): ไม่ได้ใช้ 3 เทิร์นติดกัน = หมดฤทธิ์
   // คอนเนอร์ RK800: การไล่ล่าล่มกลางคัน (เช่นคอนเนอร์ตาย) -> ปลดธง "ถูกแช่" ของทุกคนเสมอ
   CHAR_HOOKS.conner.cleanupChase(engine);
+  CHAR_HOOKS.brian.cleanupDuel(engine); // ไบรอัน: การแข่งล่มกลางคัน -> ปลดธง "ถูกแช่" ของทุกคนเสมอ
   for (const p of Object.values(players)) {
     // คอนเนอร์ RK800 (สกิลติดตัว 1 สืบสวน): ความเครียดลดลง 1 ต่อเทิร์น (ไพ่แตกในเทิร์นนี้ลดเพิ่มอีก 1)
     //  ต้องอ่านค่า p.busted ก่อน dealRound() รีเซ็ต — จึงอยู่ท้ายเทิร์นตรงนี้
@@ -6634,6 +6700,9 @@ function endTurn() {
       // ผู้วิงวอน: "เกราะศรัทธา" เก็บ "จำนวนหน่วย" ไว้ที่ statusAmt ส่วน statuses เป็นแค่ธง — ไม่ใช่ตัวนับเทิร์น
       //  หายเมื่อถูกดาเมจกินจนหมดเท่านั้น (ดู faithAbsorb) ต้องตรงกับ NO_TICK_STATUS ใน _universal_status.js
       if (k === "supFaith") continue;
+      // ไบรอัน: ร่างรถ/ร่างเพิ่มพลังเป็นธง ไม่ใช่ตัวนับเทิร์น — น้ำมันเป็นตัวจับเวลาแทน
+      //  ต้องตรงกับ NO_TICK_STATUS ใน _universal_status.js
+      if (k === "brianCar" || k === "brianBoost") continue;
       if (k === "graybeast") continue;  // ร่าง Zone: ถาวรจนกว่าจะเข้าร่างหมดแรง
       // burnout (ร่างหมดแรง): เดิมถูกยกเว้นไม่ลดเทิร์นตรงนี้ แต่ไม่มีจุดไหนในโค้ดเคลียร์ทิ้งเองเลย (ไม่มี delete p.statuses.burnout ที่ไหนทั้งไฟล์)
       //  ผลคือติดแล้วค้างถาวรทั้งแมตช์ ทั้งที่ตั้งใจให้เป็นดีบัฟ 2 เทิร์นตายตัว (ดู OGURI_BURNOUT_TURNS, characters/oguri.js) — เอาข้อยกเว้นออก ให้ลดเทิร์นตามปกติ
@@ -7414,6 +7483,7 @@ const engine = {
   onCardDrawn,
   drawToScore,
   get centralDeck() { return centralDeck; },
+  drawFromCentralDeck, // ไบรอัน N2O: ดึงการ์ด "ค่าที่ต้องการ" ออกจากกองกลางจริง (ผ่าน predicate)
   setCentralDeck(v) { centralDeck = v; },
   get kaiOverhaulSlots() { return kaiOverhaulSlots; },
   setKaiOverhaulSlots(v) { kaiOverhaulSlots = v; },

@@ -335,6 +335,8 @@ const NO_TICK_STATUS = new Set([
   "graybeast", "grit", "healthfull", "overweight", "ntd", "beat", "eva3", "banagherPassive2",
   // ผู้วิงวอน (patch 3.4): "เกราะศรัทธา" เป็นจำนวนหน่วย ไม่ใช่ตัวนับเทิร์น — หายเมื่อถูกทำลายจนหมดเท่านั้น
   "supFaith",
+  // ไบรอัน (patch 3.5): ร่างรถเป็นธง ไม่ใช่ตัวนับเทิร์น — หายเมื่อน้ำมันหมดถังหรือกดดับเครื่องเอง
+  "brianCar", "brianBoost",
 ]);
 
 module.exports = {

@@ -61,7 +61,8 @@ function isTargetable(p, iAmAttacker, c) {
   const connorTarget = !!c.connorSel && !self && !friendly && (c.connorSel !== "ultimate" || p.connorLevel === "criminal");
   const danTarget = !!c.danSel && !self && !friendly; // โมโรโบชิ ดัน: เล็งใครก็ได้ที่ไม่ใช่ตัวเอง/เพื่อนร่วมทีม
   const supTarget = !!c.supSel; // ผู้วิงวอน: เล็งได้ทุกคนบนสนามรวมทั้งตัวเอง (ทั้งสามท่ามอบผลให้เป้าหมาย)
-  return (normalAttackTarget || !!c.anataSel || c.dawnSel || c.appleSel || c.bbSel || c.shSel || c.skSel || c.doomSel || c.saObSel || escanorSkillTarget || c.ignisSel || c.ignisImpactSel || c.bgSel || !!c.bardPending || c.nanayaSel || c.tpSel || c.kaiCreateSel || c.kaiPunishSel || c.msMarkSel || c.msRuptureSel || c.psSealSel || bylethStrikeTarget || connorTarget || danTarget || supTarget || gunTarget) && p.alive;
+  const brianTarget = !!c.brianSel && !self && !friendly; // ไบรอัน: ท้าแข่งใครก็ได้ที่ไม่ใช่ตัวเอง/เพื่อนร่วมทีม
+  return (normalAttackTarget || !!c.anataSel || c.dawnSel || c.appleSel || c.bbSel || c.shSel || c.skSel || c.doomSel || c.saObSel || escanorSkillTarget || c.ignisSel || c.ignisImpactSel || c.bgSel || !!c.bardPending || c.nanayaSel || c.tpSel || c.kaiCreateSel || c.kaiPunishSel || c.msMarkSel || c.msRuptureSel || c.psSealSel || bylethStrikeTarget || connorTarget || danTarget || supTarget || brianTarget || gunTarget) && p.alive;
 }
 // แตะ/คลิกการ์ดคู่ต่อสู้แล้วต้องทำอะไร — ไล่ตามโหมดเลือกเป้าหมายที่เปิดอยู่ ไม่มีเลยก็โจมตีปกติ
 function resolveAttackPick(id, c) {
@@ -81,6 +82,7 @@ function resolveAttackPick(id, c) {
   if (c.nanayaSel) return c.pickNanaya(id);
   if (c.tpSel) return c.pickTp(id);
   if (c.supSel) return c.pickSup(id);
+  if (c.brianSel) return c.pickBrian(id);
   if (c.kaiCreateSel) return c.pickKaiCreate(id);
   if (c.kaiPunishSel) return c.pickKaiPunish(id);
   if (c.bylethStrikeSel) return c.pickBylethStrike(id);
@@ -1253,6 +1255,11 @@ const STATUS_INFO = {
   muimiRusty: { icon: "🗡️", label: "ดาบเก่าๆ", cls: "bg-echo-armor", desc: "ดาบเก่าๆ: เมื่อโจมตีปกติจะฟื้นพลังชีวิต 1 หน่วย และแต้มสกิล 1 หน่วย — ระหว่างสถานะนี้ใช้ดาบสะบั้นหอคอยสวรรค์ไม่ได้" },
   muimiTower: { icon: "⚔️", label: "ดาบสะบั้น", cls: "bg-echo-gold text-gray-900", desc: "ดาบสะบั้น: พลังโจมตีพื้นฐาน +3 และเมื่อโจมตีปกติจะฟื้นพลังชีวิต 2 หน่วย พร้อมยืดเวลาสถานะออกไปอีก 1 เทิร์น — ระหว่างสถานะนี้ Overload Force จะไม่เกิด" },
   harukaPunish: { icon: "⚖️", label: "จงไปสู่สุขติ", cls: "bg-echo-magenta", desc: "amazon punish: ตลอด 3 เทิร์นที่สถานะนี้ติดอยู่ ทุกการโจมตีปกติที่ใส่เป้าหมายซึ่งมี \"เลือดไหล\" ตั้งแต่ 3 หน่วยขึ้นไป จะจุดชนวนให้ระเบิดเป็นความเสียหายเพิ่มตามจำนวนหน่วยที่ติดอยู่ แล้วล้างเลือดไหลทั้งหมด — ระเบิดซ้ำได้หลายครั้งตลอด 3 เทิร์น (เป้าหมายต้องสะสมเลือดไหลใหม่ให้ครบก่อน)" },
+  // ---------- ไบรอัน (GT-R34) (patch 3.5 new) ----------
+  brianCar:    { icon: "🚗", label: "รถคู่ใจ", cls: "bg-echo-cyan text-gray-900", desc: "รถคู่ใจ: กินน้ำมันเทิร์นละ 1 หน่วย และทุกๆ 2 หน่วยที่รถกินจะฟื้นพลังชีวิต +1 — อยู่จนกว่าน้ำมันจะหมดถังหรือกดดับเครื่องเอง · ต้องอยู่ในร่างนี้ถึงจะใช้สกิลรองและท่าไม้ตายได้" },
+  brianBoost:  { icon: "🔥", label: "รถคู่ใจที่ขาดไม่ได้", cls: "bg-echo-hp", desc: "รถคู่ใจที่ขาดไม่ได้: กินน้ำมันเทิร์นละ 2 หน่วยแทน 1 แลกกับพลังโจมตีพื้นฐาน +1 หน่วย และแรงชนของ \"หลีกทางไป\" เพิ่มเป็น 2 หน่วย" },
+  brianPush:   { icon: "🏎️", label: "หลีกทางไป", cls: "bg-echo-gold text-gray-900", desc: "หลีกทางไป: ทุกเทิร์นหลังเปิดไพ่ จะพุ่งชนผู้เล่นที่แต้มสูงสุดในบรรดาคนที่แต้มมากกว่าเรา สร้างความเสียหาย 1 หน่วย (2 หน่วยในร่างเพิ่มพลัง) — ระหว่างนี้ใช้ท่าไม้ตายไม่ได้" },
+  brianNoFuel: { icon: "⛽", label: "ถังรั่ว", cls: "bg-echo-hp", desc: "ถังรั่ว: แพ้หรือเสมอในการแข่งที่มีเดิมพัน — ฟื้นน้ำมันจากการจบเทิร์นไม่ได้ (แต่ยังได้น้ำมันจากการชนะการจั่วตามปกติ)" },
   // ---------- สถานะ Universal ใหม่ (patch 3.4) ----------
   mend:      { icon: "💚", label: "เยียวยา", cls: "bg-echo-armor", desc: "เยียวยา: ต้นเทิร์นฟื้นพลังชีวิตเท่ากับจำนวนหน่วยที่ระบุ (1 หน่วย = 1 พลังชีวิต) — ซ้อนทับจำนวนเทิร์นได้สูงสุด 5 เทิร์น" },
   blind:     { icon: "🕶️", label: "ตาบอด", cls: "bg-echo-hp", desc: "ตาบอด: มองไม่เห็นอะไรเลยทั้งเทิร์น — ไพ่ แต้ม พลังงาน พลังชีวิต และเกราะของทุกคนรวมทั้งของตัวเอง ถูกปิดหมด" },
@@ -1370,6 +1377,15 @@ function statusEntries(p, full) {
     }
   }
   // ผู้วิงวอน: คลังคำวิงวอน + โควตาสกิล 2 ครั้ง/เทิร์น (ทุกคนเห็นได้ — ขั้นของคำวิงวอนเปลี่ยนพฤติกรรมทั้งสนาม)
+  // ไบรอัน: น้ำมันเป็นข้อมูลสาธารณะ — เป็นตัวจับเวลาของร่างรถที่ทุกคนต้องอ่านออกว่าเหลืออีกกี่เทิร์น
+  if (p.character?.id === "brian") {
+    const perTurn = p.brianBoost ? 2 : 1;
+    out.push({
+      key: "brianFuel", v: 1, icon: "⛽", label: `น้ำมัน ${p.brianFuel || 0}/${p.brianFuelMax || 12}`,
+      cls: (p.brianFuel || 0) <= 2 ? "bg-echo-hp" : "bg-echo-cyan text-gray-900",
+      desc: `น้ำมันคงเหลือ — ฟื้นเทิร์นละ 1 (หยุดฟื้นระหว่างอยู่ในรถ) · ชนะการจั่ว +2 (ได้แม้อยู่ในรถ)${p.brianCar ? ` · ตอนนี้รถกินเทิร์นละ ${perTurn} หน่วย = ขับต่อได้อีกราว ${Math.ceil((p.brianFuel || 0) / perTurn)} เทิร์น` : ""}`,
+    });
+  }
   if (p.character?.id === "the_supplicant") {
     out.push({ key: "supPrayers", v: 1, icon: "🙏", label: `คำวิงวอน ${p.supPrayers || 0}/${p.supPrayersMax || 15}`, cls: "bg-echo-cyan text-gray-900", desc: "ภาชนะคำวิงวอน: ล้างดีบัฟได้ 1 ขั้น = +1 — ครบ 4 ได้ \"กระแสเวท\" ถาวร · ครบ 8 เพิ่มฟื้นพลังงาน +1 ต่อการล้าง 1 ขั้น · ครบ 12 เพิ่มเกราะศรัทธา +1 ต่อการล้าง 1 ขั้น" });
     out.push({ key: "supUses", v: 1, icon: "✌️", label: `ใช้สกิล ${p.supSkillUses || 0}/${p.supSkillMax || 2}`, cls: "bg-white/20", desc: "ผู้วิงวอนกดสกิลได้ 2 ครั้งต่อเทิร์น ผสมช่องไหนก็ได้" });
@@ -2727,6 +2743,41 @@ function QtePanel({ qte }) {
   );
 }
 
+// ---------- ไบรอัน: กดกุญแจรถซ้ำ -> เลือกดับเครื่อง หรือ เพิ่มพลัง ----------
+function BrianKeyModal({ me, onPick, onClose }) {
+  const boosted = !!me.brianBoost;
+  return (
+    <div className="fixed inset-0 z-40 bg-black/60 grid place-items-center p-4" onClick={onClose}>
+      <div className="bg-echo-navy rounded-2xl p-5 max-w-sm w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="text-lg font-black text-echo-cyan mb-1">🔑 กุญแจรถ</div>
+        <div className="text-xs opacity-70 mb-3">
+          ตอนนี้อยู่ในร่าง <b>{boosted ? "รถคู่ใจที่ขาดไม่ได้" : "รถคู่ใจ"}</b> · น้ำมันเหลือ {me.brianFuel}/{me.brianFuelMax}
+        </div>
+        <div className="grid gap-2">
+          <button
+            onClick={() => { clickSound(); onPick("off"); }}
+            className="text-left rounded-lg border-2 border-white/15 hover:border-white/40 px-3 py-2 transition"
+          >
+            <div className="font-bold">🅿️ ดับเครื่อง</div>
+            <div className="text-xs opacity-75 mt-1">ลงจากรถ — หยุดกินน้ำมัน และกลับมาเติมน้ำมันเทิร์นละ 1 หน่วยได้ตามปกติ</div>
+          </button>
+          <button
+            disabled={boosted}
+            onClick={() => { clickSound(); onPick("boost"); }}
+            className={`text-left rounded-lg border-2 px-3 py-2 transition ${
+              boosted ? "opacity-40 cursor-not-allowed border-white/10" : "border-echo-hp hover:border-white/60"
+            }`}
+          >
+            <div className="font-bold">🔥 เพิ่มพลัง {boosted && <span className="text-[11px] px-1.5 py-0.5 rounded bg-echo-hp ml-1">เปิดอยู่แล้ว</span>}</div>
+            <div className="text-xs opacity-75 mt-1">เปลี่ยนเป็น &quot;รถคู่ใจที่ขาดไม่ได้&quot; — กินน้ำมันเทิร์นละ 2 หน่วยแทน 1 แลกกับพลังโจมตีพื้นฐาน +1</div>
+          </button>
+        </div>
+        <button onClick={onClose} className="w-full mt-3 rounded-lg py-2 font-bold bg-black/50 border border-white/25">ยกเลิก</button>
+      </div>
+    </div>
+  );
+}
+
 // ---------- คอนเนอร์: วิเคราะห์สถานการณ์ — เลือกเป้าหมาย + เรียงลำดับการกระทำของเทิร์นที่แล้ว ----------
 //  ต้องเป็นโมดัลเพราะการ "เรียงลำดับ" ทำบนกระดานไม่ได้ จึงรวมการเลือกเป้าหมายมาไว้ในนี้ด้วยทีเดียว
 const CONNOR_ACTIONS = [
@@ -3161,6 +3212,8 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
   const [bardSel, setBardSel] = useState([]);        // Bard: เป้าหมายบทเพลงที่เลือกไว้ (บทเพลงต้องการ 1-2 คน)
   const [nanayaSel, setNanayaSel] = useState(false);  // นานายะ ชิกิ: โหมดเลือกเป้าหมาย อันนี้ของนายรึเปล่า (เลือกตัวเองไม่ได้)
   const [tpSel, setTpSel] = useState(false);          // เทเปา: โหมดเลือกเป้าหมาย นายเป็นคนทำตัวเองนะ (เลือกตัวเองไม่ได้)
+  const [brianKeyOpen, setBrianKeyOpen] = useState(false);   // ไบรอัน: หน้าต่างเลือก ดับเครื่อง/เพิ่มพลัง (กดกุญแจรถซ้ำ)
+  const [brianSel, setBrianSel] = useState(false);           // ไบรอัน: โหมดเลือกเป้าหมายของ "การแข่งที่มีเดิมพัน"
   const [connorPredictOpen, setConnorPredictOpen] = useState(false); // คอนเนอร์: โมดัลวิเคราะห์สถานการณ์ (เลือกเป้าหมาย + เรียงลำดับ)
   const [supSel, setSupSel] = useState(null);                // ผู้วิงวอน: tier ที่กำลังรอจิ้มเป้าหมาย (ทั้งสามช่อง เลือกตัวเองได้)
   const [kaiCreateSel, setKaiCreateSel] = useState(false);   // ไค: โหมดเลือกเป้าหมายมือซ้ายแห่งการรังสรรค์ (เลือกตัวเองได้)
@@ -3337,6 +3390,14 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
   // คอนเนอร์: วิเคราะห์สถานการณ์กดไม่ได้ในเทิร์นแรก เพราะยังไม่มี "เทิร์นที่แล้ว" ให้คาดการณ์
   //  (server กันซ้ำที่ CHAR_HOOKS.conner.canUseSkill — ตรงนี้แค่ทำให้ปุ่มเป็นสีเทาไม่ให้กดเสียเที่ยว)
   const connorPredictLocked = ch?.id === "conner" && state.roundNumber <= 1;
+  // ไบรอัน: สกิลรอง/ท่าไม้ตายต้องอยู่ในร่างรถและมีน้ำมันพอ · ระหว่างการแข่งช่องท่าไม้ตายเป็น N2O
+  const isBrian = ch?.id === "brian";
+  const brianCarOn = isBrian && !!me?.brianCar;
+  const brianFuel = isBrian ? (me?.brianFuel || 0) : 0;
+  const brianSecLocked = isBrian && (!brianCarOn || brianFuel < 2 || (me?.statuses?.brianPush || 0) > 0);
+  const brianUltLocked = isBrian && (me?.brianN2O
+    ? brianFuel < 4                                              // N2O: ต้องมีน้ำมันอย่างน้อย 4
+    : (!brianCarOn || brianFuel < 2 || (me?.statuses?.brianPush || 0) > 0));
   const isShido = ch?.id === "shido";
   const shidoUltCd = isShido ? ((me?.shidoGuard || 0) > 0 ? me.shidoGuard : (me?.shidoCd || 0)) : 0;
   const shidoUltLocked = isShido && shidoUltCd > 0;
@@ -3513,6 +3574,16 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
     if (tier === "basic" && ch?.id === "nanaya") { setNanayaSel(true); setSkillOpen(false); return; }
     // อาจารย์ ไบเลธ: สกิลรองเปิดหน้าต่างเลือกแบบ (ฟาดทันที/เสริมดาบ) · ท่าไม้ตายเปิดหน้าต่างเลือกหลักสูตร
     // คอนเนอร์ RK800: สกิลรอง/ท่าไม้ตายเข้าโหมดเลือกเป้าหมายก่อนส่งไป server
+    // ไบรอัน: กุญแจรถ — ยังไม่ขึ้นรถ = ขึ้นเลย · อยู่ในรถแล้ว = เปิดหน้าต่างให้เลือกดับเครื่อง/เพิ่มพลัง
+    if (tier === "basic" && ch?.id === "brian") {
+      if (!me?.brianCar) { socket.emit("useSkill", { tier: "basic" }); setSkillOpen(false); return; }
+      setBrianKeyOpen(true); setSkillOpen(false); return;
+    }
+    // ไบรอัน: ท่าไม้ตาย — ปกติต้องเลือกเป้าหมายก่อน · ระหว่างการแข่งช่องนี้เป็น N2O ซึ่งไม่ต้องเลือกใคร
+    if (tier === "ultimate" && ch?.id === "brian") {
+      if (me?.brianN2O) { socket.emit("useSkill", { tier: "ultimate" }); setSkillOpen(false); return; }
+      setBrianSel(true); setSkillOpen(false); return;
+    }
     // คอนเนอร์: สกิลพื้นฐานเปิดโมดัลคาดการณ์ (เลือกเป้าหมาย + เรียงลำดับในหน้าต่างเดียว)
     if (tier === "basic" && ch?.id === "conner") { setConnorPredictOpen(true); setSkillOpen(false); return; }
     if ((tier === "secondary" || tier === "ultimate") && ch?.id === "conner") { setConnorSel(tier); setSkillOpen(false); return; }
@@ -3647,6 +3718,16 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
     setBylethSwordOpen(false);
     if (mode === "strike") { setBylethStrikeSel(true); return; } // แบบที่ 1 ต้องเลือกเป้าหมายก่อน
     socket.emit("useSkill", { tier: "secondary", item: "buff" });
+  };
+  // ไบรอัน: เลือกดับเครื่อง/เพิ่มพลัง -> ส่ง item ไปกับสกิลพื้นฐาน
+  const pickBrianKey = (mode) => {
+    socket.emit("useSkill", { tier: "basic", item: mode });
+    setBrianKeyOpen(false);
+  };
+  // ไบรอัน: เลือกคู่แข่งของ "การแข่งที่มีเดิมพัน" -> ส่งไป server ทันที
+  const pickBrian = (id) => {
+    socket.emit("useSkill", { tier: "ultimate", targets: [id] });
+    setBrianSel(false);
   };
   // คอนเนอร์ วิเคราะห์สถานการณ์: ส่งทั้งเป้าหมายและลำดับที่คาดการณ์ไปพร้อมกัน
   //  guess = [] คือคำตอบ "ไม่ได้ทำอะไรเลย" ซึ่งเป็นคำตอบที่ถูกต้องได้ ไม่ใช่การยกเลิก
@@ -3812,6 +3893,13 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
     if (connorPredictOpen && (phase !== "PLAYING" || me?.skillUsed || done)) setConnorPredictOpen(false);
   }, [connorPredictOpen, phase, me?.skillUsed, done]);
   useEffect(() => {
+    // กุญแจรถไม่กินโควตาสกิลของเทิร์น จึงเช็คแค่เฟส/ล็อกมือ ไม่เช็ค me.skillUsed
+    if (brianKeyOpen && (phase !== "PLAYING" || done)) setBrianKeyOpen(false);
+  }, [brianKeyOpen, phase, done]);
+  useEffect(() => {
+    if (brianSel && (phase !== "PLAYING" || me?.skillUsed || done)) setBrianSel(false);
+  }, [brianSel, phase, me?.skillUsed, done]);
+  useEffect(() => {
     // ผู้วิงวอนกดสกิลได้ 2 ครั้ง/เทิร์น จึงเช็คโควตาของตัวเอง ไม่ใช่ me.skillUsed แบบตัวอื่น
     if (supSel && (phase !== "PLAYING" || done || (me?.supSkillUses || 0) >= (me?.supSkillMax || 2))) setSupSel(null);
   }, [supSel, phase, done, me?.supSkillUses, me?.supSkillMax]);
@@ -3896,6 +3984,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
     anataSel, dawnSel, appleSel, bbSel, shSel, skSel, doomSel, saObSel, escanorSel, ignisSel, ignisImpactSel, bgSel, bardPending, nanayaSel, tpSel,
     kaiCreateSel, kaiPunishSel, msMarkSel, msRuptureSel, psSealSel, pickPsSeal, gunSel, pickGunTarget,
     supSel, pickSup,
+    brianSel, pickBrian,
     bylethStrikeSel, pickBylethStrike,
     connorSel, pickConnor,
     danSel, pickDan,
@@ -4034,6 +4123,12 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
           <div className="shrink-0 text-center mt-1.5 text-hard">
             <span className="text-lg font-black text-echo-hp animate-pulse">👁️ แตะเลือกเป้าหมาย อันนี้ของนายรึเปล่า</span>
             <button onClick={() => { clickSound(); setNanayaSel(false); }} className="ml-2 text-sm font-bold bg-black/60 rounded-full px-3 py-1 border border-white/30">ยกเลิก</button>
+          </div>
+        )}
+        {brianSel && (
+          <div className="shrink-0 text-center mt-1.5 text-hard">
+            <span className="text-lg font-black text-echo-cyan animate-pulse">🏁 แตะเลือกคู่แข่งของ &quot;การแข่งที่มีเดิมพัน&quot;</span>
+            <button onClick={() => { clickSound(); setBrianSel(false); }} className="ml-2 text-sm font-bold bg-black/60 rounded-full px-3 py-1 border border-white/30">ยกเลิก</button>
           </div>
         )}
         {supSel && (
@@ -4196,13 +4291,13 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
               {/* ช่องสกิล 3 อัน — ทรงพัด: ช่องกลาง (สกิลรอง) ยกสูงกว่าอีก 2 ช่อง */}
               <div className="grid grid-cols-3 gap-2 mt-3 items-end">
                 <div className="translate-y-1.5">
-                  <SkillSlot label="สกิลพื้นฐาน" tier="basic" skill={ch?.basic} points={me.skillPoints} disabled={!me.alive || phase !== "PLAYING" || (!isHisakawa && (done || noSkill || moonCellOn)) || hisakawaSwitchLocked || miyakoHealPending || hakunoSecondaryPending || beatBasicLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || witchMarkCooldown || (me.skillUsed && !gambleRepeat && !isByleth && !isHaruka && !isApple && !isMuimi && !isBard && !isTohno && !isHakuno && !isDoomguy && !isKai && !isTakumi && !isHisakawa && !isSup) || harukaBasicLocked || muimiBasicLocked || bylethBasicLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || cassiusLocked || veilLocked || ktBasicLocked || (isHakuno && me.hakunoGenderSwitched) || doomBasicLocked || takutoBasicPending || tepeuCookLocked || tepeuPonderLocked || psBladeLocked || ippoBasicCd > 0 || supBudgetLocked || arjunaBasicLocked || connorPredictLocked} onUse={requestSkillUse} cooldown={witchMarkCd || ippoBasicCd} ammo={isGambler ? me.gamblerUses : isMuimi ? me.muimiEmergencyUses : undefined} cost={isGambler && goldenOn ? halfCost(ch?.basic) : undefined} />
+                  <SkillSlot label="สกิลพื้นฐาน" tier="basic" skill={ch?.basic} points={me.skillPoints} disabled={!me.alive || phase !== "PLAYING" || (!isHisakawa && (done || noSkill || moonCellOn)) || hisakawaSwitchLocked || miyakoHealPending || hakunoSecondaryPending || beatBasicLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || witchMarkCooldown || (me.skillUsed && !gambleRepeat && !isByleth && !isHaruka && !isApple && !isMuimi && !isBard && !isTohno && !isHakuno && !isDoomguy && !isKai && !isTakumi && !isHisakawa && !isSup && !isBrian) || harukaBasicLocked || muimiBasicLocked || bylethBasicLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || cassiusLocked || veilLocked || ktBasicLocked || (isHakuno && me.hakunoGenderSwitched) || doomBasicLocked || takutoBasicPending || tepeuCookLocked || tepeuPonderLocked || psBladeLocked || ippoBasicCd > 0 || supBudgetLocked || arjunaBasicLocked || connorPredictLocked} onUse={requestSkillUse} cooldown={witchMarkCd || ippoBasicCd} ammo={isGambler ? me.gamblerUses : isMuimi ? me.muimiEmergencyUses : undefined} cost={isGambler && goldenOn ? halfCost(ch?.basic) : undefined} />
                 </div>
                 <div className="-translate-y-2">
-                  <SkillSlot label="สกิลรอง" tier="secondary" skill={ch?.secondary} points={me.skillPoints} disabled={done || phase !== "PLAYING" || noSkill || moonCellOn || miyakoComboPending || hakunoSecondaryPending || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || (me.skillUsed && !isByleth && !isBard && !isDoomguy && !isKai && !isTakumi && !isSup) || bylethSecLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || ohgerLocked || lanLocked || ktSecLocked || skSecLocked || banagherAssaultLocked || doomNoEffectLocked || takutoSecPending || takutoNotApprivoiseLocked || monsterMe || tepeuPonderLocked || tepeuCookLocked || batKarmaLocked || psSealLocked || harukaSecLocked || muimiSecLocked || burdenCooldown || ippoSecCd > 0 || supBudgetLocked || arjunaSecLocked} onUse={requestSkillUse} cooldown={burdenCd || ippoSecCd} ammo={isApple ? me.appleGiveUses : me.beamAmmo} cost={isGambler && goldenOn ? halfCost(ch?.secondary) : undefined} />
+                  <SkillSlot label="สกิลรอง" tier="secondary" skill={ch?.secondary} points={me.skillPoints} disabled={done || phase !== "PLAYING" || noSkill || moonCellOn || miyakoComboPending || hakunoSecondaryPending || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || (me.skillUsed && !isByleth && !isBard && !isDoomguy && !isKai && !isTakumi && !isSup) || bylethSecLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || ohgerLocked || lanLocked || ktSecLocked || skSecLocked || banagherAssaultLocked || doomNoEffectLocked || takutoSecPending || takutoNotApprivoiseLocked || monsterMe || tepeuPonderLocked || tepeuCookLocked || batKarmaLocked || psSealLocked || harukaSecLocked || muimiSecLocked || burdenCooldown || ippoSecCd > 0 || supBudgetLocked || arjunaSecLocked || brianSecLocked} onUse={requestSkillUse} cooldown={burdenCd || ippoSecCd} ammo={isApple ? me.appleGiveUses : me.beamAmmo} cost={isGambler && goldenOn ? halfCost(ch?.secondary) : undefined} />
                 </div>
                 <div className="translate-y-1.5">
-                  {isBard ? <BardComposeSlot me={me} /> : isKai ? <KaiOverhaulSlot me={me} /> : <SkillSlot label="ท่าไม้ตาย" tier="ultimate" skill={ch?.ultimate} points={me.skillPoints} disabled={(done || phase !== "PLAYING" || noSkill || moonCellOn || beatMe || (me.skillUsed && !isByleth && !isSup) || bylethUltLocked || bylethBudgetLocked || ultimateActive || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || takumiBudgetLocked || fourthLocked || doomUltLocked || takutoUltLockedNow || tepeuCookLocked || tepeuPonderLocked || offerLocked || ktUltLocked || shUltLocked || shCharging || rgCharging || phenexTaunting || hikaruUltLocked || shidoUltLocked || eijiUltLocked || muimiUltLocked || ippoUltLocked || supBudgetLocked || supUltCd > 0 || arjunaUltCd > 0)} onUse={requestSkillUse} cooldown={shidoUltCd || eijiUltCd || muimiUltCd || ippoUltCd || supUltCd || arjunaUltCd} cost={undefined} />}
+                  {isBard ? <BardComposeSlot me={me} /> : isKai ? <KaiOverhaulSlot me={me} /> : <SkillSlot label="ท่าไม้ตาย" tier="ultimate" skill={ch?.ultimate} points={me.skillPoints} disabled={(done || phase !== "PLAYING" || noSkill || moonCellOn || beatMe || (me.skillUsed && !isByleth && !isSup) || bylethUltLocked || bylethBudgetLocked || ultimateActive || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || takumiBudgetLocked || fourthLocked || doomUltLocked || takutoUltLockedNow || tepeuCookLocked || tepeuPonderLocked || offerLocked || ktUltLocked || shUltLocked || shCharging || rgCharging || phenexTaunting || hikaruUltLocked || shidoUltLocked || eijiUltLocked || muimiUltLocked || ippoUltLocked || supBudgetLocked || supUltCd > 0 || arjunaUltCd > 0 || brianUltLocked)} onUse={requestSkillUse} cooldown={shidoUltCd || eijiUltCd || muimiUltCd || ippoUltCd || supUltCd || arjunaUltCd} cost={undefined} />}
                 </div>
               </div>
               {noSkill && phase === "PLAYING" && !done && (
@@ -4395,6 +4490,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
           bagOpen={bagOpen} onCloseBag={() => setBagOpen(false)} players={state.players} gameState={state.gameState} roundNumber={state.roundNumber} onPickGunAmmo={startGunPick}
           skillConfirm={skillConfirm} onConfirmSkill={confirmSkillUse} onCancelSkill={cancelSkillConfirm}
         />
+        {brianKeyOpen && me && <BrianKeyModal me={me} onPick={pickBrianKey} onClose={() => { clickSound(); setBrianKeyOpen(false); }} />}
         {connorPredictOpen && me && <ConnorPredictModal me={me} players={state.players} onSubmit={submitConnorPredict} onClose={() => { clickSound(); setConnorPredictOpen(false); }} />}
         {yuiSongOpen && me && <YuiSongModal me={me} onPick={pickYuiSong} onClose={() => setYuiSongOpen(false)} />}
       </div>
@@ -4567,6 +4663,12 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
       )}
 
       {/* โหมดเลือกเป้าหมายมือซ้ายแห่งการรังสรรค์/มือขวาแห่งการลงทัณฑ์ (ไค ชิซากิ) — เลือกตัวเองได้ */}
+      {brianSel && (
+        <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-40 text-center text-hard whitespace-nowrap">
+          <span className="text-xl font-black text-echo-cyan animate-pulse bg-black/60 rounded-full px-5 py-1.5">🏁 คลิกเลือกคู่แข่งของ &quot;การแข่งที่มีเดิมพัน&quot;</span>
+          <button onClick={() => { clickSound(); setBrianSel(false); }} className="ml-2 text-sm font-bold bg-black/60 rounded-full px-3 py-1 border border-white/30">ยกเลิก</button>
+        </div>
+      )}
       {supSel && (
         <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-40 text-center text-hard whitespace-nowrap">
           <span className="text-xl font-black text-echo-gold animate-pulse bg-black/60 rounded-full px-5 py-1.5">🙏 คลิกเลือกเป้าหมายของ {SUP_SKILL_LABEL[supSel]}</span>
@@ -4774,13 +4876,13 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
               <div className="flex flex-col items-center gap-1.5">
                 <div className="flex items-end gap-2 sm:gap-3">
                   <div className="w-40 sm:w-48">
-                    <SkillSlot size="lg" label="พื้นฐาน" tier="basic" skill={ch?.basic} points={me.skillPoints} disabled={!me.alive || phase !== "PLAYING" || (!isHisakawa && (done || noSkill || moonCellOn)) || hisakawaSwitchLocked || miyakoHealPending || hakunoSecondaryPending || beatBasicLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || witchMarkCooldown || (me.skillUsed && !gambleRepeat && !isByleth && !isHaruka && !isApple && !isMuimi && !isBard && !isTohno && !isHakuno && !isDoomguy && !isKai && !isTakumi && !isHisakawa && !isSup) || harukaBasicLocked || muimiBasicLocked || bylethBasicLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || cassiusLocked || veilLocked || ktBasicLocked || (isHakuno && me.hakunoGenderSwitched) || doomBasicLocked || takutoBasicPending || tepeuCookLocked || tepeuPonderLocked || psBladeLocked || ippoBasicCd > 0 || supBudgetLocked || arjunaBasicLocked || connorPredictLocked} onUse={requestSkillUse} cooldown={witchMarkCd || ippoBasicCd} ammo={isGambler ? me.gamblerUses : isMuimi ? me.muimiEmergencyUses : undefined} cost={isGambler && goldenOn ? halfCost(ch?.basic) : undefined} />
+                    <SkillSlot size="lg" label="พื้นฐาน" tier="basic" skill={ch?.basic} points={me.skillPoints} disabled={!me.alive || phase !== "PLAYING" || (!isHisakawa && (done || noSkill || moonCellOn)) || hisakawaSwitchLocked || miyakoHealPending || hakunoSecondaryPending || beatBasicLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || witchMarkCooldown || (me.skillUsed && !gambleRepeat && !isByleth && !isHaruka && !isApple && !isMuimi && !isBard && !isTohno && !isHakuno && !isDoomguy && !isKai && !isTakumi && !isHisakawa && !isSup && !isBrian) || harukaBasicLocked || muimiBasicLocked || bylethBasicLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || cassiusLocked || veilLocked || ktBasicLocked || (isHakuno && me.hakunoGenderSwitched) || doomBasicLocked || takutoBasicPending || tepeuCookLocked || tepeuPonderLocked || psBladeLocked || ippoBasicCd > 0 || supBudgetLocked || arjunaBasicLocked || connorPredictLocked} onUse={requestSkillUse} cooldown={witchMarkCd || ippoBasicCd} ammo={isGambler ? me.gamblerUses : isMuimi ? me.muimiEmergencyUses : undefined} cost={isGambler && goldenOn ? halfCost(ch?.basic) : undefined} />
                   </div>
                   <div className="w-40 sm:w-48">
-                    <SkillSlot size="lg" label="รอง" tier="secondary" skill={ch?.secondary} points={me.skillPoints} disabled={done || phase !== "PLAYING" || noSkill || moonCellOn || miyakoComboPending || hakunoSecondaryPending || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || (me.skillUsed && !isByleth && !isBard && !isDoomguy && !isKai && !isTakumi && !isSup) || bylethSecLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || ohgerLocked || lanLocked || ktSecLocked || skSecLocked || banagherAssaultLocked || doomNoEffectLocked || takutoSecPending || takutoNotApprivoiseLocked || monsterMe || tepeuPonderLocked || tepeuCookLocked || batKarmaLocked || psSealLocked || harukaSecLocked || muimiSecLocked || burdenCooldown || ippoSecCd > 0 || supBudgetLocked || arjunaSecLocked} onUse={requestSkillUse} cooldown={burdenCd || ippoSecCd} ammo={isApple ? me.appleGiveUses : me.beamAmmo} cost={isGambler && goldenOn ? halfCost(ch?.secondary) : undefined} />
+                    <SkillSlot size="lg" label="รอง" tier="secondary" skill={ch?.secondary} points={me.skillPoints} disabled={done || phase !== "PLAYING" || noSkill || moonCellOn || miyakoComboPending || hakunoSecondaryPending || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || (me.skillUsed && !isByleth && !isBard && !isDoomguy && !isKai && !isTakumi && !isSup) || bylethSecLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || ohgerLocked || lanLocked || ktSecLocked || skSecLocked || banagherAssaultLocked || doomNoEffectLocked || takutoSecPending || takutoNotApprivoiseLocked || monsterMe || tepeuPonderLocked || tepeuCookLocked || batKarmaLocked || psSealLocked || harukaSecLocked || muimiSecLocked || burdenCooldown || ippoSecCd > 0 || supBudgetLocked || arjunaSecLocked || brianSecLocked} onUse={requestSkillUse} cooldown={burdenCd || ippoSecCd} ammo={isApple ? me.appleGiveUses : me.beamAmmo} cost={isGambler && goldenOn ? halfCost(ch?.secondary) : undefined} />
                   </div>
                   <div className="w-40 sm:w-48">
-                    {isBard ? <BardComposeSlot me={me} /> : isKai ? <KaiOverhaulSlot me={me} /> : <SkillSlot size="lg" label="ท่าไม้ตาย" tier="ultimate" skill={ch?.ultimate} points={me.skillPoints} disabled={(done || phase !== "PLAYING" || noSkill || moonCellOn || beatMe || (me.skillUsed && !isByleth && !isSup) || bylethUltLocked || bylethBudgetLocked || ultimateActive || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || takumiBudgetLocked || monsterMe || fourthLocked || doomUltLocked || takutoUltLockedNow || tepeuCookLocked || tepeuPonderLocked || offerLocked || ktUltLocked || shUltLocked || shCharging || rgCharging || phenexTaunting || shidoUltLocked || eijiUltLocked || muimiUltLocked || ippoUltLocked || supBudgetLocked || supUltCd > 0 || arjunaUltCd > 0)} onUse={requestSkillUse} cooldown={shidoUltCd || eijiUltCd || muimiUltCd || ippoUltCd || supUltCd || arjunaUltCd} cost={undefined} />}
+                    {isBard ? <BardComposeSlot me={me} /> : isKai ? <KaiOverhaulSlot me={me} /> : <SkillSlot size="lg" label="ท่าไม้ตาย" tier="ultimate" skill={ch?.ultimate} points={me.skillPoints} disabled={(done || phase !== "PLAYING" || noSkill || moonCellOn || beatMe || (me.skillUsed && !isByleth && !isSup) || bylethUltLocked || bylethBudgetLocked || ultimateActive || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || takumiBudgetLocked || monsterMe || fourthLocked || doomUltLocked || takutoUltLockedNow || tepeuCookLocked || tepeuPonderLocked || offerLocked || ktUltLocked || shUltLocked || shCharging || rgCharging || phenexTaunting || shidoUltLocked || eijiUltLocked || muimiUltLocked || ippoUltLocked || supBudgetLocked || supUltCd > 0 || arjunaUltCd > 0 || brianUltLocked)} onUse={requestSkillUse} cooldown={shidoUltCd || eijiUltCd || muimiUltCd || ippoUltCd || supUltCd || arjunaUltCd} cost={undefined} />}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -4918,7 +5020,8 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
         bagOpen={bagOpen} onCloseBag={() => setBagOpen(false)} players={state.players} gameState={state.gameState} roundNumber={state.roundNumber} onPickGunAmmo={startGunPick}
         skillConfirm={skillConfirm} onConfirmSkill={confirmSkillUse} onCancelSkill={cancelSkillConfirm}
       />
-      {connorPredictOpen && me && <ConnorPredictModal me={me} players={state.players} onSubmit={submitConnorPredict} onClose={() => { clickSound(); setConnorPredictOpen(false); }} />}
+      {brianKeyOpen && me && <BrianKeyModal me={me} onPick={pickBrianKey} onClose={() => { clickSound(); setBrianKeyOpen(false); }} />}
+        {connorPredictOpen && me && <ConnorPredictModal me={me} players={state.players} onSubmit={submitConnorPredict} onClose={() => { clickSound(); setConnorPredictOpen(false); }} />}
         {yuiSongOpen && me && <YuiSongModal me={me} onPick={pickYuiSong} onClose={() => setYuiSongOpen(false)} />}
       </div>
     </div>

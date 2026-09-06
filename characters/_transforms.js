@@ -12,6 +12,7 @@ const shidoImg = require("./shido").IMG;   // อิสึกะ ชิโด: �
 const yuiImg = require("./yui").IMG;       // ยุย โยชิโอกะ: เหตุผลเดียวกัน
 const ippoImg = require("./ippo").IMG;     // มาคุโนะอุจิ อิปโป: เหตุผลเดียวกัน
 const arjunaImg = require("./arjuna").IMG; // มหาเทพ อรชุน: เหตุผลเดียวกัน
+const brianImg = require("./brian").IMG;   // ไบรอัน (GT-R34): เหตุผลเดียวกัน
 const muimiImg = require("./muimi").IMG;   // มุยมิ: ใช้ path รูปจาก hook กลาง
 const BAT_CAR_IMG = "/characters/bat_ben/bat_update/bat_ben_car.webp";
 const BAT_SHOT_IMG = "/characters/bat_ben/bat_update/skill1.2/bat_ben_skill1.2.jpg";
@@ -24,6 +25,17 @@ module.exports = function buildTransforms(img) {
     // ปัดขึ้นเผื่อเวลาตัดฉากเพื่อให้วิดีโอเล่นจบครบ และ queueCutscene ทำให้เล่นทุกครั้งที่กด
     muimiUltimateFull:  { img: muimiImg.skill3, video: "/characters/muimi/muimi_skill3.mp4",       title: "ดาบสะบั้นหอคอยสวรรค์", label: "ปล่อยท่าไม้ตาย", seconds: 24, music: "muimi", afterReveal: false },
     muimiUltimateShort: { img: muimiImg.skill3, video: "/characters/muimi/muimi_skill3_short.mp4", title: "ดาบสะบั้นหอคอยสวรรค์", label: "ปล่อยท่าไม้ตาย", seconds: 12, music: "muimi", afterReveal: false },
+    // ---------- ไบรอัน (GT-R34) (patch 3.5 new) ----------
+    //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก — ทุกคลิปเรียกผ่าน queueCutscene = เล่นทุกครั้ง
+    //  ยกเว้น brianKey/brianBoost ที่ฮุคกันไว้ให้เล่นเฉพาะ "ครั้งแรก" ตามสเปค (ดู brianCarShown/brianBoostShown)
+    brianKey:      { img: brianImg.skill1, video: "/characters/brian_r34/skill1/brian_skill1.mp4",        title: "กุญแจรถ",             label: "ขึ้นรถคู่ใจ",   seconds: 13, music: null, afterReveal: false },
+    brianBoost:    { img: brianImg.car,    video: "/characters/brian_r34/skill1/brian_skill1_boost.mp4",  title: "เหยียบมิด",           label: "เพิ่มพลัง",     seconds: 8, music: null, afterReveal: false },
+    brianPush:     { img: brianImg.skill2, video: "/characters/brian_r34/skill2/brian_skill2.mp4",        title: "หลีกทางไป",           label: "พุ่งชน",       seconds: 9, music: null, afterReveal: true },
+    brianDuel:     { img: brianImg.skill3, video: "/characters/brian_r34/skill3/duel/brian_duel.mp4",     title: "การแข่งที่มีเดิมพัน", label: "ท้าแข่ง",      seconds: 9, music: null, afterReveal: false },
+    brianDuelWin:  { img: brianImg.skill3, video: "/characters/brian_r34/skill3/duel/brian_duel_win.mp4", title: "WINNER",              label: "คว้าชัย",      seconds: 12, music: null, afterReveal: true },
+    brianDuelLost: { img: brianImg.skill3, video: "/characters/brian_r34/skill3/duel/brian_duel_lost.mp4",title: "LOSER",               label: "พ่ายแพ้",      seconds: 13, music: null, afterReveal: true },
+    brianN2O:      { img: brianImg.skill32, video: "/characters/brian_r34/skill3/brian_skill3.2.mp4",     title: "N2O",                 label: "เทน้ำมันทั้งถัง", seconds: 12, music: null, afterReveal: false },
+    brianN2OHit:   { img: brianImg.skill32, video: "/characters/brian_r34/skill3/brian_skill3.2_hit.mp4", title: "N2O · FINISH",        label: "เข้าเส้นชัย",  seconds: 7, music: null, afterReveal: true },
     // ---------- มหาเทพ อรชุน (patch 3.4 new) ----------
     //  seconds วัดจาก mvhd จริง (16.38) แล้วปัดขึ้นเผื่อเวลาตัดฉาก — queueCutscene = เล่นทุกครั้งที่กดท่าไม้ตาย
     arjunaPralaya: { img: arjunaImg.skill3, video: "/characters/arjuna/arjuna_skill3.mp4", title: "MAHAPRALAYA", label: "มหาประลัย", seconds: 17, music: null, afterReveal: false },
