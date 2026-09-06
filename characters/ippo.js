@@ -18,9 +18,9 @@
 const ID = "ippo";
 
 // ---------- ค่าสถานะพื้นฐาน ----------
-const IPPO_MAX_HP = 5;
+const IPPO_MAX_HP = 6;            // balance 3.4.5: เดิม 5
 const IPPO_MAX_ARMOR = 4;        // "โล่ 4" = เกราะ (เพดาน 4 แทน 3 ปกติ)
-const BASE_DODGE = 20;           // อัตราหลบหลีกพื้นฐาน (%)
+const BASE_DODGE = 30;           // อัตราหลบหลีกพื้นฐาน (%) · balance 3.4.5: เดิม 20
 
 // ---------- สกิลติดตัว ผู้ยืนหยัด ----------
 const STAND_DODGE_STEP = 10;     // หลบสำเร็จ -> อัตราหลบ +10%
@@ -36,6 +36,7 @@ const GUARD_ARMOR = 2;           // ฟื้นเกราะ
 const UPPER_COOLDOWN = 3;
 const UPPER_STUN_TURNS = 1;      // เป้าหมายไม่มีเกราะ -> สตั้น (เริ่มมีผลเทิร์นถัดไป)
 const UPPER_DECAY_TURNS = 3;     // เป้าหมายมีเกราะ -> ผุพัง
+const UPPER_ATK_BONUS = 1;       // balance 3.4.5: ระหว่างหมัดเสยค้างอยู่ พลังโจมตีพื้นฐาน +1 (ใช้ครั้งเดียวพร้อมหมัดนั้น)
 
 // ---------- ท่าไม้ตาย Dempsey roll ----------
 const DEMPSEY_COOLDOWN = 4;
@@ -76,6 +77,7 @@ module.exports = {
   UPPER_COOLDOWN,
   UPPER_STUN_TURNS,
   UPPER_DECAY_TURNS,
+  UPPER_ATK_BONUS,
   DEMPSEY_COOLDOWN,
   DEMPSEY_MAX,
   DEMPSEY_DODGE_STEP,
@@ -137,7 +139,7 @@ module.exports = {
   applyUpper(engine, p) {
     this.setCooldown(engine, p, "secondary", UPPER_COOLDOWN);
     p.ippoUpper = true;
-    engine.log(`🥊 ${p.name} Uper Cut — เตรียมหมัดเสยไว้แล้ว: การโจมตีครั้งถัดไป ถ้าเป้าหมายไม่มีเกราะจะมอบ "สตั้น" ${UPPER_STUN_TURNS} เทิร์น (เริ่มเทิร์นหน้า) · ถ้ามีเกราะจะมอบ "ผุพัง" ${UPPER_DECAY_TURNS} เทิร์น`);
+    engine.log(`🥊 ${p.name} Uper Cut — เตรียมหมัดเสยไว้แล้ว: พลังโจมตีพื้นฐาน +${UPPER_ATK_BONUS} และการโจมตีครั้งถัดไป ถ้าเป้าหมายไม่มีเกราะจะมอบ "สตั้น" ${UPPER_STUN_TURNS} เทิร์น (เริ่มเทิร์นหน้า) · ถ้ามีเกราะจะมอบ "ผุพัง" ${UPPER_DECAY_TURNS} เทิร์น`);
     return " — เตรียมหมัดเสย";
   },
 
@@ -244,7 +246,11 @@ module.exports = {
     if (!isIppo(attacker) || !target) return 0;
     const stunned = (target.statuses.stun || 0) > 0;
     ctx.ippoStunAtk = stunned;
-    return stunned ? STUN_ATK_BONUS : 0;
+    // Uper Cut (balance 3.4.5): หมัดที่กำลังจะออกแรงขึ้น +1 — ธง ippoUpper ถูกใช้หมดที่ resolveUpper
+    //  ในหมัดเดียวกัน โบนัสจึงมีผลครั้งเดียวโดยอัตโนมัติ ไม่ต้องมีตัวนับแยก
+    const upper = !!attacker.ippoUpper;
+    ctx.ippoUpperAtk = upper;
+    return (stunned ? STUN_ATK_BONUS : 0) + (upper ? UPPER_ATK_BONUS : 0);
   },
 
   // ---------- โจมตีเพิ่มตาม Dempsey Charge ----------

@@ -64,19 +64,19 @@ const DODGE = 0.0;   // หลบติดแน่นอน
 const NO_DODGE = 0.99; // หลบไม่ติดแน่นอน
 
 // ---------------------------------------------------------------- ข้อมูลตัวละคร
-test('อิปโป: ค่าสถานะพื้นฐานตรงสเปค (เลือด 5 · เกราะเพดาน 4 · หลบ 20%)', () => {
+test('อิปโป: ค่าสถานะพื้นฐานตรงสเปค (เลือด 6 · เกราะเพดาน 4 · หลบ 30%)', () => {
   const c = CHARACTERS.CHAR_BY_ID.ippo;
   assert.ok(c);
   assert.equal(c.basic.cost, 3);
   assert.equal(c.secondary.cost, 4);
   assert.equal(c.ultimate.cost, 6);
-  assert.equal(ippo.MAX_HP, 5);
+  assert.equal(ippo.MAX_HP, 6);
   assert.equal(ippo.MAX_ARMOR, 4);
-  assert.equal(ippo.BASE_DODGE, 20);
+  assert.equal(ippo.BASE_DODGE, 30);
   assert.equal(ippo.DEMPSEY_MAX, 3);
 
   const { i } = setup();
-  assert.equal(engine.maxHpOf(i), 5, 'engine ใช้เพดานเลือดของอิปโปจริง');
+  assert.equal(engine.maxHpOf(i), 6, 'engine ใช้เพดานเลือดของอิปโปจริง');
   assert.equal(engine.maxArmorOf(i), 4, 'engine ใช้เพดานเกราะ 4');
 });
 
@@ -84,19 +84,19 @@ test('อิปโป: ค่าสถานะพื้นฐานตรงส
 test('ผู้ยืนหยัด: หลบสำเร็จ -> เล่นวีดีโอ + อัตราหลบสะสม +10% (ตัน +20%) + แต้มสกิล +1', () => {
   const { i } = setup();
   i.skillPoints = 0;
-  assert.equal(ippo.dodgeChance(i), 20, 'ฐาน 20%');
+  assert.equal(ippo.dodgeChance(i), ippo.BASE_DODGE, 'เริ่มที่อัตราฐาน');
 
   withRandom([DODGE], () => ippo.tryDodge(engine, i, 'ทดสอบ'));
   assert.equal(i.ippoStandDodge, 10);
-  assert.equal(ippo.dodgeChance(i), 30);
+  assert.equal(ippo.dodgeChance(i), ippo.BASE_DODGE + ippo.STAND_DODGE_STEP);
   assert.equal(i.skillPoints, 1, 'ฟื้นแต้มสกิล +1');
   assert.ok(queued.includes('ippoDodge'), 'เล่นวีดีโอหลบหลีก');
 
   withRandom([DODGE], () => ippo.tryDodge(engine, i, 'ทดสอบ'));
   assert.equal(i.ippoStandDodge, 20);
   withRandom([DODGE], () => ippo.tryDodge(engine, i, 'ทดสอบ'));
-  assert.equal(i.ippoStandDodge, 20, 'ตันที่ +20%');
-  assert.equal(ippo.dodgeChance(i), 40);
+  assert.equal(i.ippoStandDodge, ippo.STAND_DODGE_MAX, 'ตันที่เพดานของผู้ยืนหยัด');
+  assert.equal(ippo.dodgeChance(i), ippo.BASE_DODGE + ippo.STAND_DODGE_MAX);
 });
 
 test('ผู้ยืนหยัด: โดนตีเข้าเต็มๆ -> อัตราหลบที่สะสมไว้หายหมด', () => {
@@ -106,7 +106,7 @@ test('ผู้ยืนหยัด: โดนตีเข้าเต็มๆ
 
   withRandom([NO_DODGE], () => engine.withEffectSource(a, () => engine.dealMixed(i, 1, true)));
   assert.equal(i.ippoStandDodge, 0, 'สะสมหายหมดเมื่อโดนตี');
-  assert.equal(ippo.dodgeChance(i), 20, 'กลับไปที่ฐาน');
+  assert.equal(ippo.dodgeChance(i), ippo.BASE_DODGE, 'กลับไปที่ฐาน');
 });
 
 test('ผู้ยืนหยัด: ตีคนที่ติดสตั้น พลังโจมตีพื้นฐาน +1', () => {
@@ -208,8 +208,8 @@ test('Dempsey roll: หลบสำเร็จสะสม Charge (ตัน 3)
     for (let n = 0; n < 4; n++) ippo.tryDodge(engine, i, 'ทดสอบ');
   });
   assert.equal(ippo.chargeOf(i), ippo.DEMPSEY_MAX, 'ตันที่ 3 หน่วย');
-  // ฐาน 20 + ผู้ยืนหยัดตัน 20 + Charge 3x10 = 70
-  assert.equal(ippo.dodgeChance(i), 20 + ippo.STAND_DODGE_MAX + ippo.DEMPSEY_MAX * ippo.DEMPSEY_DODGE_STEP);
+  // ฐาน + ผู้ยืนหยัดตัน + Charge เต็ม 3 หน่วย
+  assert.equal(ippo.dodgeChance(i), ippo.BASE_DODGE + ippo.STAND_DODGE_MAX + ippo.DEMPSEY_MAX * ippo.DEMPSEY_DODGE_STEP);
 });
 
 test('Dempsey roll: โจมตีสำเร็จ -> เทหมดหน้าตัก บัฟหายทั้งก้อน + เล่นวีดีโอ', () => {

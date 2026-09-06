@@ -1002,6 +1002,16 @@ function LifeBar({ p, sm, className = "" }) {
       <span className="inline-flex gap-0.5 shrink-0">
         {Array.from({ length: p.maxArmor }, (_, i) => <Shield key={i} on={i < p.armor} size={sm ? 12 : 16} />)}
       </span>
+      {/* ผู้วิงวอน "เกราะศรัทธา" (patch 3.4.5): เกราะชั้นที่ 2 — วาดต่อท้ายเกราะหลักตามที่สเปคกำหนด
+          ❤️❤️… 🛡️🛡️🛡️ 🔰🔰🔰 · โชว์เฉพาะจำนวนที่เหลือจริง (ไม่มีช่องว่างของหน่วยที่แตกไปแล้ว) */}
+      {p.supFaith > 0 && (
+        <span
+          className={`${sm ? "text-sm" : "text-lg"} leading-none whitespace-nowrap`}
+          title={`เกราะศรัทธา ${p.supFaith}/${p.supFaithMax || 3} — เกราะชั้นหลังเกราะหลัก · ระหว่างที่ยังเหลือ เจ้าของได้ "คุ้มครอง 1" และ "เสริมพลัง 1"`}
+        >
+          {"🔰".repeat(p.supFaith)}
+        </span>
+      )}
       {p.shield > 0 && <span className={`${sm ? "text-xs" : "text-sm"} text-echo-cyan font-bold`}>+🛡️{p.shield}</span>}
     </span>
   );

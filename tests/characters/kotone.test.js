@@ -220,17 +220,17 @@ test('สกิลติดตัว: โอกาส 30% ฟื้นแต้�
 });
 
 // ---------- ท่าไม้ตาย 1 + ร่าง [พร้อมลุย] ----------
-test('ท่าไม้ตาย 1 กดได้ต่อเมื่อ [ความพร้อม] ครบ 4 และหักครบ 4 ตอนเข้าร่าง', () => {
-  const p = mkPlayer({ statuses: { kotoneReady: 3 } });
+test('ท่าไม้ตาย 1 กดได้ต่อเมื่อ [ความพร้อม] ครบตาม READY_NEED และหักครบตอนเข้าร่าง', () => {
+  const p = mkPlayer({ statuses: { kotoneReady: kotone.READY_NEED - 1 } });
   const e = mkEngine({ p1: p });
   assert.equal(kotone.canUseSkill(e, p, 'ultimate', kotoneCharacter.ultimate, false), false);
 
-  p.statuses.kotoneReady = 5;
+  p.statuses.kotoneReady = kotone.READY_NEED + 1;
   assert.equal(kotone.canUseSkill(e, p, 'ultimate', kotoneCharacter.ultimate, false), true);
 
   // ทำงานทันทีก่อนเปิดการ์ด: applyInstantSkill เรียก activateReady แล้ว applyEffect ของ engine ตั้ง kready ตามมา
   kotone.applyInstantSkill(e, p, 'ultimate', false);
-  assert.equal(kotone.readyStacks(p), 1, 'เหลือ 1 จาก 5');
+  assert.equal(kotone.readyStacks(p), 1, 'เหลือ 1 หลังหักครบตาม READY_NEED');
   assert.equal(p.seen.kready, true, 'ตั้ง seen เองเพราะไม่ผ่านลูป afterReveal');
   p.statuses.kready = 999; // applyEffect ของ engine
   assert.equal(kotone.formActive(p), true);

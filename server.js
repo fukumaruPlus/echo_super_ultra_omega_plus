@@ -3353,6 +3353,11 @@ function applyGutsBullet(p, item, target) {
   if (item.ammo === "shockwave") {
     const before = target.armor;
     for (let i = 0; i < before; i++) { if (target.armor > 0) loseArmor(target); }
+    // ผู้วิงวอน (patch 3.4.5): "ปืนสลายเกราะ" สลาย "เกราะศรัทธา" ที่ซ้อนอยู่ชั้นหลังด้วย
+    //  (สเปคระบุชัดว่าเกราะศรัทธาได้รับผลจากกระสุนนี้ — ไม่งั้นชั้นหลังจะรอดทุกครั้ง)
+    const faithBefore = CHAR_HOOKS.the_supplicant.faithOf(target);
+    for (let i = 0; i < faithBefore; i++) CHAR_HOOKS.the_supplicant.faithAbsorb(engine, target);
+    if (faithBefore > 0) lastLog.push(`💥✝️ Shockwave Bullet — เกราะศรัทธาของ ${target.name} ถูกสลายทั้งหมด (-${faithBefore})`);
     mageslayerMarkSteal(target, before); // ตราล่าเวท: กระสุนนี้ทำลายเกราะด้วย loseArmor ตรงๆ ไม่ผ่านท่อ deal* จึงต้องเรียกเอง
     lastLog.push(before > 0
       ? `💥 Shockwave Bullet — เกราะของ ${target.name} ถูกทำลายทั้งหมด (-${before}) แต่พลังชีวิตจริงไม่ได้รับความเสียหาย`

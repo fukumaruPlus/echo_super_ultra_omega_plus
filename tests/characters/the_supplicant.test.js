@@ -71,15 +71,43 @@ test('ข้อมูลตัวละครลงทะเบียนคร�
 });
 
 // ---------------------------------------------------------------- สกิลพื้นฐาน Prayer
-test('Prayer: มอบเยียวยา 1 หน่วย/1 เทิร์น และล้างดีบัฟ 1 ขั้น', () => {
+test('Prayer: มอบเยียวยา 1 หน่วย/1 เทิร์น และลดดีบัฟลง "ทีละ 1 ขั้น" (patch 3.4.5)', () => {
   const { s, a } = setup();
   a.statuses.weak = 3; a.statusAmt.weak = 1;
   sup.applyPrayer(engine, s, a);
   assert.equal(a.statuses.mend, 1);
   assert.equal(a.statusAmt.mend, 1);
-  assert.ok(!a.statuses.weak, 'ดีบัฟตัวแรกในรายการต้องถูกล้าง');
+  assert.equal(a.statuses.weak, 2, 'ลดลง 1 ขั้น ไม่ใช่ลบทั้งสถานะ');
   assert.equal(s.supPrayers, 1, 'ล้างได้ 1 ขั้น = คำวิงวอน +1');
   assert.ok(fx.includes('A:heal'));
+});
+
+test('Prayer: ตัวอย่างตามสเปค — เลือดไหล 6 -> 5 · ภาระเวท 5 เทิร์น -> 4 เทิร์น', () => {
+  const { s, a } = setup();
+  a.statuses.hbleed = 6;
+  sup.applyPrayer(engine, s, a);
+  assert.equal(a.statuses.hbleed, 5);
+  const { s: s2, b } = setup();
+  b.statuses.spellburden = 5; b.statusAmt.spellburden = 2;
+  sup.applyPrayer(engine, s2, b);
+  assert.equal(b.statuses.spellburden, 4);
+  assert.equal(b.statusAmt.spellburden, 2, 'จำนวนหน่วยไม่ถูกแตะ ลดแค่เทิร์น');
+});
+
+test('Prayer: ดีบัฟที่เหลือ 1 อยู่แล้ว ลด 1 ขั้นคือหายไปเลย', () => {
+  const { s, a } = setup();
+  a.statuses.stun = 1;
+  sup.applyPrayer(engine, s, a);
+  assert.ok(!a.statuses.stun);
+});
+
+test('ปืนสลายเกราะ (Shockwave Bullet) สลายเกราะศรัทธาด้วย', () => {
+  const { s, a } = setup();
+  sup.grantFaith(engine, a, 3);
+  a.armor = 2;
+  // จำลองผลของกระสุน: เกราะหลักหมดก่อน แล้วเกราะศรัทธาถูกสลายทีละหน่วยจนหมด
+  for (let i = 0; i < 3; i++) sup.faithAbsorb(engine, a);
+  assert.equal(sup.faithOf(a), 0);
 });
 
 test('Prayer: เป้าหมายไม่มีดีบัฟเลย ไม่ได้คำวิงวอน แต่ยังได้เยียวยา', () => {

@@ -184,9 +184,10 @@ test('Mahapralaya: ล้างดีบัฟให้เป้าหมาย�
   a.statuses.hburn = 4;
   arjuna.startPralaya(engine, j);
   arjuna.applyPralaya(engine, j);
-  const left = ['stun', 'weak', 'hburn', 'fragile'].filter((k) => (a.statuses[k] || 0) > 0);
-  assert.equal(left.length, 3, 'ติดมา 3 + เปราะบางจากท่า = 4 · ถูกล้างไป 1 ขั้น เหลือ 3');
-  assert.ok(!a.statuses.stun, 'ล้างตัวแรกในรายการดีบัฟพื้นฐาน (stun มาก่อน weak)');
+  // patch 3.4.5: "1 ขั้น" = ลดตัวนับของดีบัฟตัวแรกลง 1 ไม่ใช่ลบทั้งสถานะ (stun มาก่อน weak ในรายการกลาง)
+  assert.equal(a.statuses.stun, 1, 'สตั้น 2 -> 1');
+  assert.equal(a.statuses.weak, 3, 'ตัวอื่นไม่ถูกแตะ');
+  assert.equal(a.statuses.hburn, 4);
 });
 
 test('Mahapralaya: ล้างหลังลงดาเมจ — สังหารโลกาจึงคิดจากดีบัฟเต็มจำนวนก่อนถูกล้าง', () => {
@@ -198,7 +199,7 @@ test('Mahapralaya: ล้างหลังลงดาเมจ — สัง�
   arjuna.startPralaya(engine, j);        // แจกเปราะบาง -> A มี 2 ดีบัฟตอนคิดดาเมจ
   arjuna.applyPralaya(engine, j);
   assert.equal(hp0 - a.hp, 4, 'ฐาน 1 + สังหารโลกา 1 + ดีบัฟ 2 ตัว = 4');
-  assert.ok(!a.statuses.stun, 'แล้วค่อยล้างให้ 1 ขั้นหลังดาเมจลง');
+  assert.equal(a.statuses.stun, 1, 'แล้วค่อยลดสตั้นลง 1 ขั้น (2 -> 1) หลังดาเมจลง');
 });
 
 test('Mahapralaya: อรชุนไม่ได้ล้างดีบัฟให้ตัวเอง (ล้างเฉพาะคนที่ถูกโจมตี)', () => {
