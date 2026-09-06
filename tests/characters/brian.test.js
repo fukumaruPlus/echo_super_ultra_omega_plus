@@ -382,6 +382,25 @@ test('[regression] ระหว่างการแข่ง คนอื่น
   assert.equal(c.skillPoints, before, 'คนนอกวงกดสกิลไม่ได้ และไม่เสียแต้ม');
 });
 
+test('[regression] คลิปของไบรอันต้องไม่เป็น afterReveal (กันวีดีโอเล่นซ้ำ 2 ครั้งใน 1 เทิร์น)', () => {
+  // afterReveal: true ทำให้ลูปกลางใน afterResolve() ไล่หา "สถานะที่ชื่อตรงกับคีย์ TRANSFORMS"
+  //  แล้วเล่นวีดีโอให้เอง — brianPush เป็นทั้งชื่อสถานะและชื่อคลิป จึงเคยเล่นซ้ำ
+  //  และ voidUltimateOnBust ยังลบสถานะ brianPush ทิ้งถ้าไบรอันไพ่แตกก่อนเปิดไพ่ด้วย
+  for (const k of ['brianKey', 'brianBoost', 'brianPush', 'brianDuel', 'brianDuelWin', 'brianDuelLost', 'brianN2O', 'brianN2OHit']) {
+    assert.ok(engine.TRANSFORMS[k], `ต้องมีคลิป ${k}`);
+    assert.equal(engine.TRANSFORMS[k].afterReveal, false, `${k} ต้องคิวเองจากโค้ด ไม่ใช่ผ่านลูปกลาง`);
+  }
+});
+
+test('[regression] ไบรอันไพ่แตกแล้ว "หลีกทางไป" ต้องไม่ถูกลบทิ้ง', () => {
+  const { b } = setup();
+  brian.startCar(engine, b);
+  brian.applyPush(engine, b);
+  b.cards = [{ value: 12, color: 'red' }, { value: 12, color: 'red' }]; // 24 = ไพ่แตก
+  engine.voidUltimateOnBust(b);
+  assert.equal(b.statuses.brianPush, brian.PUSH_TURNS, 'สกิลรองไม่ใช่ท่าไม้ตาย ไม่ควรโดนยกเลิกเพราะไพ่แตก');
+});
+
 // ---------------------------------------------------------------- N2O
 test('N2O: ช่องท่าไม้ตายเปลี่ยนเป็น N2O เฉพาะระหว่างการแข่ง และต้องมีน้ำมัน >= 4', () => {
   const { b, a } = setup();

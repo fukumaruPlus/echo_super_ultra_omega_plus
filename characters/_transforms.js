@@ -28,14 +28,18 @@ module.exports = function buildTransforms(img) {
     // ---------- ไบรอัน (GT-R34) (patch 3.5 new) ----------
     //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก — ทุกคลิปเรียกผ่าน queueCutscene = เล่นทุกครั้ง
     //  ยกเว้น brianKey/brianBoost ที่ฮุคกันไว้ให้เล่นเฉพาะ "ครั้งแรก" ตามสเปค (ดู brianCarShown/brianBoostShown)
+    //  ⚠️ ทุกคีย์ของไบรอันต้องเป็น afterReveal: false — คลิปพวกนี้ถูก "คิวเอง" จากโค้ดทั้งหมด
+    //  afterReveal: true จะทำให้ลูปกลางใน afterResolve() ไล่หาสถานะที่ "ชื่อตรงกับคีย์ TRANSFORMS"
+    //  แล้วเล่นวีดีโอให้อีกรอบ — brianPush เป็นทั้งชื่อสถานะและชื่อคลิป จึงเคยเล่นซ้ำ 2 ครั้งใน 1 เทิร์น
+    //  (ซ้ำร้าย voidUltimateOnBust ยังลบสถานะ brianPush ทิ้งถ้าไบรอันไพ่แตกก่อนเปิดไพ่ด้วย)
     brianKey:      { img: brianImg.skill1, video: "/characters/brian_r34/skill1/brian_skill1.mp4",        title: "กุญแจรถ",             label: "ขึ้นรถคู่ใจ",   seconds: 13, music: null, afterReveal: false },
     brianBoost:    { img: brianImg.car,    video: "/characters/brian_r34/skill1/brian_skill1_boost.mp4",  title: "เหยียบมิด",           label: "เพิ่มพลัง",     seconds: 8, music: null, afterReveal: false },
-    brianPush:     { img: brianImg.skill2, video: "/characters/brian_r34/skill2/brian_skill2.mp4",        title: "หลีกทางไป",           label: "พุ่งชน",       seconds: 9, music: null, afterReveal: true },
+    brianPush:     { img: brianImg.skill2, video: "/characters/brian_r34/skill2/brian_skill2.mp4",        title: "หลีกทางไป",           label: "พุ่งชน",       seconds: 9, music: null, afterReveal: false },
     brianDuel:     { img: brianImg.skill3, video: "/characters/brian_r34/skill3/duel/brian_duel.mp4",     title: "การแข่งที่มีเดิมพัน", label: "ท้าแข่ง",      seconds: 9, music: null, afterReveal: false },
-    brianDuelWin:  { img: brianImg.skill3, video: "/characters/brian_r34/skill3/duel/brian_duel_win.mp4", title: "WINNER",              label: "คว้าชัย",      seconds: 12, music: null, afterReveal: true },
-    brianDuelLost: { img: brianImg.skill3, video: "/characters/brian_r34/skill3/duel/brian_duel_lost.mp4",title: "LOSER",               label: "พ่ายแพ้",      seconds: 13, music: null, afterReveal: true },
+    brianDuelWin:  { img: brianImg.skill3, video: "/characters/brian_r34/skill3/duel/brian_duel_win.mp4", title: "WINNER",              label: "คว้าชัย",      seconds: 12, music: null, afterReveal: false },
+    brianDuelLost: { img: brianImg.skill3, video: "/characters/brian_r34/skill3/duel/brian_duel_lost.mp4",title: "LOSER",               label: "พ่ายแพ้",      seconds: 13, music: null, afterReveal: false },
     brianN2O:      { img: brianImg.skill32, video: "/characters/brian_r34/skill3/brian_skill3.2.mp4",     title: "N2O",                 label: "เทน้ำมันทั้งถัง", seconds: 12, music: null, afterReveal: false },
-    brianN2OHit:   { img: brianImg.skill32, video: "/characters/brian_r34/skill3/brian_skill3.2_hit.mp4", title: "N2O · FINISH",        label: "เข้าเส้นชัย",  seconds: 7, music: null, afterReveal: true },
+    brianN2OHit:   { img: brianImg.skill32, video: "/characters/brian_r34/skill3/brian_skill3.2_hit.mp4", title: "N2O · FINISH",        label: "เข้าเส้นชัย",  seconds: 7, music: null, afterReveal: false },
     // ---------- มหาเทพ อรชุน (patch 3.4 new) ----------
     //  seconds วัดจาก mvhd จริง (16.38) แล้วปัดขึ้นเผื่อเวลาตัดฉาก — queueCutscene = เล่นทุกครั้งที่กดท่าไม้ตาย
     arjunaPralaya: { img: arjunaImg.skill3, video: "/characters/arjuna/arjuna_skill3.mp4", title: "MAHAPRALAYA", label: "มหาประลัย", seconds: 17, music: null, afterReveal: false },
