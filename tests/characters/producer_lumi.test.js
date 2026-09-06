@@ -251,6 +251,34 @@ test('luminous: ใช้แล้วแต้มไอดอลกลับเ�
   assert.equal(lumi.dynamicSkillFor(L, ch, 'ultimate').name, ch[`ultimate_${lumi.idolKeyOf(L)}`].name);
 });
 
+test('[regression] ไอดอลทุกคนต้องมีภาพปกของตัวเอง — ทั้งช่องแรกและช่องท่าไม้ตาย', () => {
+  // เคยพลาด: สลับ dynamicSkillFor ไว้แค่ที่ useSkill ลืม buildStateFor
+  //  ผลคือ "กดแล้วได้ท่าถูก แต่ปุ่มค้างที่ชื่อ/ภาพของไอดอลค่าเริ่มต้นตลอด"
+  const ch = CHARACTERS.CHAR_BY_ID.producer_lumi;
+  const { L } = setup();
+  const seenBasic = new Set();
+  const seenUlt = new Set();
+  for (const key of lumi.IDOL_KEYS) {
+    L.lumiIdol = key;
+    const b = lumi.dynamicSkillFor(L, ch, 'basic');
+    const u = lumi.dynamicSkillFor(L, ch, 'ultimate');
+    assert.ok(b.img.includes(`/${key}/`), `ปกสกิลพื้นฐานต้องเป็นภาพของ ${key} — ได้ ${b.img}`);
+    assert.ok(u.img.includes(`/${key}/`), `ปกท่าไม้ตายต้องเป็นภาพของ ${key} — ได้ ${u.img}`);
+    assert.equal(u.name, ch[`ultimate_${key}`].name);
+    seenBasic.add(b.img);
+    seenUlt.add(u.img);
+  }
+  assert.equal(seenBasic.size, lumi.IDOL_KEYS.length, 'ภาพช่องแรกต้องไม่ซ้ำกันเลย');
+  assert.equal(seenUlt.size, lumi.IDOL_KEYS.length, 'ภาพท่าไม้ตายต้องไม่ซ้ำกันเลย');
+});
+
+test('[regression] buildStateFor ต้องสลับปุ่มให้ตรงกับ useSkill (ไม่ใช่แค่ฝั่งเดียว)', () => {
+  const fs = require('fs');
+  const src = fs.readFileSync(require('path').join(__dirname, '../../server.js'), 'utf8');
+  const n = (src.match(/producer_lumi\.dynamicSkillFor/g) || []).length;
+  assert.ok(n >= 3, `ต้องเรียก dynamicSkillFor ทั้งใน useSkill และ buildStateFor (basic+ultimate) — พบ ${n} จุด`);
+});
+
 // ---------------------------------------------------------------- ท่าไม้ตาย 1 (5 แบบ)
 test('ท่าไม้ตาย: สลับตามไอดอลที่ยืนอยู่ และเล่นคลิปของไอดอลคนนั้น', () => {
   const ch = CHARACTERS.CHAR_BY_ID.producer_lumi;

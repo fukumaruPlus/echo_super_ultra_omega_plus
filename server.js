@@ -2691,6 +2691,13 @@ function buildStateFor(viewerId) {
         secondaryPub = pub(CHAR_HOOKS.escanor.dynamicSkillFor(engine, p, ch, "secondary"));
         ultimatePub = pub(CHAR_HOOKS.escanor.dynamicSkillFor(engine, p, ch, "ultimate"));
       }
+      // โปรดิวเซอร์ (patch 3.6): ช่องแรกสลับ "สลับไอดอล"/"ชุบไอดอล" (ภาพ = ไอดอลปัจจุบัน)
+      //  และช่องท่าไม้ตายสลับตามไอดอล 5 คน + luminous — ต้องคิดสูตรเดียวกับ useSkill() เป๊ะ
+      //  ไม่งั้นปุ่มค้างที่ชื่อ/ภาพของค่าเริ่มต้น ทั้งที่กดแล้วได้ท่าของไอดอลที่ยืนอยู่จริง
+      if (ch.id === "producer_lumi") {
+        basicPub = pub(CHAR_HOOKS.producer_lumi.dynamicSkillFor(p, ch, "basic"));
+        ultimatePub = pub(CHAR_HOOKS.producer_lumi.dynamicSkillFor(p, ch, "ultimate"));
+      }
       if (ch.id === "hisakawa_sister") {
         basicPub = pub(CHAR_HOOKS.hisakawa_sister.dynamicSkillFor(p, ch, "basic"));
         secondaryPub = pub(CHAR_HOOKS.hisakawa_sister.dynamicSkillFor(p, ch, "secondary"));
