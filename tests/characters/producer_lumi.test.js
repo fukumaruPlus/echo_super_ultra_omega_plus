@@ -455,24 +455,60 @@ test('luminous: พลังโจมตี +1 ไม่ซ้อนทับ (�
   assert.equal(computeAttackBase(engine, L, A).base, 3);
 });
 
-test('luminous: คู่ต่อสู้ทุกคนตีครบ -> คิดคลิป burst แล้วฟื้นเลือด 2 เกราะ 1', () => {
+test('luminous: ถูกตีครบตามจำนวนคู่ต่อสู้ -> คิวคลิป burst แล้วฟื้นเลือด 2 เกราะ 1', () => {
   const { L, A, C } = setup();
   lumi.applyLuminous(engine, L);
   L.hp = 1; L.armor = 0;
-  assert.equal(lumi.onAttackedNormally(engine, A, L), false, 'ยังไม่ครบทุกคน');
-  assert.equal(lumi.onAttackedNormally(engine, C, L), true, 'ครบแล้ว');
+  assert.equal(lumi.onAttackedNormally(engine, A, L), false, 'ครั้งที่ 1 จาก 2');
+  assert.equal(lumi.onAttackedNormally(engine, C, L), true, 'ครั้งที่ 2 = ครบ');
   assert.ok(queued.includes('lumiBurst'));
   lumi.flushBurst(engine);
   assert.equal(L.hp, 3, 'ฟื้นเลือด 2');
   assert.equal(L.armor, 1, 'ฟื้นเกราะ 1');
-  assert.equal(lumi.onAttackedNormally(engine, A, L), false, 'จ่ายรางวัลแล้วไม่ซ้ำ');
+  assert.equal(lumi.onAttackedNormally(engine, A, L), false, 'จ่ายรางวัลแล้วไม่ซ้ำในท่าเดียวกัน');
 });
 
-test('luminous: เหลือ 1vs1 ไม่นับรางวัล burst', () => {
+test('[regression] luminous: นับ "จำนวนครั้ง" ไม่ใช่จำนวนคน — คนเดิมตีซ้ำก็นับ', () => {
+  const { L, A } = setup();
+  lumi.applyLuminous(engine, L);
+  L.hp = 1; L.armor = 0;
+  assert.equal(lumi.onAttackedNormally(engine, A, L), false, 'ครั้งที่ 1');
+  assert.equal(lumi.onAttackedNormally(engine, A, L), true, 'คนเดิมตีซ้ำครั้งที่ 2 ก็ครบ');
+  lumi.flushBurst(engine);
+  assert.equal(L.hp, 3);
+  assert.equal(L.armor, 1);
+});
+
+test('[regression] luminous: จุดนับต้องอยู่ก่อนด่านหลบหลีกใน doAttack', () => {
+  // luminous มีการหลบ 40% ของคาโฮะติดมาด้วย — ถ้านับหลังด่านหลบ หมัดที่ถูกหลบ (~40%) จะหายไปเงียบๆ
+  //  จนรางวัลแทบไม่มีทางเกิดขึ้นเลย (บั๊กที่ผู้เล่นเจอจริง)
+  const fs = require('fs');
+  const path = require('path');
+  const src = fs.readFileSync(path.join(__dirname, '../../server.js'), 'utf8');
+  const iCount = src.indexOf('producer_lumi.onAttackedNormally');
+  const iDodge = src.indexOf('producer_lumi.tryAttackDodge');
+  const iEiji = src.indexOf('eiji.tryAttackDodge(engine, attacker, target)');
+  assert.ok(iCount > 0 && iDodge > 0 && iEiji > 0);
+  assert.ok(iCount < iEiji, 'ต้องนับก่อนด่านหลบของเอจิ');
+  assert.ok(iCount < iDodge, 'ต้องนับก่อนด่านหลบของตัวเอง');
+});
+
+test('[regression] luminous: รางวัลต้องจ่ายได้แม้หมัดที่ทำให้ครบถูกหลบ (มีตาข่ายที่ endTurn)', () => {
+  // หมัดที่ถูกหลบทำให้ doAttack return ตั้งแต่ด่านหลบ ไม่ผ่าน postAttackFollowup ที่เรียก flushBurst
+  const fs = require('fs');
+  const path = require('path');
+  const src = fs.readFileSync(path.join(__dirname, '../../server.js'), 'utf8');
+  const n = (src.match(/producer_lumi\.flushBurst/g) || []).length;
+  assert.ok(n >= 2, `flushBurst ต้องถูกเรียกทั้งที่ postAttackFollowup และ endTurn — พบ ${n} จุด`);
+});
+
+test('luminous: เหลือ 1vs1 ไม่นับรางวัล burst (ตัวนับก็ไม่ขยับ)', () => {
   const { L, A, C } = setup();
   C.alive = false;
   lumi.applyLuminous(engine, L);
-  assert.equal(lumi.onAttackedNormally(engine, A, L), false, 'คู่ต่อสู้เหลือคนเดียว = ไม่นับ');
+  assert.equal(lumi.onAttackedNormally(engine, A, L), false);
+  assert.equal(lumi.onAttackedNormally(engine, A, L), false, 'ตีกี่ครั้งก็ไม่ติด');
+  assert.ok(!L.lumiHitCount, 'ไม่นับสะสมไว้ด้วย');
 });
 
 // ---------------------------------------------------------------- สกิลติดตัว

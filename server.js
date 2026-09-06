@@ -6138,6 +6138,10 @@ function doAttack(byId, targetId) {
   if (CHAR_HOOKS.oguri.tryFlowDodge(engine, attacker, target)) return;
   if (CHAR_HOOKS.escanor.tryNightDodge(engine, attacker, target)) return;
 
+  // โปรดิวเซอร์ (luminous): นับจำนวนครั้งที่ถูกตี — ต้องนับ "การถูกเล็ง" ไม่ใช่ "การโดนดาเมจ"
+  //  จึงต้องอยู่ก่อนด่านหลบหลีกทั้งหมด · luminous มีการหลบ 40% ของคาโฮะติดมาด้วย ถ้านับหลังด่านหลบ
+  //  หมัดที่ถูกหลบ (~40%) จะหายไปเงียบๆ จนรางวัลแทบไม่มีทางเกิดขึ้นเลย
+  const lumiBurst = CHAR_HOOKS.producer_lumi.onAttackedNormally(engine, attacker, target);
   // มหาเทพ อรชุน (สกิลติดตัว หัวใจที่เที่ยงธรรม): จดจำว่าใครเป็นฝ่ายลงมือกับอรชุนก่อน
   //  บันทึก "ตอนเลือกเป้า" ไม่ใช่ตอนดาเมจลง — การโจมตีที่ถูกหลบ/กันไว้ก็ยังนับว่าเคยลงมือแล้ว
   //  จึงต้องอยู่ก่อนด่านหลบหลีกทั้งหมด
@@ -6346,8 +6350,6 @@ function doAttack(byId, targetId) {
   const ippoUpperFx = CHAR_HOOKS.ippo.resolveUpper(engine, attacker, target, ippoArmorBefore);
   // โปรดิวเซอร์: Mishiro 346 ขโมยของ · Tsubasa 283 ฟื้นแต้มสกิล · All star 765 จองหมัดที่ 2
   const lumiAtkFx = CHAR_HOOKS.producer_lumi.onAttackLanded(engine, attacker, target);
-  // luminous: นับว่าใครตีเราแล้วบ้าง — ครบทุกคนเมื่อไหร่คิววีดีโอ burst ไว้ให้เล่นก่อนจ่ายรางวัล
-  const lumiBurst = CHAR_HOOKS.producer_lumi.onAttackedNormally(engine, attacker, target);
   // ผู้วิงวอน (characters/the_supplicant.js): ตราพิพากษาเดินหน้า — "ถูกโจมตี" และ "เป็นฝ่ายโจมตี" นับแยกกัน
   //  ยิงทีละฝั่งเพราะทั้งผู้โจมตีและผู้ถูกโจมตีอาจถือตราคนละใบพร้อมกันได้
   const supJudgeDefFx = CHAR_HOOKS.the_supplicant.onJudgeTrigger(engine, target, "ถูกโจมตี");
@@ -6693,6 +6695,10 @@ function finishYuukiVictory() {
 }
 
 function endTurn() {
+  // โปรดิวเซอร์ (luminous burst): ตาข่ายสำรอง — ถ้าหมัดที่ทำให้ครบ "ถูกหลบ" doAttack จะ return
+  //  ตั้งแต่ด่านหลบ ไม่ผ่าน postAttackFollowup เลย รางวัลจึงไม่มีวันจ่าย (และ luminous มีการหลบ 40%
+  //  ของคาโฮะติดมาด้วย จึงเกิดบ่อยมาก) · flushBurst เป็น idempotent เรียกซ้ำไม่มีผลข้างเคียง
+  CHAR_HOOKS.producer_lumi.flushBurst(engine);
   // ถ้าเทิร์นกำลังจะจบโดยยังไม่ได้ใช้สิทธิ์โจมตีเพิ่มของไบเลธ ให้เปิดสิทธิ์ตรงนี้
   // ครอบคลุมผู้ชนะไม่ได้โจมตี, โจมตีพลาด/ถูกลบล้าง และ path ที่ไม่ผ่าน postAttackFollowup
   if (startBylethGraduationAttack()) return;

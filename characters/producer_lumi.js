@@ -156,7 +156,7 @@ module.exports = {
     p.lumiKoharuUsed = false;    // โคฮารุ: ใช้สิทธิ์ "ไพ่ใบแรกหักลบ" ของเทิร์นนี้ไปแล้วหรือยัง
     p.lumiStolen = [];           // Mishiro 346: id ของคนที่ขโมยไปแล้วในรอบท่าไม้ตายนี้
     p.lumiPending = [];          // Million star 765: ดาเมจที่หน่วงไว้ [{ fromId, n }]
-    p.lumiHitBy = [];            // luminous: id ของคนที่ตีเราแล้วในรอบท่านี้
+    p.lumiHitCount = 0;          // luminous: จำนวนครั้งที่ถูกตีในรอบท่านี้ (ไม่ใช่จำนวนคน)
     p.lumiBurstDone = false;     // luminous: จ่ายรางวัล "ทุกคนตีครบ" ไปแล้วหรือยัง
     p.lumiBurstPending = false;  // รางวัล burst ที่รอคลิปเล่นจบ
     p.lumiExtraAtk = 0;          // All star 765: จำนวนครั้งโจมตีเพิ่มที่ค้างอยู่
@@ -458,7 +458,7 @@ module.exports = {
     p.statuses.lumiLuminous = ULT_TURNS;
     p.lumiPoints = 0;            // ใช้แล้วต้องเก็บใหม่
     p.lumiStolen = [];
-    p.lumiHitBy = [];
+    p.lumiHitCount = 0;
     p.lumiBurstDone = false;
     p.transformAt = engine.nextTransformCounter();
     engine.queueCutscene(p, "lumiLuminous");
@@ -466,16 +466,22 @@ module.exports = {
     return " — luminous!";
   },
 
-  // ---------- ตอนถูกโจมตีปกติ (luminous: นับว่าใครตีเราแล้วบ้าง) ----------
-  //  คืน true = ครบทุกคนแล้วและต้องเล่นคลิป burst (ผู้เรียกลงรางวัลผ่าน applyBurst หลังคลิปจบ)
+  // ---------- ตอนถูกโจมตีปกติ (luminous: นับ "จำนวนครั้งที่ถูกตี") ----------
+  //  ⚠️ ต้องเรียก "ก่อน" ด่านหลบหลีกทั้งหมดใน doAttack — ไม่งั้นหมัดที่ถูกหลบจะไม่ถูกนับเลย
+  //  ซึ่งเป็นปัญหาใหญ่มากเพราะ luminous มีการหลบ 40% ของคาโฮะติดมาด้วย = ~40% ของหมัดหายไปเงียบๆ
+  //  (นับ "การถูกเล็ง" ไม่ใช่ "การโดนดาเมจ" — โดนหลบหรือโดนหน่วงดาเมจก็ยังนับว่าถูกตี)
+  //  เกณฑ์: ถูกตีครบเท่าจำนวนคู่ต่อสู้ที่ยังอยู่ · ไม่นับกรณีเหลือ 1vs1 (ต้องมีคู่ต่อสู้ตั้งแต่ 2 คนขึ้นไป)
+  //  คืน true = ครบแล้วและคิวคลิป burst ไว้ (รางวัลลงที่ flushBurst หลังคลิปจบ)
   onAttackedNormally(engine, attacker, target) {
     if (!luminousOn(target) || !attacker || target.lumiBurstDone) return false;
-    target.lumiHitBy = target.lumiHitBy || [];
-    if (!target.lumiHitBy.includes(attacker.id)) target.lumiHitBy.push(attacker.id);
-    // "ไม่นับกรณีเหลือ 1vs1" — ต้องมีคู่ต่อสู้อย่างน้อย 2 คนถึงจะนับรางวัลนี้
+    if (attacker.id === target.id || engine.sameTeam(target, attacker)) return false;
     const foes = engine.alivePlayers().filter((o) => o.id !== target.id && !engine.sameTeam(target, o));
-    if (foes.length < 2) return false;
-    if (!foes.every((o) => target.lumiHitBy.includes(o.id))) return false;
+    if (foes.length < 2) return false; // "ไม่นับกรณีเหลือ 1vs1"
+    target.lumiHitCount = (target.lumiHitCount || 0) + 1;
+    if (target.lumiHitCount < foes.length) {
+      engine.log(`🌈 ${target.name} luminous — ถูกโจมตีแล้ว ${target.lumiHitCount}/${foes.length} ครั้ง`);
+      return false;
+    }
     target.lumiBurstDone = true;
     target.lumiBurstPending = true; // รางวัลลงหลังคลิปเล่นจบ (ดู flushBurst)
     engine.queueCutscene(target, "lumiBurst");
@@ -606,7 +612,7 @@ module.exports = {
       engine.log(`🌈 ${p.name} luminous หมดเวลาแล้ว — ต้องสะสมแต้ม "ไอดอล" ใหม่อีก ${POINTS_NEED} แต้ม`);
     }
     p.lumiStolen = [];
-    p.lumiHitBy = [];
+    p.lumiHitCount = 0;
     p.lumiBurstDone = false;
     p.lumiExtraAtk = 0;
   },
