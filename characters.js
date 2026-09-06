@@ -2001,7 +2001,7 @@ const CHARACTERS = [
     id: "brian",
     name: "ไบรอัน (GT-R34)",
     avatar: 0,
-    difficulty: "hard",
+    difficulty: "special",
     unique: true, // เลือกได้แค่ 1 คนต่อเกม (โหมดการแข่งระงับกติกาทั้งสนาม ซ้อนกัน 2 คนไม่ได้)
     img: "/characters/brian_r34/brian.jpg",
     // ---------- ไบรอัน (GT-R34) (patch 3.5 new) — ดู characters/brian.js ----------

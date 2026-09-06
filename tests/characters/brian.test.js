@@ -59,7 +59,7 @@ function setup() {
 test('ข้อมูลตัวละครลงทะเบียนครบ (รวมช่องท่าไม้ตาย 2 N2O)', () => {
   const ch = CHARACTERS.CHAR_BY_ID.brian;
   assert.ok(ch);
-  assert.equal(ch.difficulty, 'hard');
+  assert.equal(ch.difficulty, 'special');
   assert.equal(ch.unique, true);
   assert.equal(ch.basic.cost, 1);
   assert.equal(ch.secondary.cost, 4);

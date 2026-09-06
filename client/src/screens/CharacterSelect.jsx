@@ -11,11 +11,11 @@ const P_DISPLAY = "var(--font-p-display)";
 const DIFFICULTY_GROUPS = [
   { key: "easy", label: "ง่าย", color: "#2E9E4B", order: ["banagher", "hikaru", "kuwagata", "mageslayer", "ignis"] },
   { key: "medium", label: "กลาง", color: "#E5B33B", order: ["eva13", "temari", "shrade_elan", "riddhe", "miyako", "bat_ben", "escanor", "hisakawa_sister", "ippo", "arjuna"] },
-  { key: "hard", label: "ยาก", color: "#C0392B", order: ["oberon", "kotone", "bard", "shiki", "hakuno", "kai", "takumi", "the_supplicant", "brian"] },
+  { key: "hard", label: "ยาก", color: "#C0392B", order: ["oberon", "kotone", "bard", "shiki", "hakuno", "kai", "takumi", "the_supplicant"] },
   { key: "fun", label: "เอาฮา", color: "#9B4F96", order: ["gambler", "appleguy", "broadband_man", "dan"] },
   { key: "extreme", label: "ยากสุดขีด", color: "#111827", order: ["satoru"] },
   { key: "impossible", label: "ทักษิณ จะโปรหาบิดาท่านหรือ?", color: "#450a0a", order: ["tohno", "nanaya", "princess_shiki"] },
-  { key: "special", label: "พิเศษ", color: "#0e7490", order: ["ultraman_trigger", "yuuki", "yui", "shido"] },
+  { key: "special", label: "พิเศษ", color: "#0e7490", order: ["ultraman_trigger", "yuuki", "yui", "shido", "brian"] },
 ];
 // ตัวละครในกลุ่มความยากนั้น เรียงตาม order ที่กำหนด
 function charsInGroup(roster, g) {
