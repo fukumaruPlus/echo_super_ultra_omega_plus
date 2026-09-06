@@ -13,6 +13,7 @@ const yuiImg = require("./yui").IMG;       // ยุย โยชิโอกะ
 const ippoImg = require("./ippo").IMG;     // มาคุโนะอุจิ อิปโป: เหตุผลเดียวกัน
 const arjunaImg = require("./arjuna").IMG; // มหาเทพ อรชุน: เหตุผลเดียวกัน
 const brianImg = require("./brian").IMG;   // ไบรอัน (GT-R34): เหตุผลเดียวกัน
+const lumiChar = require("./producer_lumi"); // โปรดิวเซอร์ (luminous): เหตุผลเดียวกัน
 const muimiImg = require("./muimi").IMG;   // มุยมิ: ใช้ path รูปจาก hook กลาง
 const BAT_CAR_IMG = "/characters/bat_ben/bat_update/bat_ben_car.webp";
 const BAT_SHOT_IMG = "/characters/bat_ben/bat_update/skill1.2/bat_ben_skill1.2.jpg";
@@ -25,6 +26,16 @@ module.exports = function buildTransforms(img) {
     // ปัดขึ้นเผื่อเวลาตัดฉากเพื่อให้วิดีโอเล่นจบครบ และ queueCutscene ทำให้เล่นทุกครั้งที่กด
     muimiUltimateFull:  { img: muimiImg.skill3, video: "/characters/muimi/muimi_skill3.mp4",       title: "ดาบสะบั้นหอคอยสวรรค์", label: "ปล่อยท่าไม้ตาย", seconds: 24, music: "muimi", afterReveal: false },
     muimiUltimateShort: { img: muimiImg.skill3, video: "/characters/muimi/muimi_skill3_short.mp4", title: "ดาบสะบั้นหอคอยสวรรค์", label: "ปล่อยท่าไม้ตาย", seconds: 12, music: "muimi", afterReveal: false },
+    // ---------- โปรดิวเซอร์ (luminous) (patch 3.6 new) ----------
+    //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก · ทุกคลิปคิวเองจากโค้ด จึงต้อง afterReveal: false
+    //  (afterReveal: true จะทำให้ลูปกลางใน afterResolve() ไล่หาสถานะชื่อเดียวกับคีย์แล้วเล่นซ้ำ)
+    lumiUlt_haruka: { img: lumiChar.IDOLS.haruka.ultImg, video: "/characters/producer_lumi/haruka/haruka_idol_intro.mp4", title: "All star 765", label: "เอาให้สุดไปเลย", seconds: 15, music: null, afterReveal: false },
+    lumiUlt_anzu: { img: lumiChar.IDOLS.anzu.ultImg, video: "/characters/producer_lumi/anzu/anzu_idol_intro.mp4", title: "Mishiro 346", label: "ขี้เกียจแล้ว", seconds: 20, music: null, afterReveal: false },
+    lumiUlt_mirai: { img: lumiChar.IDOLS.mirai.ultImg, video: "/characters/producer_lumi/mirai/mirai_idol_intro.mp4", title: "Million star 765", label: "ฉันน่ะ อดทนเก่งนะ", seconds: 10, music: null, afterReveal: false },
+    lumiUlt_kaho: { img: lumiChar.IDOLS.kaho.ultImg, video: "/characters/producer_lumi/kaho/kaho_idol_intro.mp4", title: "Tsubasa 283", label: "ได้เวลาสนุกแล้ว", seconds: 17, music: null, afterReveal: false },
+    lumiUlt_kohaku: { img: lumiChar.IDOLS.kohaku.ultImg, video: "/characters/producer_lumi/kohaku/kohaku_idol_intro.mp4", title: "kuroi 961", label: "จะพยายามค่ะ", seconds: 16, music: null, afterReveal: false },
+    lumiLuminous: { img: lumiChar.IMG.luminous, video: "/characters/producer_lumi/luminus/luminus_intro.mp4", title: "luminous", label: "รวมพลังไอดอลทั้ง 5", seconds: 14, music: null, afterReveal: false },
+    lumiBurst:    { img: lumiChar.IMG.luminous, video: "/characters/producer_lumi/luminus/luminus_burst.mp4", title: "LUMINOUS BURST", label: "ทุกคนตีครบแล้ว", seconds: 16, music: null, afterReveal: false },
     // ---------- ไบรอัน (GT-R34) (patch 3.5 new) ----------
     //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก — ทุกคลิปเรียกผ่าน queueCutscene = เล่นทุกครั้ง
     //  ยกเว้น brianKey/brianBoost ที่ฮุคกันไว้ให้เล่นเฉพาะ "ครั้งแรก" ตามสเปค (ดู brianCarShown/brianBoostShown)

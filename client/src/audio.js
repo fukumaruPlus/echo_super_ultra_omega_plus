@@ -135,6 +135,18 @@ const FILES = {
   // ไบรอัน (GT-R34): เพลงประจำร่างรถ และเพลงระหว่างการแข่งที่มีเดิมพัน (ทับเพลงร่างรถ)
   brian_theme: "/characters/brian_r34/brian_theme.mp3",
   brian_duel_theme: "/characters/brian_r34/brian_duel_theme.m4a",
+  // โปรดิวเซอร์ (luminous): เพลงประจำท่าไม้ตายของไอดอลแต่ละคน + เสียงพูดตอนสลับตัว
+  lumi_song_haruka: "/characters/producer_lumi/haruka/haruka_idol_song.m4a",
+  lumi_song_anzu: "/characters/producer_lumi/anzu/anzu_idol_song.m4a",
+  lumi_song_mirai: "/characters/producer_lumi/mirai/mirai_idol_song.m4a",
+  lumi_song_kaho: "/characters/producer_lumi/kaho/kaho_idol_song.m4a",
+  lumi_song_kohaku: "/characters/producer_lumi/kohaku/kohaku_idol_song.m4a",
+  lumi_voice_haruka: "/characters/producer_lumi/haruka/haruka_idol_voice.m4a",
+  lumi_voice_anzu: "/characters/producer_lumi/anzu/anzu_idol_voice.m4a",
+  lumi_voice_mirai: "/characters/producer_lumi/mirai/mirai_idol_voice.m4a",
+  lumi_voice_kaho: "/characters/producer_lumi/kaho/kaho_idol_voice.m4a",
+  lumi_voice_kohaku: "/characters/producer_lumi/kohaku/kohaku_idol_voice.m4a",
+  lumi_luminous: "/characters/producer_lumi/luminus/luminus_song.m4a",
   byleth_hit: "/characters/byleth/hit_sound.mp3", // เสียงโจมตีของ "ดาบต้องสาป"
   action_button: "/effect_sound/action_button.wav",
   trun_change: "/effect_sound/trun_change.wav",

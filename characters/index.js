@@ -49,6 +49,7 @@ const ippo = require("./ippo");
 const arjuna = require("./arjuna");
 const the_supplicant = require("./the_supplicant");
 const brian = require("./brian");
+const producer_lumi = require("./producer_lumi");
 const muimi = require("./muimi");
 
 const CHARACTER_MODULES = [
@@ -98,6 +99,7 @@ const CHARACTER_MODULES = [
   arjuna,
   the_supplicant,
   brian,
+  producer_lumi,
 ];
 
 const CHAR_HOOKS = {};

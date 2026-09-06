@@ -410,6 +410,8 @@ function maxHpOf(p) {
   if (p && p.characterId === "ippo") return Math.max(1, CHAR_HOOKS.ippo.maxHp() - ((p.maxHpPenalty) || 0));
   // ผู้วิงวอน (patch 3.4 new): พลังชีวิตพื้นฐาน 5 หน่วย
   if (p && p.characterId === "the_supplicant") return Math.max(1, CHAR_HOOKS.the_supplicant.maxHp() - ((p.maxHpPenalty) || 0));
+  // โปรดิวเซอร์ (patch 3.6): หลอดเลือดเป็นของ "ไอดอล" (5) ตอนยืนอยู่ และเป็นของ "โปรดิวเซอร์" (3) เมื่อไอดอลล้ม
+  if (p && p.characterId === "producer_lumi") return Math.max(1, CHAR_HOOKS.producer_lumi.maxHp(p) - ((p.maxHpPenalty) || 0));
   return Math.max(1, MAX_HP - ((p && p.maxHpPenalty) || 0));
 }
 // ฟื้นเลือดจริงแบบเคารพสถานะ "ไม่ใช้งานต่อ" / "ไร้ทางเยียวยา" — คืนจำนวนที่ฟื้นได้จริง
@@ -1524,6 +1526,7 @@ function maxArmorOf(p) {
     : (p && p.characterId === "eva13") ? 0
     : (p && p.characterId === "ippo") ? CHAR_HOOKS.ippo.maxArmor() // อิปโป (patch 3.3 new): "โล่ 4" = เพดานเกราะ 4
     : (p && p.characterId === "the_supplicant") ? CHAR_HOOKS.the_supplicant.maxArmor() // ผู้วิงวอน (patch 3.4 new): เพดานเกราะ 5
+    : (p && p.characterId === "producer_lumi") ? CHAR_HOOKS.producer_lumi.maxArmor(p) // โปรดิวเซอร์: เกราะ 3 ตอนไอดอลยืน · 0 เมื่อไอดอลล้ม
     : (p && p.characterId === "eiji") ? CHAR_HOOKS.eiji.maxArmor() // เอจิ (patch 2.4 new): เกราะพื้นฐาน 4 หน่วย
     : MAX_ARMOR;
   return armorBase
@@ -1594,6 +1597,9 @@ function instantDeath(p, force) {
   if (!force && p.characterId === "byleth" && CHAR_HOOKS.byleth.tryRevive(engine, p)) return;
   // มหาเทพ อรชุน (ตะเกียงไฟที่ดับมอด, characters/arjuna.js): ตายระหว่าง "ฟื้นคืนชีพ" ยังไม่หมดเวลา -> ฟื้นทันที (เลือด 1 เกราะ 0)
   if (!force && p.characterId === "arjuna" && CHAR_HOOKS.arjuna.tryRevive(engine, p)) return;
+  // โปรดิวเซอร์ (characters/producer_lumi.js): ไอดอลเลือดหมด = "ไอดอลล้ม" ไม่ใช่ตกรอบ —
+  //  หลอดเลือดสลับไปเป็นของโปรดิวเซอร์ (3) ต่อ · ตกรอบจริงเมื่อโปรดิวเซอร์เลือดหมดอีกที
+  if (!force && p.characterId === "producer_lumi" && CHAR_HOOKS.producer_lumi.tryIdolDown(engine, p)) return;
   // ริต้า เบอร์นัล (สกิลติดตัว 2 patch 2.1.7, characters/phenex.js): ตกรอบจริงขณะท่าไม้ตาย 2 ยังทำงานอยู่ -> ปลดปล่อยความเจ็บปวดที่สะสมทั้งหมดก่อนตาย
   if (p.characterId === "phenex") CHAR_HOOKS.phenex.maybeReleasePainOnDeath(engine, p);
   p.hp = 0; p.alive = false; p.result = "dead"; p.locked = true;
@@ -1708,6 +1714,8 @@ function displayImg(p) {
   if (p.characterId === "bat_ben") { const bimg = CHAR_HOOKS.bat_ben.displayImg(p); if (bimg) return bimg; }
   // ไบรอัน: ระหว่างอยู่ในร่างรถ = ภาพ brian_car.webp (null = ใช้ภาพปกติ)
   if (p.characterId === "brian") { const rimg = CHAR_HOOKS.brian.displayImg(p); if (rimg) return rimg; }
+  // โปรดิวเซอร์: ภาพไอดอลที่ยืนแนวหน้า — ไอดอลล้มแล้วกลับไปเป็นภาพโปรดิวเซอร์
+  if (p.characterId === "producer_lumi") { const limg = CHAR_HOOKS.producer_lumi.displayImg(p); if (limg) return limg; }
   // โอเบรอน: ร่างสลับตามช่วงเวลากลางวัน/กลางคืนเสมอ
   if (p.characterId === "oberon") return isNightRound(roundNumber) ? OBERON_NIGHT_IMG : OBERON_MORNING_IMG;
   // ชเรด เอลัน: รวมร่างทำนองเพลงแล้ว = ร่างอควาเรียน สปาด้า ถาวร
@@ -1844,6 +1852,9 @@ function activeSkillMusic() {
   // ไบรอัน (characters/brian.js): เพลงประจำร่างรถ · ระหว่างการแข่งที่มีเดิมพันใช้เพลงการแข่งแทน
   const bestBrian = CHAR_HOOKS.brian.activeMusic(engine);
   if (bestBrian) return bestBrian;
+  // โปรดิวเซอร์: เพลงประจำไอดอลระหว่างท่าไม้ตาย 1 · เพลง luminous ระหว่างท่าไม้ตาย 2
+  const bestLumi = CHAR_HOOKS.producer_lumi.activeMusic(engine);
+  if (bestLumi) return bestLumi;
   // อิปโป (characters/ippo.js): เพลงประจำท่า Dempsey roll — เล่นค้างตลอดที่บัฟยังอยู่
   const bestIppo = CHAR_HOOKS.ippo.activeMusic(engine);
   if (bestIppo) return bestIppo;
@@ -2328,6 +2339,8 @@ function resetCombat(p) {
   CHAR_HOOKS.arjuna.resetCombat(p);
   // ไบรอัน: น้ำมัน/ตัวสะสมน้ำมันที่รถกิน/ธงวีดีโอครั้งแรก + ธง "ถูกแช่" ที่อยู่ที่ผู้เล่นทุกคน
   CHAR_HOOKS.brian.resetCombat(p);
+  // โปรดิวเซอร์: ไอดอลที่ยืนอยู่ / เลือดโปรดิวเซอร์ / แต้ม "ไอดอล" / คิวดาเมจหน่วง ฯลฯ
+  CHAR_HOOKS.producer_lumi.resetCombat(p);
   CHAR_HOOKS.bat_ben.resetCombat(p); // แบทแมน: ร่างรถแบทโมบิล + โควตากดครั้งเดียวต่อเกม
   CHAR_HOOKS.yui.resetCombat(p);   // ยุย โยชิโอกะ: เพลงที่เล่นแล้ว / คิวชุบชีวิต / ธงกันลูปการจั่วตาม
   CHAR_HOOKS.shido.resetCombat(p); // อิสึกะ ชิโด: ดาเมจที่บันทึกไว้ / กับดักฝากด้วยนะตัวฉัน / คิวเกิดใหม่
@@ -2879,6 +2892,20 @@ function buildStateFor(viewerId) {
           ? { n: p.supJudgeCount || 0, need: CHAR_HOOKS.the_supplicant.JUDGE_NEED, ally: !!p.supJudgeAlly, gif: CHAR_HOOKS.the_supplicant.ULT_GIF } : undefined,
         // ---------- มหาเทพ อรชุน (patch 3.4 new) ----------
         arjunaUltCd: mine && p.characterId === "arjuna" ? CHAR_HOOKS.arjuna.ultCooldownLeft(engine, p) : undefined,
+        // ---------- โปรดิวเซอร์ (luminous) (patch 3.6 new) ----------
+        //  ไอดอลที่ยืนแนวหน้าและแต้ม "ไอดอล" เป็นข้อมูลสาธารณะ (ทุกคนต้องอ่านออกว่ากำลังเจอผลติดตัวอะไร
+        //  และอีกกี่แต้มจะปลดล็อก luminous) ส่วนรายชื่อไอดอลให้เลือกส่งให้เจ้าของคนเดียว
+        lumiIdol: p.characterId === "producer_lumi" ? CHAR_HOOKS.producer_lumi.idolKeyOf(p) : undefined,
+        lumiIdolName: p.characterId === "producer_lumi" ? CHAR_HOOKS.producer_lumi.idolOf(p).name : undefined,
+        lumiIdolPassive: p.characterId === "producer_lumi" ? CHAR_HOOKS.producer_lumi.idolOf(p).passive : undefined,
+        lumiIdolDown: p.characterId === "producer_lumi" ? CHAR_HOOKS.producer_lumi.idolDown(p) : undefined,
+        lumiPoints: p.characterId === "producer_lumi" ? (p.lumiPoints || 0) : undefined,
+        lumiPointsMax: p.characterId === "producer_lumi" ? CHAR_HOOKS.producer_lumi.POINTS_NEED : undefined,
+        // เลือดโปรดิวเซอร์ที่พักไว้ระหว่างไอดอลยังยืน — ไอดอลล้มแล้วค่านี้ไปอยู่ในหลอดหลักแทน จึงส่ง undefined
+        lumiProducerHp: (p.characterId === "producer_lumi" && !CHAR_HOOKS.producer_lumi.idolDown(p) && !takumiBlackout)
+          ? (p.lumiProducerHp || 0) : undefined,
+        lumiProducerMax: p.characterId === "producer_lumi" ? CHAR_HOOKS.producer_lumi.PRODUCER_HP : undefined,
+        lumiIdols: mine && p.characterId === "producer_lumi" ? CHAR_HOOKS.producer_lumi.publicIdols(p) : undefined,
         // ---------- ไบรอัน (GT-R34) (patch 3.5 new) ----------
         //  น้ำมันเป็นข้อมูลสาธารณะ (ทุกคนเห็น) เพราะเป็นตัวจับเวลาของร่างรถที่ทุกคนต้องอ่านออก
         brianFuel: p.characterId === "brian" ? CHAR_HOOKS.brian.fuelOf(p) : undefined,
@@ -3674,6 +3701,8 @@ function dealRound() {
     CHAR_HOOKS.the_supplicant.onRoundStartTick(engine, p);
     // ---------- ไบรอัน (characters/brian.js): รถกินน้ำมัน (แปลงเป็นเลือด) หรือเติมน้ำมันประจำเทิร์น ----------
     CHAR_HOOKS.brian.onRoundStartTick(engine, p);
+    // ---------- โปรดิวเซอร์: ผลติดตัวรายไอดอล + ฝึกซ้อม + ดาเมจที่หน่วงไว้จากเทิร์นก่อน ----------
+    CHAR_HOOKS.producer_lumi.onRoundStartTick(engine, p);
     // ---------- "เยียวยา" (สถานะ Universal patch 3.4): ฟื้นพลังชีวิตต่อเทิร์นตามจำนวนหน่วย ----------
     //  วางไว้ที่นี่ (ต้นเทิร์น) เหมือนลุกไหม้/เลือดไหล การลดเทิร์นทำที่ลูปกลางของ endTurn ตามปกติ
     tickMend(engine, p);
@@ -3708,6 +3737,7 @@ function dealRound() {
 
   // ---------- คอนเนอร์ RK800 (characters/conner.js): การไล่ล่ายังดำเนินอยู่ -> แช่ผู้เล่นนอกวงใหม่ทุกเทิร์น ----------
   //  ต้องอยู่หลังลูปต้นเทิร์น เพราะในลูปเพิ่งตั้ง p.locked = false และแจกไพ่ใบแรกให้ทุกคนไปแล้ว
+  CHAR_HOOKS.producer_lumi.onRoundStartAfterLoop(engine); // โปรดิวเซอร์: รีเซ็ตโควตาหมัดที่ 2 ของ All star 765
   CHAR_HOOKS.conner.onRoundStartAfterLoop(engine);
   // ---------- ยุย (characters/yui.js): girl don't cry — คนแต้มสกิลน้อยสุดในวงได้ +1 ----------
   //  ต้องอยู่หลังลูปต้นเทิร์น ไม่งั้นการเทียบ "ใครแต้มน้อยสุด" จะใช้ค่าคนละเทิร์นกันตามลำดับที่นั่ง
@@ -3805,6 +3835,9 @@ function hit(id) {
   }
   // คอนเนอร์ RK800 (สกิลติดตัว 1 สืบสวน): การจั่วไพ่ทำให้เครียด +1 — นับครั้งเดียวต่อเทิร์นไม่ว่าจะจั่วกี่ใบ
   //  นับเฉพาะตอนได้ไพ่จริง (กองหมดกลางคัน = ไม่นับ)
+  // โปรดิวเซอร์ (โคฮารุ): ไพ่ใบแรกของเทิร์นถูกพลิกเครื่องหมายเป็นลบ — ต้องทำ "ก่อน" onCardDrawn
+  //  ไม่งั้นทริกเกอร์สี/การ์ดพิเศษจะคิดจากค่าเดิมที่ยังไม่พลิก
+  if (drawn) CHAR_HOOKS.producer_lumi.onCardDraw(engine, p, drawn);
   if (drawn) CHAR_HOOKS.conner.onCardDraw(engine, p);
   // ยุย (characters/yui.js): my soul your beats — ใครจั่ว คนอื่นในวงจั่วตามด้วย (กันลูปในฮุคเอง)
   if (drawn) CHAR_HOOKS.yui.onCardDraw(engine, p);
@@ -3965,6 +3998,8 @@ function useSkill(id, tier, targets, item) {
   }
   // ไบรอัน: ระหว่าง "การแข่งที่มีเดิมพัน" ช่องท่าไม้ตายกลายเป็น N2O (0 แต้ม แต่เทน้ำมันทั้งถัง)
   if (ch && ch.id === "brian" && tier === "ultimate" && CHAR_HOOKS.brian.n2oSlot(engine, p)) skill = ch.ultimate2;
+  // โปรดิวเซอร์: ช่องแรกสลับ "สลับไอดอล"/"ชุบไอดอล" · ช่องท่าไม้ตายสลับตามไอดอล 5 คน + luminous
+  if (ch && ch.id === "producer_lumi") skill = CHAR_HOOKS.producer_lumi.dynamicSkillFor(p, ch, tier);
   if (ch && ch.id === "escanor") {
     skill = CHAR_HOOKS.escanor.prepareSkill(engine, p, tier, targets);
     if (!skill) return;
@@ -4091,6 +4126,8 @@ function useSkill(id, tier, targets, item) {
   const isSupPick = p.characterId === "the_supplicant";
   // ไบรอัน "กุญแจรถ": ไม่นับเป็นการใช้สกิลของเทิร์น (กดแล้วยังใช้สกิลอื่นได้อีก 1 ครั้ง)
   const isBrianKey = p.characterId === "brian" && tier === "basic";
+  // โปรดิวเซอร์: ช่องแรก (สลับไอดอล / ชุบไอดอล) ไม่นับเป็นการใช้สกิลของเทิร์นทั้งสองแบบ
+  const isLumiBasic = p.characterId === "producer_lumi" && tier === "basic";
   // ไบรอัน "N2O": ต้องยกเว้นจากโควตาสกิลของเทิร์นด้วย — การแข่งจบใน 1 เทิร์น และการกดท่าไม้ตาย 1
   //  กินโควตาไปแล้วในเทิร์นเดียวกัน ถ้าไม่ยกเว้น N2O จะกดไม่ได้เลยตลอดเกม (สเปคระบุว่า "กดได้ ไม่สนกฎของท่าไม้ตาย 1")
   const isBrianN2O = p.characterId === "brian" && tier === "ultimate" && CHAR_HOOKS.brian.n2oSlot(engine, p);
@@ -4110,7 +4147,7 @@ function useSkill(id, tier, targets, item) {
   const isBylethPick = p.characterId === "byleth";
   if (isBylethPick && (p.bylethSkillUsesRound || 0) >= CHAR_HOOKS.byleth.SKILL_USES_PER_TURN) return;
   if (isSupPick && (p.supSkillUsesRound || 0) >= CHAR_HOOKS.the_supplicant.SKILL_USES_PER_TURN) return;
-  if (p.skillUsedRound && !gambleRepeat && !isBrianKey && !isBrianN2O && !isSupPick && !isBylethPick && !isHarukaBasic && !isApplePick && !isMuimiBasic && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHisakawaFreeAction) return; // ใช้สกิลได้เพียง 1 อันต่อเทิร์น (ซ้ำ/ซ้อนไม่ได้)
+  if (p.skillUsedRound && !gambleRepeat && !isBrianKey && !isBrianN2O && !isLumiBasic && !isSupPick && !isBylethPick && !isHarukaBasic && !isApplePick && !isMuimiBasic && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHisakawaFreeAction) return; // ใช้สกิลได้เพียง 1 อันต่อเทิร์น (ซ้ำ/ซ้อนไม่ได้)
   // MOON*CELL (คิชินามิ ฮาคุโนะ): ต้องมีแต้มคำสาปแห่งดวงจันทร์ครบ 3 เท่านั้น
   if (st === "moonCell" && (p.hakunoMoonPoints || 0) < HAKUNO_MOONCELL_NEED) return;
   // ข้าขอบัญชา (ชาย/หญิง คิชินามิ ฮาคุโนะ): กดซ้ำไม่ได้จนกว่าผลเดิมจะหมด
@@ -4295,6 +4332,10 @@ function useSkill(id, tier, targets, item) {
   if (isArjunaPick && !CHAR_HOOKS.arjuna.canUseSkill(engine, p, tier)) return;
   // ---------- ไบรอัน (GT-R34) (characters/brian.js) ----------
   //  พื้นฐาน: item = "off"/"boost" ตอนกดครั้งที่ 2 · ท่าไม้ตาย 1 ต้องเลือกเป้าหมาย · N2O ไม่ต้อง
+  // ---------- โปรดิวเซอร์ (luminous) (characters/producer_lumi.js) ----------
+  //  ช่องแรก: item = คีย์ไอดอลที่จะสลับไป (ตอนไอดอลล้มจะกลายเป็นช่องชุบ ไม่ต้องส่ง item)
+  const isLumiPick = p.characterId === "producer_lumi";
+  if (isLumiPick && !CHAR_HOOKS.producer_lumi.canUseSkill(engine, p, tier, item)) return;
   const isBrianPick = p.characterId === "brian";
   let brianTarget = null;
   if (isBrianPick) {
@@ -4424,7 +4465,7 @@ function useSkill(id, tier, targets, item) {
     if (p.statuses.freecast <= 0) delete p.statuses.freecast;
     lastLog.push(`👸 ${p.name} การ์ดราชินี — ใช้สกิลนี้โดยไม่เสียแต้มสกิล`);
   }
-  if (!isApplePick && !isMuimiBasic && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHarukaBasic && !isBylethPick && !isHisakawaFreeAction && !isYuiBasic && !isSupPick && !isBrianKey && !isBrianN2O) p.skillUsedRound = true; // สกิลเลือก/สลับและเสบียงฉุกเฉินไม่นับโควตาสกิลหลัก
+  if (!isApplePick && !isMuimiBasic && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHarukaBasic && !isBylethPick && !isHisakawaFreeAction && !isYuiBasic && !isSupPick && !isBrianKey && !isBrianN2O && !isLumiBasic) p.skillUsedRound = true; // สกิลเลือก/สลับและเสบียงฉุกเฉินไม่นับโควตาสกิลหลัก
   if (isKaiPick) p.kaiSkillUsesRound = (p.kaiSkillUsesRound || 0) + 1;
   if (isTakumiPick) p.takumiSkillUsesRound = (p.takumiSkillUsesRound || 0) + 1;
 
@@ -4576,6 +4617,7 @@ function useSkill(id, tier, targets, item) {
   // ---------- ผู้วิงวอน / มหาเทพ อรชุน (patch 3.4) ----------
   if (isSupPick && supTarget) flashSuffix = CHAR_HOOKS.the_supplicant.applyInstantSkill(engine, p, tier, supTarget) || flashSuffix;
   if (isBrianPick) flashSuffix = CHAR_HOOKS.brian.applyInstantSkill(engine, p, tier, brianTarget, item) || flashSuffix;
+  if (isLumiPick) flashSuffix = CHAR_HOOKS.producer_lumi.applyInstantSkill(engine, p, tier, item) || flashSuffix;
   if (isArjunaPick && tier !== "ultimate") flashSuffix = CHAR_HOOKS.arjuna.applyInstantSkill(engine, p, tier) || flashSuffix;
   // Mahapralaya: แจกเปราะบาง + คิววีดีโอตรงนี้ แล้วลงความเสียหายจริงหลังวีดีโอจบ (ดูท้ายฟังก์ชัน)
   let arjunaPralayaPending = false;
@@ -5494,6 +5536,13 @@ function resolveRound() {
         lastLog.push(`🔥 ${l.name} Last Stand — ไม่รับความเสียหายจากการที่ไพ่แตก`);
         continue;
       }
+      if (CHAR_HOOKS.producer_lumi.isLossImmune(engine, l)) {
+        // โปรดิวเซอร์ (ความฝันของฉันคือเธอ): ขณะท่าไม้ตายทำงาน ไม่รับดาเมจแพ้จั่ว/ไพ่แตก
+        addSkill(l, 1);
+        firePassive(l, "lose");
+        lastLog.push(`🌈 ${l.name} ความฝันของฉันคือเธอ — ไม่รับความเสียหายจากการแพ้/ไพ่แตก`);
+        continue;
+      }
       if (CHAR_HOOKS.eva13.isLossImmune(engine, l)) {
         // สกิลติดตัว 2 เอวา 13 (ทุกอย่างไร้ความหมาย): ไม่รับดาเมจแพ้จั่ว/แตก
         //  — นอก fourth impact ทำงานเสมอ ยกเว้นสกิลติดตัว 3 (เลือด <= 3) ทำงานอยู่ | fourth impact = บังคับทำงาน
@@ -5704,6 +5753,12 @@ function afterSummary() {
 
   // แบทแมน (characters/bat_ben.js): ระหว่างเร้นเงา ออกจากเงามืดมาโจมตีไม่ได้
   // เจ้าหญิงราก (characters/princess_shiki.js): สกิลติดตัว — โจมตีปกติไม่ได้เลย เว้นแต่ติด "ชักดาบ"
+  // โปรดิวเซอร์ (ฝึกซ้อม): 3 เทิร์นนี้โจมตีปกติไม่ได้ แต่ทำอย่างอื่นได้ตามปกติ
+  if (winner && winner.alive && CHAR_HOOKS.producer_lumi.cannotAttack(winner)) {
+    lastLog.push(`🎤 ${winner.name} กำลังเตรียมซ้อมอยู่ — ไม่มีเทิร์นโจมตี`);
+    endTurn();
+    return;
+  }
   if (winner && winner.alive && CHAR_HOOKS.princess_shiki.cannotAttack(winner)) {
     lastLog.push(`👁️ ${winner.name} ไม่ได้ชักดาบออกมา — ไม่มีเทิร์นโจมตี (สกิลติดตัว · ใช้สกิลพื้นฐาน "อืม ฉันเข้าใจแล้ว" เพื่อโจมตีได้)`);
     endTurn();
@@ -5785,7 +5840,12 @@ function postAttackFollowup(attacker) {
     if (CHAR_HOOKS.takuto.startThirdAttack(engine, attacker)) return;
   }
   // อิปโป (characters/ippo.js): Dempsey roll — โจมตีต่อเนื่องตามจำนวน Dempsey Charge ที่สะสมไว้
+  // โปรดิวเซอร์: จ่ายรางวัล luminous burst หลังคลิปเล่นจบ (คิวไว้ตั้งแต่ตอนโดนตีครบทุกคน)
+  CHAR_HOOKS.producer_lumi.flushBurst(engine);
   if (CHAR_HOOKS.ippo.startExtraAttack(engine, attacker)) return;
+  // โปรดิวเซอร์: All star 765 หมัดที่ 2 · kuroi 961 ตีต่อจากผู้ชนะ (ต้องอยู่หลังหมัดที่ 2 ของตัวเอง)
+  if (CHAR_HOOKS.producer_lumi.startExtraAttack(engine, attacker)) return;
+  if (CHAR_HOOKS.producer_lumi.startLoserAttack(engine)) return;
   // ฟุจิตะ โคโตเนะ (characters/kotone.js): Self-affirmation Explosion! Love Love — โจมตีเพิ่มอีก 1 ครั้ง
   if (attacker && attacker.alive && attacker.characterId === "kotone") {
     if (CHAR_HOOKS.kotone.startExtraAttack(engine, attacker)) return;
@@ -5907,6 +5967,7 @@ function doAttack(byId, targetId) {
     return;
   }
   if (CHAR_HOOKS.princess_shiki.cannotAttack(attacker)) return;       // เจ้าหญิงราก (patch 2.2.7): โจมตีไม่ได้ เว้นแต่ติดชักดาบ
+  if (CHAR_HOOKS.producer_lumi.cannotAttack(attacker)) return;                            // โปรดิวเซอร์: ระหว่าง "เตรียมซ้อม" โจมตีปกติไม่ได้
   // ไค ชิซากิ: โทสะระงับด้วยโทสะ — มีคู่ปรับ (kaiRival1/kaiRival2 ยังไม่หมด) บังคับเป้าหมายมีแค่คู่ปรับเท่านั้น
   if (attacker.kaiRivalId && ((attacker.statuses.kaiRival1 || 0) > 0 || (attacker.statuses.kaiRival2 || 0) > 0) && target.id !== attacker.kaiRivalId) {
     if (isYuuki(attacker)) postAttackFollowup(attacker);
@@ -6078,6 +6139,8 @@ function doAttack(byId, targetId) {
   if (CHAR_HOOKS.eiji.tryAttackDodge(engine, attacker, target)) return;
   // อิปโป (characters/ippo.js): หลบการโจมตีปกติ — หลบพ้นแล้วจบเทิร์นด้วยฉากหลบ
   if (CHAR_HOOKS.ippo.tryAttackDodge(engine, attacker, target)) return;
+  // โปรดิวเซอร์ (Tsubasa 283 ของคาโฮะ): หลบหลีก 40%
+  if (CHAR_HOOKS.producer_lumi.tryAttackDodge(engine, attacker, target)) return;
   // เอจิ สกิลติดตัว 1 (ผู้เล่นอันดับ 2): ผู้ชนะไปตีคนอื่นที่ไม่ใช่เอจิ -> 25% ขัดจังหวะแล้วสวนคืน
   if (CHAR_HOOKS.eiji.tryInterrupt(engine, attacker, target)) return;
 
@@ -6274,6 +6337,10 @@ function doAttack(byId, targetId) {
   const batGunFired = CHAR_HOOKS.bat_ben.consumeGun(engine, attacker);
   // อิปโป (characters/ippo.js): Uper Cut ลงผลตามว่าเป้าหมาย "มีเกราะก่อนโดนหมัดนี้" หรือไม่
   const ippoUpperFx = CHAR_HOOKS.ippo.resolveUpper(engine, attacker, target, ippoArmorBefore);
+  // โปรดิวเซอร์: Mishiro 346 ขโมยของ · Tsubasa 283 ฟื้นแต้มสกิล · All star 765 จองหมัดที่ 2
+  const lumiAtkFx = CHAR_HOOKS.producer_lumi.onAttackLanded(engine, attacker, target);
+  // luminous: นับว่าใครตีเราแล้วบ้าง — ครบทุกคนเมื่อไหร่คิววีดีโอ burst ไว้ให้เล่นก่อนจ่ายรางวัล
+  const lumiBurst = CHAR_HOOKS.producer_lumi.onAttackedNormally(engine, attacker, target);
   // ผู้วิงวอน (characters/the_supplicant.js): ตราพิพากษาเดินหน้า — "ถูกโจมตี" และ "เป็นฝ่ายโจมตี" นับแยกกัน
   //  ยิงทีละฝั่งเพราะทั้งผู้โจมตีและผู้ถูกโจมตีอาจถือตราคนละใบพร้อมกันได้
   const supJudgeDefFx = CHAR_HOOKS.the_supplicant.onJudgeTrigger(engine, target, "ถูกโจมตี");
@@ -6561,6 +6628,8 @@ function doAttack(byId, targetId) {
   // ---------- มิซึซาว่า ฮารุกะ (characters/haruka.js) ----------
   if (harukaPunishFx.punishStacks > 0) addFx({ name: `จงไปสู่สุขติ — ระเบิดเลือดไหล +${harukaPunishFx.punishStacks}`, img: CHAR_HOOKS.haruka.IMG.skill2, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
   if (ippoUpperFx) addFx({ name: ippoUpperFx.kind === "decay" ? "Uper Cut — ผุพัง 3 เทิร์น" : "Uper Cut — สตั้นเทิร์นหน้า", img: CHAR_HOOKS.ippo.IMG.skill2, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
+  if (lumiAtkFx) for (const name of lumiAtkFx) addFx({ name, img: displayImg(attacker), by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
+  if (lumiBurst) addFx({ name: "luminous — ทุกคนตีครบแล้ว!", img: CHAR_HOOKS.producer_lumi.IMG.luminous, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (supJudgeDefFx) addFx({ name: `${supJudgeDefFx.kind === "mercy" ? "ความเมตตา" : "คำพิพากษา"} ${supJudgeDefFx.n}/${CHAR_HOOKS.the_supplicant.JUDGE_NEED}`, img: CHAR_HOOKS.the_supplicant.IMG.skill3, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   if (supJudgeAtkFx) addFx({ name: `${supJudgeAtkFx.kind === "mercy" ? "ความเมตตา" : "คำพิพากษา"} ${supJudgeAtkFx.n}/${CHAR_HOOKS.the_supplicant.JUDGE_NEED}`, img: CHAR_HOOKS.the_supplicant.IMG.skill3, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
   if (batGunFired) addFx({ name: `ปืนติดรถ +${CHAR_HOOKS.bat_ben.GUN_BONUS}`, img: CHAR_HOOKS.bat_ben.IMG_GUN, by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
@@ -6735,6 +6804,8 @@ function endTurn() {
         if (k === "danChase" || k === "danDisciple") CHAR_HOOKS.dan.onStatusExpire(engine, p, k);
         // ผู้วิงวอน: "ตราพิพากษา" หมดเวลา 5 เทิร์นโดยยังไม่ครบ 3 ครั้ง -> ผลปลายทางฝั่ง "ไม่สัมฤทธิ์"
         if (k === "supJudge") CHAR_HOOKS.the_supplicant.onJudgeExpire(engine, p);
+        // โปรดิวเซอร์: ท่าไม้ตายหมดเวลา -> ล้างธงประจำท่า (ของที่ขโมยแล้ว/คนที่ตีเราแล้ว/หมัดที่ค้าง)
+        if (k === "lumiUlt" || k === "lumiLuminous") CHAR_HOOKS.producer_lumi.onUltExpire(engine, p, k);
         if (k === "kaiLink") CHAR_HOOKS.kai.onExpireKaiLink(p);
         if (k === "kaiRival1" || k === "kaiRival2") CHAR_HOOKS.kai.onExpireKaiRival(p);
         // ทาคุมิ ฟุจิวาระ: ถึงจะมองไม่เห็น แต่ฉันยังอยู่ หมดเวลาเองตามธรรมชาติ (ไม่มีใครไพ่แตกใน 5 เทิร์น) -> รีเซ็ต guard ให้ใช้ท่าไม้ตายรอบหน้าได้ปกติ
