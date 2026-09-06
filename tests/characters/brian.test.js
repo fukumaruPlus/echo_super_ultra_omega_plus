@@ -401,6 +401,20 @@ test('[regression] N2O กดได้ในเทิร์นเดียวก
   assert.equal(brian.fuelOf(b), 0, 'เทน้ำมันทั้งถัง');
 });
 
+test('[regression] state ที่ส่งให้ client ระหว่างการแข่ง: brianN2O=true ทั้งที่ skillUsed=true แล้ว', () => {
+  // สัญญากับฝั่ง client: ปุ่มท่าไม้ตายต้องกดได้ทั้งที่ me.skillUsed เป็น true อยู่
+  //  (ท่าไม้ตาย 1 กินโควตาไปแล้วในเทิร์นเดียวกัน) — ถ้าปุ่มไปเช็ค me.skillUsed ตรงๆ N2O จะกดไม่ได้เลย
+  const { b, a } = setup();
+  b.skillPoints = 8;
+  brian.startCar(engine, b);
+  engine.setGameState('PLAYING');
+  engine.useSkill('B', 'ultimate', ['A']);
+  assert.equal(b.skillUsedRound, true, 'ท่าไม้ตาย 1 กินโควตาแล้ว');
+  assert.equal(brian.n2oSlot(engine, b), true, 'ช่องท่าไม้ตายเป็น N2O');
+  assert.equal(brian.n2oReady(engine, b), true, 'และกดได้จริง (น้ำมันพอ)');
+  assert.equal(brian.canUseSkill(engine, b, 'ultimate'), true);
+});
+
 test('[regression] ระหว่างการแข่ง คนอื่นกดสกิลไม่ได้จริงผ่านท่อ useSkill', () => {
   const { b, a, c } = setup();
   b.skillPoints = 8;
