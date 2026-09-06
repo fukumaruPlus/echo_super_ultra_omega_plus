@@ -1329,6 +1329,9 @@ function statusEntries(p, full) {
     // รูปโปรไฟล์แสดงร่าง Morning/Night และ Solar มีตัวนับเฉพาะด้านล่างอยู่แล้ว จึงไม่ต้องแสดงป้ายซ้ำ
     if (k === "escanorMorning" || k === "escanorNight" || k === "escanorSolar") continue;
     if (k === "mageslayerBurdenBgm") continue; // ผู้สังหารเมจ: ตัวจับเวลาเพลงพื้นหลัง Mana Burden ไม่ใช่สถานะที่ผู้เล่นต้องเห็น
+    // ไบรอัน: ร่างเพิ่มพลังเป็น "การอัปเกรดของร่างรถ" ไม่ใช่สถานะแยก — เอนจินเก็บ brianCar ไว้เป็นธงหลัก
+    //  (ทุกด่านเช็ค carOn) แต่ฝั่ง UI ต้องโชว์ชื่อเดียว ไม่งั้นขึ้นซ้อนกัน 2 ป้ายแล้วอ่านสับสน
+    if (k === "brianCar" && (p.statuses.brianBoost || 0) > 0) continue;
     const info = STATUS_INFO[k] || { icon: "✦", label: k, cls: "bg-white/20", desc: "" };
     const amt = (p.statusAmt || {})[k] || 0; // จำนวน (amount) ของบัฟ/ดีบัฟพื้นฐาน (patch 2.0.8)
     out.push({ key: k, v, amt, ...info });
