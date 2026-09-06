@@ -105,6 +105,7 @@ module.exports = {
     p.brianBoostShown = false;
     p.brianDuel = null;      // { targetId, n2o } — สถานะการดวลของไบรอัน
     p.brianFrozen = false;   // ถูกแช่เพราะอยู่นอกวงดวล (บังคับไพ่แตก)
+    p.brianPushFiredRound = 0; // เทิร์นล่าสุดที่ "หลีกทางไป" ชนไปแล้ว (กันยิงซ้ำในเทิร์นเดียว)
   },
 
   // ---------- น้ำมัน: จุดเดียวที่แก้ค่านี้ได้ ----------
@@ -263,6 +264,7 @@ module.exports = {
   //  "คนที่แต้มมากกว่าเรา" นับจากแต้มจริงหลังเปิดไพ่ · ไพ่แตกไม่นับว่ามากกว่า (แต้มถือเป็น -1)
   pushTargetOf(engine, p) {
     if (!isBrian(p) || !p.alive || !((p.statuses.brianPush || 0) > 0)) return null;
+    if (p.brianPushFiredRound === engine.roundNumber) return null; // ชนไปแล้วเทิร์นนี้ (กันยิงซ้ำ/ลูปไม่รู้จบ)
     const mine = engine.bustedOf(p) ? -1 : engine.scoreOf(p);
     let best = null;
     for (const o of engine.alivePlayers()) {
@@ -273,6 +275,10 @@ module.exports = {
     }
     return best ? best.player : null;
   },
+  // ปักธงว่า "ชนไปแล้วในเทิร์นนี้" — ต้องเรียกก่อนคิววีดีโอ ไม่ใช่ตอนลงดาเมจ เพราะ afterSummary()
+  //  ถูกเรียกซ้ำหลังวีดีโอจบ ถ้ายังไม่ปักธงตอนนั้นจะวนคิววีดีโอไม่รู้จบ
+  markPushFired(engine, p) { if (p) p.brianPushFiredRound = engine.roundNumber; },
+
   // ลงความเสียหายจริง — เรียกหลังวีดีโอ brian_skill2.mp4 เล่นจบ (สเปค: วีดีโอก่อนความเสียหายทุกครั้ง)
   applyPushHit(engine, p, target) {
     if (!p || !p.alive || !target || !target.alive) return;

@@ -327,6 +327,61 @@ test('ไบรอันตกรอบ: ลงจากรถ + ยกเลิ
   assert.equal(brian.duelActive(engine), false);
 });
 
+// ---------------------------------------------------------------- regression: บั๊กที่ทำเซิร์ฟเวอร์พัง
+test('[regression] เพลงประจำร่างรถไม่ทำให้ broadcastState พัง (เคยอ้าง best ก่อนประกาศ)', () => {
+  const { b, a } = setup();
+  const realBroadcast = saved.broadcastState;
+  brian.startCar(engine, b);
+  // เรียก broadcastState ตัวจริง -> buildStateFor -> activeSkillMusic (จุดที่เคยโยน ReferenceError)
+  assert.doesNotThrow(() => realBroadcast());
+  brian.boostCar(engine, b);
+  assert.doesNotThrow(() => realBroadcast());
+  brian.startDuel(engine, b, a); // ระหว่างการแข่งใช้เพลงคนละเพลง — ต้องไม่พังเหมือนกัน
+  assert.doesNotThrow(() => realBroadcast());
+});
+
+test('[regression] "หลีกทางไป" ชนได้ครั้งเดียวต่อเทิร์น (กัน afterSummary วนไม่รู้จบ)', () => {
+  const { b, a } = setup();
+  brian.startCar(engine, b);
+  brian.applyPush(engine, b);
+  b.cards = [{ value: 5, color: 'red' }];
+  a.cards = [{ value: 15, color: 'red' }];
+  assert.ok(brian.pushTargetOf(engine, b), 'ยังไม่ชน = มีเป้าหมาย');
+  brian.markPushFired(engine, b);
+  assert.equal(brian.pushTargetOf(engine, b), null, 'ชนไปแล้วเทิร์นนี้ = ไม่มีเป้าหมายอีก');
+  engine.setRoundNumber(engine.roundNumber + 1);
+  assert.ok(brian.pushTargetOf(engine, b), 'เทิร์นใหม่กลับมาชนได้');
+});
+
+test('[regression] N2O กดได้ในเทิร์นเดียวกับที่กดท่าไม้ตาย 1 (ไม่ติดโควตาสกิลของเทิร์น)', () => {
+  const { b, a } = setup();
+  engine.setCentralDeck(Array.from({ length: 40 }, (_, i) => ({ value: (i % 11) + 1, color: 'red' })));
+  b.skillPoints = 8;
+  brian.startCar(engine, b);
+  engine.setGameState('PLAYING'); // คัตซีนดันเกมเข้าเฟส CUTSCENE — ในเกมจริงมันจบแล้วกลับมาเอง
+  engine.useSkill('B', 'ultimate', ['A']);
+  assert.equal(brian.duelActive(engine), true, 'การแข่งเริ่มแล้ว');
+  assert.equal(b.skillUsedRound, true, 'ท่าไม้ตาย 1 กินโควตาสกิลของเทิร์นไปแล้ว');
+
+  engine.setGameState('PLAYING');
+  engine.useSkill('B', 'ultimate'); // N2O — ถ้าไม่ยกเว้นโควตา บรรทัดนี้จะเงียบไปเฉยๆ
+  assert.equal(engine.calculateScore(b.cards), 21, 'N2O ต้องดันแต้มขึ้น 21 ได้จริง');
+  assert.equal(b.brianDuel.n2o, true);
+  assert.equal(brian.fuelOf(b), 0, 'เทน้ำมันทั้งถัง');
+});
+
+test('[regression] ระหว่างการแข่ง คนอื่นกดสกิลไม่ได้จริงผ่านท่อ useSkill', () => {
+  const { b, a, c } = setup();
+  b.skillPoints = 8;
+  brian.startCar(engine, b);
+  engine.setGameState('PLAYING');
+  engine.useSkill('B', 'ultimate', ['A']);
+  engine.setGameState('PLAYING');
+  const before = c.skillPoints;
+  engine.useSkill('C', 'basic');
+  assert.equal(c.skillPoints, before, 'คนนอกวงกดสกิลไม่ได้ และไม่เสียแต้ม');
+});
+
 // ---------------------------------------------------------------- N2O
 test('N2O: ช่องท่าไม้ตายเปลี่ยนเป็น N2O เฉพาะระหว่างการแข่ง และต้องมีน้ำมัน >= 4', () => {
   const { b, a } = setup();

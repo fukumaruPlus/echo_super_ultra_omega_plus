@@ -1841,9 +1841,10 @@ function activeSkillMusic() {
   //  (ฝั่ง client เล่นไฟล์ใหม่ต่อจากตำแหน่งเดิมผ่าน MUSIC_POSITION_GROUPS จึงไม่มีรอยสะดุดตอนสลับช่วงเวลา)
   const bestByleth = CHAR_HOOKS.byleth.activeMusic(engine, isNightRound(roundNumber));
   if (bestByleth) return bestByleth;
-  // อิปโป (characters/ippo.js): เพลงประจำท่า Dempsey roll — เล่นค้างตลอดที่บัฟยังอยู่
+  // ไบรอัน (characters/brian.js): เพลงประจำร่างรถ · ระหว่างการแข่งที่มีเดิมพันใช้เพลงการแข่งแทน
   const bestBrian = CHAR_HOOKS.brian.activeMusic(engine);
-  if (bestBrian && (!best || bestBrian.at > best.at)) best = bestBrian;
+  if (bestBrian) return bestBrian;
+  // อิปโป (characters/ippo.js): เพลงประจำท่า Dempsey roll — เล่นค้างตลอดที่บัฟยังอยู่
   const bestIppo = CHAR_HOOKS.ippo.activeMusic(engine);
   if (bestIppo) return bestIppo;
   // ยุย (characters/yui.js): เพลงประจำท่าไม้ตายที่กำลังบรรเลงอยู่
@@ -2732,6 +2733,9 @@ function buildStateFor(viewerId) {
         ultimatePub = pub(p.phenexReborn ? ch.ultimate2 : ch.ultimate);
       }
       // DoomGuy (patch 2.2 full): สกิลรอง "Weapon" โชว์ชื่อ/ราคา/ภาพตามอาวุธที่ถืออยู่จริง
+      // ไบรอัน: ระหว่าง "การแข่งที่มีเดิมพัน" ช่องท่าไม้ตายกลายเป็น N2O — ต้องคิดสูตรเดียวกับ useSkill()
+      //  ไม่งั้นปุ่มจะโชว์ชื่อ/ราคา/ภาพของท่าไม้ตาย 1 ทั้งที่กดแล้วได้ N2O
+      if (ch.id === "brian" && CHAR_HOOKS.brian.n2oSlot(engine, p)) ultimatePub = pub(ch.ultimate2);
       if (ch.id === "doomguy") {
         const w = DOOM_WEAPONS[p.doomWeapon] || DOOM_WEAPONS.shotgun;
         const effDesc = {
@@ -4085,6 +4089,9 @@ function useSkill(id, tier, targets, item) {
   const isSupPick = p.characterId === "the_supplicant";
   // ไบรอัน "กุญแจรถ": ไม่นับเป็นการใช้สกิลของเทิร์น (กดแล้วยังใช้สกิลอื่นได้อีก 1 ครั้ง)
   const isBrianKey = p.characterId === "brian" && tier === "basic";
+  // ไบรอัน "N2O": ต้องยกเว้นจากโควตาสกิลของเทิร์นด้วย — การแข่งจบใน 1 เทิร์น และการกดท่าไม้ตาย 1
+  //  กินโควตาไปแล้วในเทิร์นเดียวกัน ถ้าไม่ยกเว้น N2O จะกดไม่ได้เลยตลอดเกม (สเปคระบุว่า "กดได้ ไม่สนกฎของท่าไม้ตาย 1")
+  const isBrianN2O = p.characterId === "brian" && tier === "ultimate" && CHAR_HOOKS.brian.n2oSlot(engine, p);
   // ทาคุมิ ฟุจิวาระ: ขึ้นเกียร์ (พื้นฐาน) / ลงเกียร์ (รอง) / ถึงจะมองไม่เห็น แต่ฉันยังอยู่ (ท่าไม้ตาย) ไม่นับเป็นการใช้สกิลของเทิร์นร่วมกัน
   //  งบรวม 5 ครั้งต่อเทิร์น ผสมกันได้อิสระ (แพทเทิร์นเดียวกับไค กว้างขึ้นครอบคลุมท่าไม้ตายด้วย) — ท่าไม้ตายกดซ้ำไม่ได้ผ่านเช็คทั่วไปด้านล่าง (takumiBlackout บล็อกเอง)
   const isTakumiPick = p.characterId === "takumi" && (tier === "basic" || tier === "secondary" || tier === "ultimate");
@@ -4101,7 +4108,7 @@ function useSkill(id, tier, targets, item) {
   const isBylethPick = p.characterId === "byleth";
   if (isBylethPick && (p.bylethSkillUsesRound || 0) >= CHAR_HOOKS.byleth.SKILL_USES_PER_TURN) return;
   if (isSupPick && (p.supSkillUsesRound || 0) >= CHAR_HOOKS.the_supplicant.SKILL_USES_PER_TURN) return;
-  if (p.skillUsedRound && !gambleRepeat && !isBrianKey && !isSupPick && !isBylethPick && !isHarukaBasic && !isApplePick && !isMuimiBasic && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHisakawaFreeAction) return; // ใช้สกิลได้เพียง 1 อันต่อเทิร์น (ซ้ำ/ซ้อนไม่ได้)
+  if (p.skillUsedRound && !gambleRepeat && !isBrianKey && !isBrianN2O && !isSupPick && !isBylethPick && !isHarukaBasic && !isApplePick && !isMuimiBasic && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHisakawaFreeAction) return; // ใช้สกิลได้เพียง 1 อันต่อเทิร์น (ซ้ำ/ซ้อนไม่ได้)
   // MOON*CELL (คิชินามิ ฮาคุโนะ): ต้องมีแต้มคำสาปแห่งดวงจันทร์ครบ 3 เท่านั้น
   if (st === "moonCell" && (p.hakunoMoonPoints || 0) < HAKUNO_MOONCELL_NEED) return;
   // ข้าขอบัญชา (ชาย/หญิง คิชินามิ ฮาคุโนะ): กดซ้ำไม่ได้จนกว่าผลเดิมจะหมด
@@ -4415,7 +4422,7 @@ function useSkill(id, tier, targets, item) {
     if (p.statuses.freecast <= 0) delete p.statuses.freecast;
     lastLog.push(`👸 ${p.name} การ์ดราชินี — ใช้สกิลนี้โดยไม่เสียแต้มสกิล`);
   }
-  if (!isApplePick && !isMuimiBasic && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHarukaBasic && !isBylethPick && !isHisakawaFreeAction && !isYuiBasic && !isSupPick && !isBrianKey) p.skillUsedRound = true; // สกิลเลือก/สลับและเสบียงฉุกเฉินไม่นับโควตาสกิลหลัก
+  if (!isApplePick && !isMuimiBasic && !isTohnoPick && !isHakunoGender && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHarukaBasic && !isBylethPick && !isHisakawaFreeAction && !isYuiBasic && !isSupPick && !isBrianKey && !isBrianN2O) p.skillUsedRound = true; // สกิลเลือก/สลับและเสบียงฉุกเฉินไม่นับโควตาสกิลหลัก
   if (isKaiPick) p.kaiSkillUsesRound = (p.kaiSkillUsesRound || 0) + 1;
   if (isTakumiPick) p.takumiSkillUsesRound = (p.takumiSkillUsesRound || 0) + 1;
 
@@ -5653,14 +5660,15 @@ function attackableTargets(atkId) {
 function afterSummary() {
   // คอนเนอร์ RK800 (สกิลติดตัว 2): ระหว่างการไล่ล่า ทุกเทิร์นเหลือแค่ จั่ว -> สรุปแต้ม ไม่มีเฟสโจมตีเลย
   if (CHAR_HOOKS.conner.chaseActive(engine)) { endTurn(); return; }
-  // ไบรอัน: ระหว่างการแข่ง เทิร์นนั้นไม่มีเฟสโจมตี (จบที่การวัดแต้มล้วนๆ)
-  if (CHAR_HOOKS.brian.duelActive(engine)) { endTurn(); return; }
   // ไบรอัน (สกิลรอง หลีกทางไป): พุ่งชนคนที่แต้มสูงสุดที่มากกว่าเรา — วีดีโอก่อน แล้วค่อยลงความเสียหาย
   //  ทำที่นี่ (หลังรู้แต้มทุกคนแล้ว ก่อนเข้าเฟสโจมตี) เพราะเงื่อนไขคือ "คนที่แต้มมากกว่าเรา"
   {
     const pusher = alivePlayers().find((p) => CHAR_HOOKS.brian.pushTargetOf(engine, p));
     if (pusher) {
       const pt = CHAR_HOOKS.brian.pushTargetOf(engine, pusher);
+      // ⚠️ ต้องปักธง "ยิงไปแล้วเทิร์นนี้" ก่อนคิววีดีโอเสมอ — callback ด้านล่างเรียก afterSummary() ซ้ำ
+      //  ถ้าไม่ปัก pushTargetOf จะยังคืนเป้าหมายเดิม แล้ววนคิววีดีโอไม่รู้จบ
+      CHAR_HOOKS.brian.markPushFired(engine, pusher);
       queueCutscene(pusher, "brianPush");
       runCutsceneQueue(() => { CHAR_HOOKS.brian.applyPushHit(engine, pusher, pt); afterSummary(); });
       return;
