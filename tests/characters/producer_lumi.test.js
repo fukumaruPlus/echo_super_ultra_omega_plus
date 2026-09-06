@@ -361,6 +361,54 @@ test('All star 765 (ฮารุกะ): จองหมัดที่ 2 คร
   assert.equal(L.lumiExtraAtk, 1);
 });
 
+test('[regression] Million star 765: ดาเมจที่หน่วงไว้ต้องสลายไปพร้อมไอดอล ไม่ไหลไปฆ่าโปรดิวเซอร์', () => {
+  // ก้อนที่หน่วงไว้คือดาเมจที่ "ไอดอลรับไว้แล้ว" — ถ้าปล่อยค้าง มันจะไปลงหลอดโปรดิวเซอร์ที่มีแค่ 3
+  //  และไม่มีเกราะ = ดาเมจที่เล็งไอดอลเต็มหลอดฆ่าทั้งตัวละครได้ในทีเดียว (ขัดกฎแกนของตัวละคร)
+  const { L, A } = setup();
+  L.lumiIdol = 'mirai';
+  lumi.applyUlt(engine, L);
+  engine.withEffectSource(A, () => engine.dealMixed(L, 3, true));
+  assert.equal(L.lumiPending.length, 1, 'ดาเมจถูกหน่วงไว้');
+  L.hp = 0; L.armor = 0;
+  engine.instantDeath(L);                       // ไอดอลล้มจากเหตุอื่น
+  assert.equal(L.hp, lumi.PRODUCER_HP);
+  assert.equal(L.lumiPending.length, 0, 'คิวถูกล้างพร้อมไอดอล');
+  lumi.onRoundStartTick(engine, L);
+  assert.equal(L.hp, lumi.PRODUCER_HP, 'โปรดิวเซอร์ไม่โดนดาเมจที่เล็งไอดอลไว้');
+  assert.equal(L.alive, true);
+});
+
+test('Million star 765: หลายก้อนในเทิร์นเดียวลงผลพร้อมกันในเทิร์นถัดไป (ยอดรวมไม่เปลี่ยน)', () => {
+  const { L, A } = setup();
+  L.lumiIdol = 'mirai'; L.armor = 0;
+  lumi.applyUlt(engine, L);
+  const hp0 = L.hp;
+  for (let i = 0; i < 3; i++) engine.withEffectSource(A, () => engine.dealMixed(L, 1, true));
+  assert.equal(L.hp, hp0, 'เทิร์นนี้ยังไม่โดนเลย');
+  assert.equal(L.lumiPending.length, 3);
+  lumi.onRoundStartTick(engine, L);
+  assert.equal(L.hp, hp0 - 3, 'ลงพร้อมกันทั้ง 3 ก้อน');
+});
+
+test('โคฮารุ: หักลบจากแต้มที่มีอยู่จริง และมีพื้นล่างที่ 0 ตามกติกากลางของเกม', () => {
+  const { L } = setup();
+  L.lumiIdol = 'kohaku';
+  L.cards = [{ value: 15, color: 'red' }];
+  const c = { value: 9, color: 'red' };
+  lumi.onCardDraw(engine, L, c);
+  L.cards.push(c);
+  assert.equal(engine.scoreOf(L), 6, '15 - 9 = 6');
+  // scoreOf() ของเกมมีพื้นล่างที่ 0 อยู่แล้ว (เหมือน cardBonus ติดลบของไบเลธ) — ติดลบไม่ได้
+  const { L: L2 } = setup();
+  L2.lumiIdol = 'kohaku';
+  L2.cards = [{ value: 3, color: 'red' }];
+  const c2 = { value: 9, color: 'red' };
+  lumi.onCardDraw(engine, L2, c2);
+  L2.cards.push(c2);
+  assert.equal(engine.scoreOf(L2), 0);
+  assert.equal(engine.bustedOf(L2), false, 'แต้มต่ำไม่ใช่ไพ่แตก');
+});
+
 // ---------------------------------------------------------------- luminous
 test('luminous: รวมผลติดตัวและความสามารถท่าไม้ตายของทั้ง 5 คน', () => {
   const { L } = setup();
