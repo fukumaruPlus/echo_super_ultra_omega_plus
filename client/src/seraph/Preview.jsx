@@ -109,7 +109,7 @@ export default function SeraphPreview() {
           onPlace={() => pushToast("ลงแต้ม Matrix", "◆")} onDone={done}
         />
       )}
-      {scene === "pairing" && <PairingScene key={runId} pairs={PAIRS} myId="p1" bye={{ name: "ยูนะ", img: AVATAR(7) }} onDone={done} />}
+      {scene === "pairing" && <PairingScene key={runId} pairs={PAIRS} myId="p1" byes={[{ id: "p7", name: "ยูนะ", img: AVATAR(7) }]} onDone={done} />}
       {scene === "day5" && <Day5Intro key={runId} players={PLAYERS} night={night} onDone={done} />}
       {scene === "reveal" && <CharacterReveal key={runId} player={{ ...PLAYERS[0], night }} onDone={done} />}
       {scene === "revealSeen" && <CharacterReveal key={runId} player={{ ...PLAYERS[1], night }} seen onDone={done} />}

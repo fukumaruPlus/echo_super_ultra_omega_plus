@@ -57,14 +57,14 @@ let cycleRound = 1;
 let phase = "draw";      // draw | place | duel
 let places = {};         // { playerId: placeKey } ของวันนี้
 let placeDone = {};      // { playerId: true } ส่งผลเรียบร้อยแล้ว
-let pairs = [];          // [{ a, b, done, winnerId }]
-let byeId = null;
+let pairs = [];          // มีได้แค่ 1 คู่ต่อรอบ (กติกา: วันที่ 5 ดวลคู่เดียวแล้ววนกลับ)
+let byeIds = [];         // ทุกคนที่เหลือ = ผ่านเข้ารอบถัดไปโดยไม่ต้องดวล
 let duelIndex = 0;       // คู่ที่กำลังลงสนาม
 let pendingLog = [];
 
 function reset() {
   on = false; day = 1; cycleRound = 1; phase = "draw";
-  places = {}; placeDone = {}; pairs = []; byeId = null; duelIndex = 0;
+  places = {}; placeDone = {}; pairs = []; byeIds = []; duelIndex = 0;
   onAllPlaced = null;
   pendingLog = [];
 }
@@ -370,25 +370,29 @@ function advanceDay(engine) {
   return { next: "day" };
 }
 
-/** จับคู่ดวลแบบสุ่ม — คนที่เหลือ (เลขคี่) ผ่านเข้ารอบถัดไปฟรี */
+/**
+ * จับคู่ดวล — **สุ่มมาแค่ 1 คู่ต่อรอบเท่านั้น** คนที่เหลือทั้งหมดผ่านเข้ารอบถัดไปฟรี
+ * (กติกา: วันที่ 5 เกิดการต่อสู้แค่คู่เดียว จบแล้ววนกลับไปวันที่ 1 ของรอบใหม่
+ *  ดังนั้นประกาศคู่ตอนจบวันที่ 2 จึงแสดงแค่คู่เดียวด้วย)
+ */
 function makePairs(engine) {
-  const alive = Object.values(engine.players).filter((p) => p.alive && !p.scEliminated);
-  const pool = [...alive];
+  const pool = Object.values(engine.players).filter((p) => p.alive && !p.scEliminated);
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
   pairs = [];
-  byeId = pool.length % 2 === 1 ? pool.pop().id : null;
-  for (let i = 0; i < pool.length; i += 2) {
-    pairs.push({ a: pool[i].id, b: pool[i + 1].id, done: false, winnerId: null });
-  }
-  duelIndex = 0;
-  for (const pr of pairs) {
-    const a = engine.players[pr.a], b = engine.players[pr.b];
+  byeIds = [];
+  if (pool.length >= 2) {
+    const a = pool.shift(), b = pool.shift();
+    pairs.push({ a: a.id, b: b.id, done: false, winnerId: null });
     engine.log(`⚔️ คู่ดวลวันที่ 5 — ${a.name} ปะทะ ${b.name}`);
   }
-  if (byeId) engine.log(`✨ ${engine.players[byeId].name} จับคู่ไม่ลงตัว — ผ่านเข้ารอบถัดไปโดยไม่ต้องดวล`);
+  byeIds = pool.map((p) => p.id);
+  if (byeIds.length) {
+    engine.log(`✨ ผ่านเข้ารอบถัดไปโดยไม่ต้องดวล: ${byeIds.map((id) => engine.players[id].name).join(" · ")}`);
+  }
+  duelIndex = 0;
 }
 
 /** เข้าวันที่ 5: ทุกคนได้แต้มสกิลเริ่มต้น 4 + เปิดเผยตัวละครของคู่ที่ลงสนาม */
@@ -447,10 +451,9 @@ function checkDuelProgress(engine) {
     if (winner.scStat) winner.scStat.duelWins++;
     engine.log(`🏅 ${winner.name} ผ่านเข้ารอบถัดไป`);
   }
+  // มีคู่เดียวต่อรอบ -> ดวลจบเมื่อไหร่ก็จบรอบทันที ไม่มีคู่ถัดไป
   duelIndex++;
-  if (duelIndex >= pairs.length) return "cycleEnd";
-  revealCurrentPair(engine);
-  return "nextPair";
+  return "cycleEnd";
 }
 
 /** จบรอบ: รีเซ็ต/ฟื้น/รางวัล (SERAPH_MOONCELL.md §8) */
@@ -465,7 +468,7 @@ function endCycle(engine) {
     engine.addGold(p, CYCLE_END_GOLD);
   }
   pairs = [];
-  byeId = null;
+  byeIds = [];
   duelIndex = 0;
   day = 1;
   cycleRound++;
@@ -549,8 +552,7 @@ function stateFor(engine, viewerId) {
       bName: engine.players[pr.b] ? engine.players[pr.b].name : "",
       done: pr.done, winnerId: pr.winnerId
     })),
-    bye: byeId,
-    byeName: byeId && engine.players[byeId] ? engine.players[byeId].name : null,
+    byes: byeIds.map((id) => ({ id, name: engine.players[id] ? engine.players[id].name : "" })),
     myOpponent: me ? opponentOf(me.id) : null,
     duelIndex,
     duelPair: pair ? { a: pair.a, b: pair.b } : null,

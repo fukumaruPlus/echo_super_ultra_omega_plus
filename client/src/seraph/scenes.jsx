@@ -191,7 +191,7 @@ export function DayBanner({ day = 1, short = false, onDone }) {
    S6 — ประกาศคู่ดวล (จบวันที่ 2) · 7.0s
    เปิดด้วยความเงียบ 400ms — ผู้เรียกต้อง stopMusic() ก่อน mount ฉากนี้
    ========================================================================= */
-export function PairingScene({ pairs = [], bye = null, myId = null, onDone }) {
+export function PairingScene({ pairs = [], byes = [], myId = null, onDone }) {
   const [stage, setStage] = useState(0); // 0 เงียบ+ข้อความ · 1 ตัดทีละคู่ · 2 แผนผังรวม · 3 นับถอยหลัง
   const [shown, setShown] = useState(-1);
   const [glitch, setGlitch] = useState(0);
@@ -268,14 +268,16 @@ export function PairingScene({ pairs = [], bye = null, myId = null, onDone }) {
               );
             })}
           </div>
-          {bye && (
+          {/* วันที่ 5 ดวลแค่คู่เดียวต่อรอบ — ที่เหลือทั้งหมดผ่านเข้ารอบถัดไปโดยไม่ต้องดวล */}
+          {byes.length > 0 && (
             <div
-              className="flex flex-col items-center gap-1 px-4 py-2"
-              style={{ border: "2px solid var(--color-echo-gold)", background: "rgba(4,7,12,.72)", animation: "pRise 360ms 400ms both" }}
+              className="flex flex-col items-center gap-2 px-4 py-3"
+              style={{ border: "2px solid var(--color-echo-gold)", background: "rgba(4,7,12,.78)", animation: "pRise 360ms 400ms both" }}
             >
-              <ShadowPortrait name={bye.name} img={bye.img} size="sm" />
-              <span className="text-[11px] font-bold text-echo-gold">ผ่านโดยไม่ต้องดวล</span>
-              <span className="sc-sysline text-[9px] opacity-70">{"> BYE — NO OPPONENT ASSIGNED"}</span>
+              <span className="text-xs font-black text-echo-gold">ผ่านเข้ารอบถัดไปโดยไม่ต้องดวล</span>
+              <div className="flex flex-wrap justify-center gap-3">
+                {byes.map((o) => <ShadowPortrait key={o.id} name={o.name} img={o.img} size="sm" />)}
+              </div>
             </div>
           )}
           {stage === 3 && (

@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { socket } from "../socket";
-import { playMusic, playSfx, stopMusic } from "../audio";
+import { playMusic, playSfx, stopMusic, stopMusicExcept } from "../audio";
 import Game from "../screens/Game";
 import Arena from "./Arena";
 import PlaceSelect from "./PlaceSelect";
@@ -52,14 +52,20 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
   useEffect(() => { if (sc && sc.day >= 4) preloadWave3(sc.night); }, [sc && sc.day, sc && sc.night]);
 
   // ---------- เพลง (SERAPH_SCENES.md §6) ----------
+  //  คิดเป็น "แทร็กเดียวที่ควรดังตอนนี้" แล้วค่อยสั่งครั้งเดียว — กันเพลงซ้อน
+  //  S6/S7 เปิดด้วยความเงียบ (null) เพราะความเงียบเป็นส่วนหนึ่งของฉาก
+  const wantTrack = !sc ? null
+    : (scene && (scene.kind === "pairing" || scene.kind === "day5")) ? null
+    : sc.day === 5 ? (sc.night ? "sc_duel_night" : "sc_duel_day")
+    : state.gameState === "SERAPH_PLACE" ? "sc_rest"
+    : "sc_day";
   useEffect(() => {
-    if (!sc) return;
-    // S6/S7 เปิดด้วยความเงียบ — ความเงียบเป็นส่วนหนึ่งของฉาก ห้ามมีเพลงคลอ
-    if (scene && (scene.kind === "pairing" || scene.kind === "day5")) { stopMusic(); return; }
-    if (sc.day === 5) playMusic(sc.night ? "sc_duel_night" : "sc_duel_day", sc.cycleRound);
-    else if (state.gameState === "SERAPH_PLACE") playMusic("sc_rest");
-    else playMusic("sc_day");
-  }, [sc && sc.day, sc && sc.night, sc && sc.cycleRound, state.gameState, scene && scene.kind]);
+    // stopMusicExcept ก่อนเสมอ: playMusic พักเฉพาะแทร็กที่ currentMusic ชี้อยู่
+    // ถ้าตัวแปรนั้นหลุดซิงก์เมื่อไหร่จะมีแทร็กเก่าค้างเล่นทับกัน
+    stopMusicExcept(wantTrack);
+    if (!wantTrack) { stopMusic(); return; }
+    playMusic(wantTrack, wantTrack.startsWith("sc_duel") ? sc.cycleRound : undefined);
+  }, [wantTrack, sc && sc.cycleRound]);
 
   // ---------- ล้างตัวเลือกค้างเมื่อเข้าเฟสเลือกสถานที่รอบใหม่ ----------
   useEffect(() => {
@@ -192,7 +198,7 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
             aImg: (state.players.find((p) => p.id === pr.a) || {}).img,
             bImg: (state.players.find((p) => p.id === pr.b) || {}).img
           }))}
-          bye={sc.bye ? { name: sc.byeName, img: (state.players.find((p) => p.id === sc.bye) || {}).img } : null}
+          byes={(sc.byes || []).map((o) => ({ ...o, img: (state.players.find((p) => p.id === o.id) || {}).img }))}
           myId={state.youId}
           onDone={closeScene}
         />

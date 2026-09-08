@@ -171,19 +171,23 @@ test("ตัวตนถูกซ่อนจนกว่าจะลงดว�
   if (other) assert.strictEqual(Seraph.canSee(e.players[pair.a], other), false);
 });
 
-test("จับคู่: จำนวนคี่ต้องมีคนผ่านฟรี 1 คน · จำนวนคู่ไม่มี", () => {
+test("จับคู่: ดวลแค่ 1 คู่ต่อรอบ ที่เหลือผ่านฟรีทั้งหมด", () => {
+  // กติกา: วันที่ 5 เกิดการต่อสู้แค่คู่เดียว จบแล้ววนกลับวันที่ 1 ของรอบใหม่
   const e5 = startWith(5);
   Seraph.makePairs(e5);
   let st = Seraph.stateFor(e5, "p1");
-  assert.strictEqual(st.pairs.length, 2);
-  assert.ok(st.bye, "เลขคี่ต้องมีคนผ่านฟรี");
+  assert.strictEqual(st.pairs.length, 1, "ต้องมีคู่ดวลคู่เดียวเท่านั้น");
+  assert.strictEqual(st.byes.length, 3, "ที่เหลือทั้งหมดผ่านฟรี");
   Seraph.reset();
 
   const e4 = startWith(4);
   Seraph.makePairs(e4);
   st = Seraph.stateFor(e4, "p1");
-  assert.strictEqual(st.pairs.length, 2);
-  assert.strictEqual(st.bye, null);
+  assert.strictEqual(st.pairs.length, 1);
+  assert.strictEqual(st.byes.length, 2);
+  // คนที่ผ่านฟรีต้องไม่ใช่คนในคู่ดวล
+  const inPair = new Set([st.pairs[0].a, st.pairs[0].b]);
+  assert.ok(st.byes.every((b) => !inPair.has(b.id)));
 });
 
 test("วันที่ 5: ลงสนามแค่คู่ที่กำลังดวล คนอื่นเป็นผู้ชม", () => {
@@ -198,23 +202,19 @@ test("วันที่ 5: ลงสนามแค่คู่ที่กำ�
   assert.ok(spectators.every((p) => p.locked === true && p.cards.length === 0), "ผู้ชมต้องถูกล็อกและไม่มีไพ่");
 });
 
-test("ผู้แพ้ตกรอบ แล้วคิวเดินไปคู่ถัดไป จนหมดคิวจึงจบรอบ", () => {
+test("ผู้แพ้ตกรอบ แล้วจบรอบทันที (มีคู่เดียวจึงไม่มีคู่ถัดไป)", () => {
   const e = startWith(4);
   Seraph.makePairs(e);
   Seraph.beginDuelDay(e);
-  const st0 = Seraph.stateFor(e, "p1");
-  const pair0 = st0.pairs[0];
+  const pair = Seraph.stateFor(e, "p1").pairs[0];
 
   assert.strictEqual(Seraph.checkDuelProgress(e), "continue", "ยังไม่มีใครตาย = ดวลต่อ");
-  e.players[pair0.a].alive = false;
-  assert.strictEqual(Seraph.checkDuelProgress(e), "nextPair");
-  assert.strictEqual(e.players[pair0.a].scEliminated, true);
-  assert.strictEqual(e.players[pair0.b].scEliminated, false);
-
-  const pair1 = Seraph.stateFor(e, "p1").pairs[1];
-  e.players[pair1.b].alive = false;
-  assert.strictEqual(Seraph.checkDuelProgress(e), "cycleEnd", "หมดคิวคู่ดวลแล้ว");
-  assert.strictEqual(Seraph.survivors(e).length, 2);
+  e.players[pair.a].alive = false;
+  assert.strictEqual(Seraph.checkDuelProgress(e), "cycleEnd", "คู่เดียวจบ = จบรอบเลย");
+  assert.strictEqual(e.players[pair.a].scEliminated, true);
+  assert.strictEqual(e.players[pair.b].scEliminated, false);
+  // 4 คน ตกรอบ 1 -> เหลือ 3 (คนที่ผ่านฟรีต้องไม่โดนอะไร)
+  assert.strictEqual(Seraph.survivors(e).length, 3);
 });
 
 test("จบรอบ: ฟื้นเต็ม · แต้มสกิล 0 · Matrix ที่ลงไปถูกล้าง (ที่ยังไม่ลงยังอยู่) · +5 เหรียญ", () => {

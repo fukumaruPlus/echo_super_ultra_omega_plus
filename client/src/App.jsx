@@ -189,17 +189,15 @@ export default function App() {
   useEffect(() => {
     // CUTSCENE: หยุดเพลงพื้นหลัง ปล่อยให้เสียงในวีดีโอเล่น (เพลงสกิลมาหลังวีดีโอ)
     // ร่างแปลง (Ginga/Unicorn): เพลงสกิลทับ | ช่วงต่อสู้: เพลงกลางวัน/กลางคืน | อื่นๆ: main_home
-    // SE.RA.PH คุมเพลงของตัวเองทั้งหมดใน SeraphGame — ต้องออกตั้งแต่บรรทัดแรก
-    //  ⚠️ ห้ามปล่อยให้ไหลลงไปถึง resetMusicPositions() ด้านล่าง: มันสั่ง pause() ทุกแทร็ก
-    //  และ effect ของคอมโพเนนต์ลูกทำงาน "ก่อน" ของพ่อ -> เพลงที่ SeraphGame เพิ่งสั่งเล่นจะถูกหยุดทันที
-    //  (นี่คือสาเหตุที่ฉากเลือกสถานที่เงียบสนิท)
-    if (state && state.seraph) return;
+    const seraphMode = !!(state && state.seraph);
     const battle = phase === "PLAYING" || phase === "SUMMARY" || phase === "ATTACK" || phase === "ATTACKING" || phase === "TRANSITION";
     const inMatch = battle || phase === "CUTSCENE";
 
     // ขอบเขตแมตช์: เริ่มเกมใหม่ / จบเกม -> รีเซ็ตตำแหน่งเพลงทั้งหมด เริ่มเพลงใหม่จากต้น
     // (การเล่นต่อจากจุดเดิมนับเฉพาะภายในแมตช์เดียวกันเท่านั้น)
-    if (inMatch !== prevInMatch.current) resetMusicPositions();
+    // ⚠️ resetMusicPositions() สั่ง pause() ทุกแทร็ก และ effect ของลูกทำงาน "ก่อน" ของพ่อ
+    //  ถ้าปล่อยให้ทำงานในโหมด SE.RA.PH เพลงที่ SeraphGame เพิ่งสั่งเล่นจะถูกหยุดทันที
+    if (!seraphMode && inMatch !== prevInMatch.current) resetMusicPositions();
     prevInMatch.current = inMatch;
 
     // เพลงกลางวัน/กลางคืน (patch พิเศษ): กลางวัน = new_morning | กลางคืน = new_night
@@ -210,11 +208,15 @@ export default function App() {
     }
     if (!inMatch) prevCycle.current = null;
 
-    // โหมดประหยัด (patch 2.0.6): ข้ามวีดีโอคัตซีน — ระหว่างรอคนอื่นดูวีดีโอ เพลงเล่นต่อตามปกติ
-    if (phase === "CUTSCENE" && (!lowQ || mandatoryCutscene)) stopMusic();
-    else if (skillMusic) playMusic(skillMusic, skillMusicSeq); // seq เปลี่ยน = การเปิดร่างใหม่ -> เริ่มเพลงใหม่
-    else if (battle || phase === "CUTSCENE") playMusic(cycle === "night" ? "new_night" : "new_morning", cycleSeq.current);
-    else playMusic("main_home");
+    // เพลงพื้นหลัง: โหมด SE.RA.PH คุมของตัวเองใน SeraphGame — ตรงนี้ต้องไม่ยุ่งด้วย
+    //  แต่ "เสียงเอฟเฟกต์" ด้านล่างต้องทำงานทุกโหมด (เดิม early-return ตรงนี้ทำให้เสียงหายไปทั้งโหมด)
+    if (!seraphMode) {
+      // โหมดประหยัด (patch 2.0.6): ข้ามวีดีโอคัตซีน — ระหว่างรอคนอื่นดูวีดีโอ เพลงเล่นต่อตามปกติ
+      if (phase === "CUTSCENE" && (!lowQ || mandatoryCutscene)) stopMusic();
+      else if (skillMusic) playMusic(skillMusic, skillMusicSeq); // seq เปลี่ยน = การเปิดร่างใหม่ -> เริ่มเพลงใหม่
+      else if (battle || phase === "CUTSCENE") playMusic(cycle === "night" ? "new_night" : "new_morning", cycleSeq.current);
+      else playMusic("main_home");
+    }
 
     // เปลี่ยนจาก "เลือกการ์ด" ไปสรุปผล -> เสียง trun_change (ยกเว้นเข้า cutscene)
     if (prevPhase.current === "PLAYING" && phase && phase !== "PLAYING" && phase !== "CUTSCENE") {

@@ -302,6 +302,17 @@ export function playMusic(name, seq) {
   currentMusic = name;
   a.play().catch(() => {}); // seq เดิม (เช่น กลับมาหลัง cutscene) -> เล่นต่อจากจุดเดิม ไม่เริ่มใหม่
 }
+// หยุดทุกแทร็กยกเว้นตัวที่ระบุ — ตาข่ายกันเพลงซ้อน
+//  playMusic พักเฉพาะแทร็กที่ currentMusic ชี้อยู่ ถ้าตัวแปรนั้นหลุดซิงก์เมื่อไหร่
+//  (เช่นมีอะไรสั่งเล่นข้ามทาง หรือ effect ทำงานสลับกันหลายตัว) จะมีแทร็กเก่าค้างเล่นอยู่เงียบ ๆ
+//  เรียกตัวนี้ก่อนเปลี่ยนเพลงจะการันตีว่าเหลือเสียงเดียวจริง ๆ
+export function stopMusicExcept(keep) {
+  for (const [name, a] of Object.entries(musicCache)) {
+    if (name === keep) continue;
+    if (!a.paused) a.pause();
+  }
+  if (keep == null) currentMusic = null;
+}
 export function stopMusic() {
   if (!currentMusic) return;
   getMusic(currentMusic).pause(); // พักไว้ ไม่รีเซ็ต -> กลับมาเล่นต่อจากจุดเดิม (ในแมตช์)
