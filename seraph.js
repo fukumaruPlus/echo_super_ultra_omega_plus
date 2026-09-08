@@ -105,6 +105,8 @@ function initPlayer(engine, p) {
   p.armor = START_ARMOR;
   p.skillPoints = 0;
   p.gold = START_GOLD;
+  // สถิติสำหรับฉากผู้ชนะคนสุดท้าย (S12)
+  p.scStat = { dayWins: 0, duelWins: 0, matrixSpent: 0, places: {} };
 }
 
 /** ฟิลด์ที่ต้องล้างทุกครั้งที่ resetCombat (กันค้างข้ามแมตช์ — GAME_SYSTEM.md gotcha #11) */
@@ -112,6 +114,7 @@ function resetFields(p) {
   p.scCapHp = 0; p.scCapArmor = 0; p.scCapSkill = 0; p.scSkillLevel = 0;
   p.scMatrix = 0; p.scPlaced = {}; p.scSeen = [];
   p.scSpectator = false; p.scEliminated = false; p.scPlace = null; p.scPlaceResult = null;
+  p.scStat = null;
 }
 
 // ============================================================
@@ -184,6 +187,7 @@ function onRoundWinner(engine, w) {
   if (!noCombat() || !w) return;
   const before = w.scMatrix || 0;
   w.scMatrix = Math.min(MATRIX_MAX, before + 1);
+  if (w.scStat) w.scStat.dayWins++;
   if (w.scMatrix > before) engine.log(`◆ ${w.name} ชนะประจำวัน — Matrix +1 (${w.scMatrix}/${MATRIX_MAX})`);
   else engine.log(`◆ ${w.name} ชนะประจำวัน — Matrix เต็มแล้ว (${MATRIX_MAX}/${MATRIX_MAX}) แต้มใหม่สูญไป`);
 }
@@ -250,6 +254,7 @@ function applyPlace(engine, p, key, opts) {
   places[p.id] = key;
   placeDone[p.id] = true;
   p.scPlace = key;
+  if (p.scStat) p.scStat.places[key] = (p.scStat.places[key] || 0) + 1;
   p.scPlaceResult = null;   // ให้แต่ละสถานที่เติมเอง -> client เอาไปขึ้นฉากแจ้งเตือน
   if (key === "room") return placeRoom(engine, p);
   if (key === "church") return placeChurch(engine, p, opts.option);
@@ -310,6 +315,7 @@ function placePark(engine, p, targets) {
     p.scPlaced[tid] = cur + 1;
     p.scMatrix--;
     used++;
+    if (p.scStat) p.scStat.matrixSpent++;
   }
   p.scPlaceResult = used > 0
     ? { place: "park", title: `ลงแต้ม Matrix ${used} แต้ม`, detail: `เหลือในคลัง ${p.scMatrix}`, tone: "cyan" }
@@ -438,6 +444,7 @@ function checkDuelProgress(engine) {
   }
   if (winner) {
     pair.winnerId = winner.id;
+    if (winner.scStat) winner.scStat.duelWins++;
     engine.log(`🏅 ${winner.name} ผ่านเข้ารอบถัดไป`);
   }
   duelIndex++;
@@ -526,6 +533,15 @@ function stateFor(engine, viewerId) {
     eliminated: me ? !!me.scEliminated : false,
     placeResult: me ? me.scPlaceResult || null : null,   // ผลของสถานที่ที่เพิ่งไปมา (ของผู้ชมคนนี้เท่านั้น)
     shopOpen: !isDuelDay(),                              // ซื้อของได้เฉพาะวันสืบสวน
+    stat: me ? me.scStat || null : null,                  // สถิติของผู้ชมคนนี้ (ใช้ในฉากจบเกม)
+    // สรุปตอนจบเกม: ใครรอด ใครถูกลบ + สถิติของทุกคน (เปิดเผยได้แล้วเพราะเกมจบ)
+    finalBoard: Object.values(engine.players).map((o) => ({
+      id: o.id, name: o.name,
+      charName: engine.CHAR_BY_ID[o.characterId] ? engine.CHAR_BY_ID[o.characterId].name : "???",
+      img: null, eliminated: !!o.scEliminated, alive: !!o.alive,
+      gold: o.gold || 0, skillLevel: o.scSkillLevel || START_SKILL_LEVEL,
+      stat: o.scStat || null
+    })),
     // --- ข้อมูลสาธารณะ ---
     pairs: pairs.map((pr) => ({
       a: pr.a, b: pr.b,

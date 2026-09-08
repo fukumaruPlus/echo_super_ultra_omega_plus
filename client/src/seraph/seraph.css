@@ -786,15 +786,16 @@
 }
 .sc-arena-ring:nth-child(2) { inset: 14%; border-style: dashed; animation-duration: 46s; animation-direction: reverse; }
 .sc-arena-ring:nth-child(3) { inset: 30%; border-color: rgba(53, 230, 212, 0.5); animation-duration: 34s; }
-/* หัววงแหวนเรืองแสง — ใช้ box-shadow แทน drop-shadow
-   drop-shadow บนวงกลมขนาด 96vmin ที่หมุนอยู่ตลอด ต้อง rasterize ใหม่ทุกเฟรม */
+/* หัววงแหวนเรืองแสง — ห้ามใช้ box-shadow หรือ drop-shadow ที่นี่เด็ดขาด
+   วงแหวนอยู่ในบริบท preserve-3d (พื้นเอียง 74 องศา) เงาของอิลิเมนต์ที่ถูกหมุนใน 3D
+   จะถูก rasterize เป็น "กล่องสี่เหลี่ยมทึบ" ไม่ใช่รูปวงกลม -> กลายเป็นก้อนสีบังสนาม
+   ใช้ความสว่างของเส้นขอบล้วน ๆ แทน (ได้ผลทางสายตาใกล้เคียงและไม่มีเงาให้เพี้ยน) */
 .sc-arena-ring::after {
   content: "";
   position: absolute;
   inset: -1px;
   border-radius: 50%;
-  border-top: 2px solid var(--color-sc-cyan);
-  box-shadow: 0 0 12px rgba(53, 230, 212, 0.5);
+  border-top: 2px solid #7ffff0;
 }
 
 /* แกนกลาง: กองไพ่ลอย + วงแหวนพลังงาน */

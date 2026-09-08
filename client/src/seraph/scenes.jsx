@@ -11,8 +11,8 @@ import { SystemLines, GlitchCut, SeraphBackground, ShadowPortrait, DataCube } fr
 
 const PD = "var(--font-p-display)";
 
-/** ตัวช่วย: ยิง callback ตามตารางเวลาของฉาก แล้วเก็บกวาด timer ให้เอง */
-function useTimeline(steps, deps = []) {
+/** ตัวช่วย: ยิง callback ตามตารางเวลาของฉาก แล้วเก็บกวาด timer ให้เอง (ใช้ร่วมกับ finale.jsx) */
+export function useTimeline(steps, deps = []) {
   useEffect(() => {
     const timers = steps.map(([at, fn]) => setTimeout(fn, at));
     return () => timers.forEach(clearTimeout);

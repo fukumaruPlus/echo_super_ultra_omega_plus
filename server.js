@@ -2847,7 +2847,12 @@ function buildStateFor(viewerId) {
         locked: p.locked,
         busted: (show || promoShow || allyShow || connorReads) ? bustedOf(p) : false,
         result: p.result,
-        cardCount: p.cards.length,
+        // SE.RA.PH วันดวล: จำนวนไพ่ในมือของ "คู่ต่อสู้" เป็นความลับ — เห็นได้ต่อเมื่อ
+        //  ลง Matrix ไว้บนเขาอย่างน้อย 1 แต้ม (นี่คือผลของ Matrix ระดับ 1 ตาม §6)
+        //  ผู้ชมไม่โดนกฎนี้ เพราะสเปก §7 ให้ผู้ชมเห็นคู่ที่ลงสนามได้เต็ม ๆ
+        cardCount: (Seraph.isDuelDay() && viewer && !mine && !viewer.scSpectator
+          && Seraph.inCurrentDuel(viewer) && Seraph.matrixLevelOn(viewer, p) < 1)
+          ? null : p.cards.length,
         cards: blackout ? null : (mine ? p.cards : null),
         // SE.RA.PH Matrix ระดับ 3: ผู้ชมที่ลงครบ 3 แต้มบนคนนี้ เห็นแต้มของเขาตลอดเวลา (§6)
         //  (ระดับ 1 "เห็นจำนวนไพ่" ใช้ cardCount ที่ส่งให้ทุกคนอยู่แล้ว — client เป็นคนเลือกโชว์ตามระดับ)

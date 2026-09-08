@@ -6,7 +6,7 @@
 //  (สถานที่ที่คู่แข่งไป คือข้อมูลสืบสวนที่มีค่าที่สุดในโหมดนี้)
 // ============================================================
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { playSfx } from "../audio";
 import { SC_PLACE, SC_PLACE_ORDER } from "./assets";
 import { SeraphBackground, DayRail, MatrixSlots } from "./ui";
@@ -55,35 +55,21 @@ export default function PlaceSelect({
   me = {},
   day = 1,
   night = false,
-  seconds = 20,
   placedCount = 0,
   totalPlayers = 1,
+  submitted = false,   // ส่งให้ server แล้วจริง ๆ (ยกเลิกไม่ได้) — พ่อเป็นคนคุม
+  pending = null,      // เลือกไว้แต่ยังไม่ยืนยัน (โบสถ์/สวน/ร้านค้า) — ยกเลิกได้
+  chosen = null,       // สถานที่ที่ server ยืนยันแล้ว
   onPick
 }) {
   const [hover, setHover] = useState("room");
-  const [picked, setPicked] = useState(null);
-  const [left, setLeft] = useState(seconds);
 
-  const choose = (key, auto = false) => {
+  const choose = (key) => {
     const st = placeState(key, me);
-    if (st.disabled || picked) return;
-    setPicked(key);
+    if (st.disabled || submitted) return;   // ล็อกเฉพาะตอนส่งไปแล้วเท่านั้น
     playSfx("sc_glitch");
-    onPick && onPick(key, auto);
+    onPick && onPick(key);
   };
-
-  // นับถอยหลัง — หมดเวลาแล้วสุ่มให้ (ธรรมเนียมเดียวกับเฟส ATTACK ของเอนจินเดิม)
-  useEffect(() => {
-    if (picked) return undefined;
-    if (left <= 0) {
-      const auto = SC_PLACE_ORDER.filter((k) => !placeState(k, me).disabled);
-      choose(auto[Math.floor(Math.random() * auto.length)] || "room", true);
-      return undefined;
-    }
-    const t = setTimeout(() => setLeft((n) => n - 1), 1000);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [left, picked]);
 
   const info = useMemo(() => placeState(hover, me), [hover, me]);
   const hoverPlace = SC_PLACE[hover];
@@ -119,7 +105,7 @@ export default function PlaceSelect({
           {SC_PLACE_ORDER.map((key, i) => {
             const p = SC_PLACE[key];
             const st = placeState(key, me);
-            const isPicked = picked === key;
+            const isPicked = pending === key || chosen === key;
             return (
               <button
                 key={key}
@@ -135,6 +121,7 @@ export default function PlaceSelect({
                 onMouseEnter={() => { if (!st.disabled) { setHover(key); playSfx("sc_noti"); } }}
                 onFocus={() => !st.disabled && setHover(key)}
                 onClick={() => choose(key)}
+                disabled={submitted || st.disabled}
               >
                 <img src={p.img} alt="" className="sc-place-bg" />
                 <span className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(4,7,12,.95) 8%, transparent 62%)", transform: "skewX(8deg)" }} />
@@ -171,9 +158,9 @@ export default function PlaceSelect({
 
       {/* ล่างจอ: ใครเลือกแล้วบ้าง — เป็นจุด ไม่บอกว่าเลือกที่ไหน */}
       <div className="absolute bottom-4 inset-x-0 flex flex-col items-center gap-2">
-        {picked && (
-          <div className="sc-sysline text-xs" style={{ animation: "scBannerIn 300ms both" }}>
-            {`> DESTINATION LOCKED : ${SC_PLACE[picked].name} — รอผู้เล่นคนอื่น`}
+        {submitted && (
+          <div className="text-sm font-bold" style={{ animation: "scBannerIn 300ms both", color: "var(--color-sc-mint)" }}>
+            ✔ เลือกเรียบร้อยแล้ว — รอผู้เล่นคนอื่น
           </div>
         )}
         <div className="flex items-center gap-2">

@@ -20,6 +20,7 @@ import StorePanel from "./StorePanel";
 import { preloadWave1, preloadWave2, preloadWave3 } from "./assets";
 import { SystemLines, SeraphBackground } from "./ui";
 import { SeraphBoot, DayBanner, PairingScene, Day5Intro, CharacterReveal, DeletionScene, DayWinnerScene } from "./scenes";
+import { FaceOffScene, CycleEndScene, FinalWinnerScene } from "./finale";
 
 const PD = "var(--font-p-display)";
 const PLACE_ICON = { room: "🛏️", church: "⛪", park: "🌳", library: "📚", store: "🏪" };
@@ -32,6 +33,7 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
   const [pendingPlace, setPendingPlace] = useState(null); // เลือกสถานที่ไว้แต่ยังไม่ยืนยันกับ server
 
   const prevDay = useRef(null);
+  const prevCycle = useRef(null);
   const prevDuelIndex = useRef(null);
   const seenPairing = useRef(false);
   const bootShown = useRef(false);
@@ -72,10 +74,23 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
     if (!bootShown.current) {
       bootShown.current = true;
       prevDay.current = sc.day;
+      prevCycle.current = sc.cycleRound;
       prevDuelIndex.current = sc.duelIndex;
       setScene({ kind: "boot" });
       return;
     }
+    // S11 จบรอบ — รอบเลขเปลี่ยน = เพิ่งผ่านวันดวลมาทั้งวง
+    //  ต้องมาก่อนแบนเนอร์วันที่ 1 ของรอบใหม่ จึงเชนต่อเองใน onDone (ไม่รอ effect รอบถัดไป
+    //  เพราะ dep จะไม่เปลี่ยนอีกแล้วหลังฉากนี้ปิด)
+    if (prevCycle.current !== null && prevCycle.current !== sc.cycleRound) {
+      prevCycle.current = sc.cycleRound;
+      prevDay.current = sc.day;
+      seenPairing.current = false;   // รอบใหม่ -> ประกาศคู่ดวลได้อีกครั้ง
+      setScene({ kind: "cycleEnd" });
+      return;
+    }
+    prevCycle.current = sc.cycleRound;
+
     // S7 เข้าวันที่ 5
     if (prevDay.current !== 5 && sc.day === 5) {
       prevDay.current = sc.day;
@@ -104,7 +119,7 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
       prevDuelIndex.current = sc.duelIndex;
       const a = state.players.find((p) => p.id === sc.duelPair.a);
       const b = state.players.find((p) => p.id === sc.duelPair.b);
-      if (a && b) { setScene({ kind: "reveal", queue: [a, b] }); return; }
+      if (a && b) { setScene({ kind: "reveal", queue: [a, b], all: [a, b] }); return; }
     }
     prevDuelIndex.current = sc.duelIndex;
   }, [sc && sc.day, sc && sc.cycleRound, sc && sc.duelIndex, sc && sc.pairs.length]);
@@ -141,6 +156,15 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
     return () => clearTimeout(t);
   }, [sc && sc.placeResult, sc && sc.day]);
 
+  // ---------- S12 ผู้ชนะคนสุดท้าย ----------
+  const shownFinal = useRef(false);
+  useEffect(() => {
+    if (!sc || state.gameState !== "GAMEOVER" || shownFinal.current) return;
+    shownFinal.current = true;
+    const left = state.players.filter((p) => !p.scEliminated && p.alive);
+    setScene({ kind: "final", winner: left[0] || null });
+  }, [state.gameState]);
+
   const closeScene = () => setScene(null);
   const emitPlace = (payload) => { playSfx("sc_glitch"); socket.emit("seraphPlace", payload); setPendingPlace("sent"); };
 
@@ -171,9 +195,32 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
           player={{ ...cur, night: sc.night }}
           onDone={() => {
             const rest = scene.queue.slice(1);
+            // เผยครบทั้งสองคนแล้ว -> ต่อด้วยฉากประจันหน้า (S8d) ก่อนเข้าดวลจริง
             if (rest.length) setScene({ ...scene, queue: rest });
-            else closeScene();
+            else setScene({ kind: "faceoff", a: scene.all[0], b: scene.all[1] });
           }}
+        />
+      );
+    } else if (scene.kind === "faceoff") {
+      overlay = <FaceOffScene a={scene.a} b={scene.b} onDone={closeScene} />;
+    } else if (scene.kind === "cycleEnd") {
+      overlay = (
+        <CycleEndScene
+          cycleRound={sc.cycleRound - 1}
+          players={state.players.filter((p) => !p.isBoss)}
+          matrixHeld={sc.matrixHeld}
+          matrixMax={sc.matrixMax}
+          // จบฉากแล้วเชนเข้าแบนเนอร์วันที่ 1 ของรอบใหม่ต่อทันที
+          onDone={() => setScene({ kind: "day", day: sc.day, short: false })}
+        />
+      );
+    } else if (scene.kind === "final") {
+      overlay = (
+        <FinalWinnerScene
+          winner={scene.winner}
+          board={sc.finalBoard || []}
+          cycleRound={sc.cycleRound}
+          onDone={closeScene}
         />
       );
     } else if (scene.kind === "deletion") {
@@ -284,9 +331,11 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
           }}
           day={sc.day}
           night={sc.night}
-          seconds={sc.placeSeconds}
           placedCount={sc.placedCount}
           totalPlayers={sc.totalPlayers}
+          submitted={pendingPlace === "sent" || !!sc.place}
+          pending={pendingPlace}
+          chosen={sc.place}
           onPick={(key) => {
             // 2 สถานที่ที่ต้องถามต่อก่อนส่ง — ที่เหลือส่งได้เลย
             // 3 สถานที่ที่ต้องทำอะไรต่อก่อนส่ง — ที่เหลือ (ห้องพัก/ห้องสมุด) ส่งได้เลย

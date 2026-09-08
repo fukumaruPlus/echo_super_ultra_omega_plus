@@ -38,7 +38,9 @@ function ringPos(i, n, selfIndex) {
     depth,
     // ย่อตามระยะลึกแค่พอให้รู้สึกมีมิติ — เดิมย่อถึง 0.62 ทำให้การ์ดหลังเหลือ ~57px (เล็กกว่าโหมดปกติครึ่งหนึ่ง)
     scale: 0.86 + depth * 0.2,
-    z: Math.round(depth * 100)
+    // จำกัดชั้นซ้อนไว้ที่ 1-20 เท่านั้น: ใช้แค่จัดลำดับ "ใครอยู่หน้าใคร" ในวงเท่านั้น
+    // ห้ามเกิน z ของแถบหัวจอ/HUD ล่าง (z-40) ไม่งั้นแผ่นโปรไฟล์จะลอยทับกองการ์ดในมือ
+    z: 1 + Math.round(depth * 19)
   };
 }
 
@@ -220,7 +222,7 @@ export default function Arena({ state, onHit, onLock }) {
 
       {/* ---------- แถบบน: วัน + นับถอยหลัง ---------- */}
       {/* pr-16 = เว้นที่ให้ปุ่มลำโพงที่ลอยอยู่มุมขวาบน (VolumeControl: top-3 right-3 ขนาด 44px) */}
-      <div className="absolute top-0 inset-x-0 z-30 pl-5 pr-16 pt-3 pb-1 flex items-start justify-between gap-3 pointer-events-none">
+      <div className="absolute top-0 inset-x-0 z-40 pl-5 pr-16 pt-3 pb-1 flex items-start justify-between gap-3 pointer-events-none">
         <div className="min-w-0">
           <div className="sc-sysline text-[10px] sm:text-xs opacity-80 truncate">
             {`> รอบ ${sc.cycleRound} · วันที่ ${sc.day}/${sc.daysTotal}`}
@@ -311,7 +313,7 @@ export default function Arena({ state, onHit, onLock }) {
       </div>
 
       {/* ---------- HUD ล่าง: ค่าของโหมดนี้ (ไม่มีหลอดเลือด/สกิลในวันที่ 1-4) ---------- */}
-      <div className="absolute bottom-0 inset-x-0 z-30 px-4 pb-3 pt-1 flex flex-col items-center gap-2">
+      <div className="absolute bottom-0 inset-x-0 z-40 px-4 pb-3 pt-1 flex flex-col items-center gap-2">
         {/* กองการ์ดในมือของเรา — อยู่เหนือ HUD ติดกับผู้เล่น อ่านเลขออกจากระยะปกติ */}
         <HandCards cards={(me && me.cards) || []} />
 
