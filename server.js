@@ -3597,7 +3597,10 @@ function dealRound() {
     }
 
     // กลางคืน (patch 2.1.7): สุ่มใหม่ทุกเทิร์นว่าสกิลพื้นฐานหรือสกิลรอง (อย่างใดอย่างหนึ่ง) จะใช้แต้มมากขึ้น — ไม่มีผลกับท่าไม้ตาย
-    if (isNightRound(roundNumber)) {
+    // SE.RA.PH: ปิดข้อเสียของกลางคืนทั้งโหมด (SERAPH_MOONCELL.md §12)
+    //  ที่นี่คือ "ภาษี tier +1" ซึ่งทำให้สกิลที่ถูกสุ่มแพงขึ้น 1 แต้มในรอบกลางคืน
+    //  ถ้าไม่ปิด รอบเลขคู่ (กลางคืนทั้งรอบ) จะมีคนกดสกิลไม่ออกทั้งที่แต้มถึงตามตาราง 2/4/6
+    if (isNightRound(roundNumber) && !Seraph.active()) {
       const ch0 = CHAR_BY_ID[p.characterId];
       const taxCandidates = [];
       if (ch0 && ch0.basic) taxCandidates.push("basic");

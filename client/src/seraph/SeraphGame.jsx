@@ -145,16 +145,26 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
   //  server ส่ง sc.placeResult มาให้เฉพาะเจ้าของ — โชว์เป็นแบนเนอร์ตอนกลับเข้าสนาม
   const [placeNotice, setPlaceNotice] = useState(null);
   const prevResult = useRef(null);
+  // (1) ตรวจว่ามีผลใหม่เข้ามาไหม — ห้ามมี timer ในนี้
+  //     sc.placeResult เป็น object ใหม่ทุกครั้งที่ state มาจาก socket effect จึงรันซ้ำทุกวินาที
+  //     ถ้าตั้ง timer ไว้ที่นี่ cleanup ของรอบก่อนจะล้างมันทิ้งก่อน early-return เสมอ = แบนเนอร์ค้างถาวร
+  const resultKey = sc && sc.placeResult
+    ? `${sc.cycleRound}-${sc.day}-${sc.placeResult.place}-${sc.placeResult.title}`
+    : null;
   useEffect(() => {
-    const r = sc && sc.placeResult;
-    const key = r ? `${sc.cycleRound}-${sc.day}-${r.place}-${r.title}` : null;
-    if (!key || prevResult.current === key) return;
-    prevResult.current = key;
+    if (!resultKey || prevResult.current === resultKey) return;
+    prevResult.current = resultKey;
+    const r = sc.placeResult;
     setPlaceNotice(r);
     playSfx(r.unlock ? "sc_glitch" : "sc_noti2");
-    const t = setTimeout(() => setPlaceNotice(null), r.unlock ? 5200 : 3800);
+  }, [resultKey]);
+
+  // (2) ตั้งเวลาปิด — dep เป็น state ในเครื่อง identity จึงนิ่ง ไม่โดนรีเซ็ตจากการอัปเดต state
+  useEffect(() => {
+    if (!placeNotice) return undefined;
+    const t = setTimeout(() => setPlaceNotice(null), placeNotice.unlock ? 5200 : 3800);
     return () => clearTimeout(t);
-  }, [sc && sc.placeResult, sc && sc.day]);
+  }, [placeNotice]);
 
   // ---------- S12 ผู้ชนะคนสุดท้าย ----------
   const shownFinal = useRef(false);

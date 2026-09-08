@@ -329,7 +329,12 @@ export default function Arena({ state, onHit, onLock }) {
           </span>
           <span className="text-xs text-white/90">🪙 <span className="font-bold text-echo-gold">{me ? me.gold : 0}</span> เหรียญ</span>
           <span className="text-xs text-white/90">📘 ระดับทักษะ <span className="font-bold">{sc.skillLevel}/{sc.skillLevelMax}</span></span>
-          <span className="text-xs text-white/90">⚡ ความจุสกิล <span className="font-bold">{sc.caps ? sc.caps.skill : 4}/8</span></span>
+          {/* ป้ายนี้คือ "ความจุ" (หลอดสูงสุด) ไม่ใช่ "แต้มที่มีอยู่" — วันที่ 1-4 แต้มสกิลคงที่ 0 เสมอ
+              และกดสกิลไม่ได้เลยตามกติกา จึงต้องเขียนกำกับไว้ ไม่งั้นอ่านแล้วเข้าใจผิดว่ากดได้แต่กดไม่ออก */}
+          <span className="text-xs text-white/90">
+            ⚡ ความจุสกิล <span className="font-bold">{sc.caps ? sc.caps.skill : 4}/8</span>
+            <span className="text-white/50"> (ใช้วันดวล)</span>
+          </span>
           {sc.watchedBy > 0 && (
             <span className="text-xs font-black" style={{ color: "var(--color-sc-red)" }}>
               👁 มีคนจับตาเจ้าอยู่ {sc.watchedBy} คน
