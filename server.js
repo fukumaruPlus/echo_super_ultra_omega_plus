@@ -149,6 +149,7 @@ const YUUKI_VIDEO = {
 const SUMMARY_TIME = 5;
 const ATTACK_TIME = 15;
 const TRANSITION_TIME = 3;
+const SERAPH_PLACE_SAFETY_SECONDS = 300; // SE.RA.PH: ตาข่ายกันเฟสเลือกสถานที่ค้างถาวร (ไม่ใช่เวลาจำกัดของผู้เล่น)
 const RECONNECT_GRACE_MS = Math.max(100, Number(process.env.RECONNECT_GRACE_MS) || 60_000);
 const RESERVATION_TTL_MS = 120_000;
 const ATTACKFX_TIME = 3;  // อนิเมชันบอกว่าใครตีใคร
@@ -3316,6 +3317,9 @@ function hasGutsWeapon(p) {
 }
 // ซื้อสินค้า: ใครกดก่อนได้ก่อน (Node เป็น single-thread — ประมวลผลทีละ event จึงไม่มี race condition จริง)
 function buyShopItem(id, itemId) {
+  // SE.RA.PH: ซื้อของได้เฉพาะ "วันสืบสวน" (วันที่ 1-4) ที่ร้านสะดวกซื้อเท่านั้น
+  //  วันดวลไม่มีการซื้อขาย — กันที่นี่ด้วย ไม่ใช่แค่ซ่อนปุ่มฝั่ง client
+  if (Seraph.isDuelDay()) return;
   const p = players[id];
   if (!p || !p.alive) return;
   const item = shopItems.find((it) => it.id === itemId);
@@ -5808,7 +5812,11 @@ function beginSeraphPlacePhase() {
   clearPhaseTimer();
   Seraph.startPlacePhase(engine, finishSeraphPlacePhase);
   gameState = "SERAPH_PLACE";
-  startPhaseTimer(Seraph.PLACE_SECONDS, finishSeraphPlacePhase);
+  // **ไม่มีเวลาจำกัด** — ไปต่อเมื่อทุกคนเลือกครบเท่านั้น (finishSeraphPlacePhase ถูกเรียกจาก
+  //  Seraph.choosePlace เมื่อไม่เหลือคนค้าง) ตัวจับเวลาที่ตั้งไว้เป็นแค่ตาข่ายกันเกมค้างถาวร
+  //  กรณีมีคนหลุดการเชื่อมต่อแล้วไม่กลับมา — ยาวกว่า RECONNECT_GRACE_MS (60s) หลายเท่า
+  //  และ client ไม่แสดงเป็นนาฬิกานับถอยหลัง
+  startPhaseTimer(SERAPH_PLACE_SAFETY_SECONDS, finishSeraphPlacePhase);
   broadcastState();
 }
 function finishSeraphPlacePhase() {

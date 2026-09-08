@@ -148,7 +148,8 @@ export function SeraphBoot({ players = [], day = 1, cycleRound = 1, onDone }) {
    S1 — แบนเนอร์เปิดวัน · 2.4s (วันแรกของรอบ) / 1.4s (วันถัดไป)
    ========================================================================= */
 export function DayBanner({ day = 1, short = false, onDone }) {
-  const dur = short ? 1400 : 2400;
+  // ยืดจากเดิม (1.4s / 2.4s) — ของเดิมหายเร็วจนอ่านไม่ทัน
+  const dur = short ? 2600 : 3800;
   const last = day === 4;
   useTimeline([
     [0, () => playSfx(last ? "sc_noti2" : "sc_noti")],
@@ -536,6 +537,95 @@ export function DeletionScene({ loser, winner, onDone }) {
       )}
 
       <GlitchCut playId={glitch} duration={1400} />
+    </div>
+  );
+}
+
+/* =========================================================================
+   S3 — ประกาศผู้ชนะประจำวัน (วันที่ 1-4) · 3.6s
+   วันธรรมดาไม่มีเฟสโจมตี ฉากนี้จึงต้องรับน้ำหนักความสะใจของทั้งวันไว้เอง
+   ภาษาไทยล้วน เพราะเป็นการแจ้งเตือนสำคัญที่ผู้เล่นต้องอ่านออกทันที
+   ========================================================================= */
+export function DayWinnerScene({ winner, scores = [], matrixHeld = 0, matrixMax = 4, mine, onDone }) {
+  const [stage, setStage] = useState(0); // 0 ประกาศชื่อ · 1 จ่ายรางวัล
+  useTimeline([
+    [0, () => playSfx("sc_noti")],
+    [1200, () => { setStage(1); playSfx("sc_noti2"); }],
+    [3600, () => onDone && onDone()]
+  ], [winner && winner.id]);
+
+  if (!winner) return null;
+  const isMe = mine === winner.id;
+
+  return (
+    <div className="fixed inset-0 z-[88] grid place-items-center pointer-events-none px-6">
+      <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 50% 45%, rgba(229,179,59,.18), rgba(4,7,12,.86) 62%)" }} />
+
+      <div className="relative flex flex-col items-center gap-3">
+        {/* วงแหวนทองแผ่ออกจากตัวผู้ชนะ */}
+        {[0, 160, 320].map((d) => (
+          <span key={d} className="sc-win-ring" style={{ "--sc-d": `${d}ms` }} />
+        ))}
+
+        <div
+          className="text-sm sm:text-lg font-bold tracking-[0.3em] text-echo-gold"
+          style={{ fontFamily: PD, animation: "scBannerIn 420ms both" }}
+        >
+          ผู้ชนะประจำวัน
+        </div>
+
+        <div
+          className="relative w-32 h-40 sm:w-40 sm:h-52 rounded-xl overflow-hidden"
+          style={{ outline: "3px solid var(--color-echo-gold)", outlineOffset: 2, animation: "popIn 460ms cubic-bezier(.2,.9,.25,1.15) both" }}
+        >
+          {/* ตัวตนยังเป็นความลับ — ฉากนี้ฉลอง "ชื่อผู้เล่น" ไม่ใช่ "ตัวละคร" */}
+          {winner.img && !winner.scHidden ? (
+            <img src={winner.img} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <span className="w-full h-full grid place-items-center bg-black text-4xl opacity-40">👤</span>
+          )}
+          <span className="absolute inset-x-0 bottom-0 py-1 text-center text-base font-black text-white" style={{ background: "rgba(0,0,0,.82)", fontFamily: PD }}>
+            {winner.name}
+          </span>
+        </div>
+
+        {stage >= 1 && (
+          <div className="flex flex-col items-center gap-2" style={{ animation: "scBannerIn 380ms both" }}>
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-2 px-3 py-1.5 text-sm font-black" style={{ background: "rgba(53,230,212,.16)", border: "1px solid var(--color-sc-cyan)", color: "var(--color-sc-cyan)" }}>
+                ◆ Matrix +1
+              </span>
+              <span className="flex items-center gap-2 px-3 py-1.5 text-sm font-black" style={{ background: "rgba(229,179,59,.16)", border: "1px solid var(--color-echo-gold)", color: "var(--color-echo-gold)" }}>
+                🪙 เหรียญ +1
+              </span>
+            </div>
+            {isMe && (
+              <span className="text-xs text-white/75">
+                Matrix ของเจ้าตอนนี้ {matrixHeld}/{matrixMax} — เอาไปลงที่สวนสาธารณะเพื่อจับตาคู่แข่ง
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* แต้มของทุกคนในวันนี้ */}
+        {scores.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-2 mt-1" style={{ animation: "scBannerIn 400ms 200ms both" }}>
+            {scores.map((s) => (
+              <span
+                key={s.id}
+                className="px-2.5 py-1 text-xs font-bold"
+                style={{
+                  background: "rgba(4,7,12,.85)",
+                  border: `1px solid ${s.id === winner.id ? "var(--color-echo-gold)" : "rgba(255,255,255,.18)"}`,
+                  color: s.busted ? "var(--color-sc-red)" : "#fff"
+                }}
+              >
+                {s.name} · {s.busted ? "แตก" : s.score}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

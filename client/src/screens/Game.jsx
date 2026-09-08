@@ -503,7 +503,10 @@ function OverloadForceBadge() {
 //  กลางวัน = background_morning.jpg | กลางคืน = background_night.jpg
 //  เปลี่ยนช่วงเวลาแบบ crossfade ช้าๆ (ไม่ตัดปุ๊บปั๊บ) — ซ้อนทั้ง 2 ภาพแล้วเฟดสลับกัน
 //  ระหว่าง Lie Like Vortigern (โอเบรอน) ฉากหลังกลางคืนกลายเป็นวีดีโอ oberon_background.mp4 (เฟดเข้า)
-function GameBackground({ cycle, oberonBg, shradeBg, bardBg, shikiBg, hakunoBg, hisakawaBg, overloadForce, lowQ }) {
+function GameBackground({ cycle, oberonBg, shradeBg, bardBg, shikiBg, hakunoBg, hisakawaBg, overloadForce, lowQ, seraph }) {
+  // SE.RA.PH: โหมดนี้วาดฉากหลังของตัวเองไว้ข้างล่างแล้ว (สนามดวลวันที่ 5 กลางวัน/กลางคืน)
+  //  ถ้าปล่อยให้กระดานเดิมวาดทับ จะกลายเป็นฉากหลังของเกมปกติแทน
+  if (seraph) return null;
   const night = cycle === "night";
   return (
     <div className="absolute inset-0 -z-10 pointer-events-none overflow-hidden">
@@ -4099,7 +4102,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
     const revealed = phase === "SUMMARY" || phase === "ATTACK" || phase === "ATTACKING";
     return (
       <div className="fixed inset-0 overflow-hidden flex flex-col">
-        <GameBackground cycle={state.cycle} oberonBg={state.oberonBg} shradeBg={state.shradeBg} bardBg={state.bardBg} shikiBg={state.shikiBg} hakunoBg={state.hakunoBg} hisakawaBg={state.hisakawaBg} overloadForce={state.overloadForce} lowQ={lowQ} />
+        <GameBackground cycle={state.cycle} oberonBg={state.oberonBg} shradeBg={state.shradeBg} bardBg={state.bardBg} shikiBg={state.shikiBg} hakunoBg={state.hakunoBg} hisakawaBg={state.hisakawaBg} overloadForce={state.overloadForce} lowQ={lowQ} seraph={!!state.seraph} />
         {/* แถบบน: รอบ + เวลา (เว้นขวาให้ปุ่มเสียง) */}
         <div className="shrink-0 flex flex-col items-center gap-1 pt-2 px-14 min-h-[40px]">
           {(phase === "PLAYING" || phase === "ATTACK") && (
@@ -4600,7 +4603,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
 
   return (
     <div className="fixed inset-0 overflow-hidden">
-      <GameBackground cycle={state.cycle} oberonBg={state.oberonBg} shradeBg={state.shradeBg} bardBg={state.bardBg} shikiBg={state.shikiBg} hakunoBg={state.hakunoBg} hisakawaBg={state.hisakawaBg} overloadForce={state.overloadForce} lowQ={lowQ} />
+      <GameBackground cycle={state.cycle} oberonBg={state.oberonBg} shradeBg={state.shradeBg} bardBg={state.bardBg} shikiBg={state.shikiBg} hakunoBg={state.hakunoBg} hisakawaBg={state.hisakawaBg} overloadForce={state.overloadForce} lowQ={lowQ} seraph={!!state.seraph} />
       <div
         className="relative overflow-hidden"
         style={{ width: DESIGN_W, height: designH, transform: `scale(${scale})`, transformOrigin: "top left" }}
@@ -5022,15 +5025,20 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
                     <span className="ml-auto text-[10px] font-black bg-black text-white rounded-full w-5 h-5 grid place-items-center shrink-0">{me.inventory.length}</span>
                   )}
                 </button>
-                <button
-                  onClick={() => { clickSound(); setShopOpen(true); }}
-                  className="p-hs-tab p-hs-tab-shop w-28 sm:w-36 h-11 sm:h-12 px-2 sm:px-3"
-                  title="ร้านค้า"
-                >
-                  <span className="text-xl sm:text-2xl">🏪</span>
-                  <span className="text-xs sm:text-sm font-black text-echo-hp" style={{ fontFamily: P_DISPLAY }}>ร้านค้า</span>
-                  <span className="ml-auto text-xs sm:text-sm font-black text-echo-gold whitespace-nowrap shrink-0">🪙{me.gold ?? 0}</span>
-                </button>
+                {/* SE.RA.PH: วันดวล (วันที่ 5) ซื้อของไม่ได้ — ร้านสะดวกซื้อเป็น 1 ใน 5 สถานที่
+                    ของ "วันสืบสวน" เท่านั้น จึงซ่อนปุ่มทิ้งไปเลย ไม่ใช่แค่กดไม่ได้
+                    (server กันซ้ำอีกชั้นที่ buyShopItem) */}
+                {!state.seraph && (
+                  <button
+                    onClick={() => { clickSound(); setShopOpen(true); }}
+                    className="p-hs-tab p-hs-tab-shop w-28 sm:w-36 h-11 sm:h-12 px-2 sm:px-3"
+                    title="ร้านค้า"
+                  >
+                    <span className="text-xl sm:text-2xl">🏪</span>
+                    <span className="text-xs sm:text-sm font-black text-echo-hp" style={{ fontFamily: P_DISPLAY }}>ร้านค้า</span>
+                    <span className="ml-auto text-xs sm:text-sm font-black text-echo-gold whitespace-nowrap shrink-0">🪙{me.gold ?? 0}</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>

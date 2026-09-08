@@ -111,7 +111,7 @@ function initPlayer(engine, p) {
 function resetFields(p) {
   p.scCapHp = 0; p.scCapArmor = 0; p.scCapSkill = 0; p.scSkillLevel = 0;
   p.scMatrix = 0; p.scPlaced = {}; p.scSeen = [];
-  p.scSpectator = false; p.scEliminated = false; p.scPlace = null;
+  p.scSpectator = false; p.scEliminated = false; p.scPlace = null; p.scPlaceResult = null;
 }
 
 // ============================================================
@@ -200,7 +200,7 @@ function startPlacePhase(engine, allPlacedCb) {
   places = {};
   placeDone = {};
   onAllPlaced = allPlacedCb;
-  for (const p of Object.values(engine.players)) p.scPlace = null;
+  for (const p of Object.values(engine.players)) { p.scPlace = null; p.scPlaceResult = null; }
 }
 
 /** ปิดเฟส: คนที่ยังไม่เลือกถูกสุ่มให้ แล้วกลับสู่เฟสจั่วไพ่ */
@@ -250,11 +250,16 @@ function applyPlace(engine, p, key, opts) {
   places[p.id] = key;
   placeDone[p.id] = true;
   p.scPlace = key;
+  p.scPlaceResult = null;   // ให้แต่ละสถานที่เติมเอง -> client เอาไปขึ้นฉากแจ้งเตือน
   if (key === "room") return placeRoom(engine, p);
   if (key === "church") return placeChurch(engine, p, opts.option);
   if (key === "park") return placePark(engine, p, opts.targets);
   if (key === "library") return placeLibrary(engine, p);
-  if (key === "store") return; // ซื้อของผ่าน buyShopItem ระหว่างเฟสนี้อยู่แล้ว
+  if (key === "store") {
+    // การซื้อของเกิดขึ้นก่อนหน้านี้แล้ว (client เปิดแผงร้านค้าให้เลือกซื้อ แล้วค่อยส่งยืนยันมา)
+    p.scPlaceResult = { place: "store", title: "แวะร้านสะดวกซื้อ", detail: `เหลือ ${p.gold} เหรียญ`, tone: "gold" };
+    return;
+  }
 }
 
 // ---------- ห้องพัก: สุ่มของฟรี 1 ชิ้น (คนละคลังกับร้านค้า) ----------
@@ -265,6 +270,7 @@ function placeRoom(engine, p) {
   for (const it of ROOM_ITEMS) { r -= it.weight; if (r <= 0) { pick = it; break; } }
   p.inventory.push({ ...pick, uid: `sc${Date.now()}${Math.floor(Math.random() * 1000)}`, free: true });
   p.scLastGift = pick.name;
+  p.scPlaceResult = { place: "room", title: "ได้ของฟรี 1 ชิ้น", detail: pick.name, tone: "gold" };
   engine.log(`🛏️ ${p.name} พักที่ห้องพัก — ได้รับ "${pick.name}" มาฟรี 1 ชิ้น`);
 }
 
@@ -274,13 +280,19 @@ function placeChurch(engine, p, option) {
   if (opt === "hp") {
     p.scCapHp = (p.scCapHp || START_HP) + 1;
     p.hp = Math.min(p.scCapHp, p.hp + 1); // ความจุใหม่เติมให้เต็มทันที (วันธรรมดาไม่มีดาเมจอยู่แล้ว)
+    p.scPlaceResult = { place: "church", title: "ความจุพลังชีวิต +1", detail: `ตอนนี้ ${p.scCapHp} หน่วย`, tone: "mint" };
     engine.log(`⛪ ${p.name} สวดที่โบสถ์ — ความจุพลังชีวิต +1 (${p.scCapHp})`);
   } else if (opt === "armor") {
     p.scCapArmor = (p.scCapArmor || START_ARMOR) + 1;
     p.armor = Math.min(p.scCapArmor, p.armor + 1);
+    p.scPlaceResult = { place: "church", title: "ความจุเกราะ +1", detail: `ตอนนี้ ${p.scCapArmor} หน่วย`, tone: "mint" };
     engine.log(`⛪ ${p.name} สวดที่โบสถ์ — ความจุเกราะ +1 (${p.scCapArmor})`);
   } else {
     p.scCapSkill = Math.min(MAX_SKILL_CAP, (p.scCapSkill || START_SKILL_CAP) + 1);
+    p.scPlaceResult = {
+      place: "church", title: "ความจุแต้มสกิล +1", detail: `ตอนนี้ ${p.scCapSkill}/${MAX_SKILL_CAP}`, tone: "mint",
+      warn: p.scCapSkill < TIER_COST.ultimate ? `ท่าไม้ตายต้องการ ${TIER_COST.ultimate} — ยังร่ายไม่ได้` : null
+    };
     engine.log(`⛪ ${p.name} สวดที่โบสถ์ — ความจุแต้มสกิล +1 (${p.scCapSkill}/${MAX_SKILL_CAP})`);
   }
 }
@@ -299,6 +311,9 @@ function placePark(engine, p, targets) {
     p.scMatrix--;
     used++;
   }
+  p.scPlaceResult = used > 0
+    ? { place: "park", title: `ลงแต้ม Matrix ${used} แต้ม`, detail: `เหลือในคลัง ${p.scMatrix}`, tone: "cyan" }
+    : { place: "park", title: "ไม่ได้ลงแต้มอะไร", detail: `Matrix ในคลัง ${p.scMatrix}`, tone: "dim" };
   if (used > 0) engine.log(`🌳 ${p.name} เฝ้าดูจากสวนสาธารณะ — ลงแต้ม Matrix ${used} แต้ม (เหลือ ${p.scMatrix})`);
   else engine.log(`🌳 ${p.name} แวะสวนสาธารณะแต่ไม่ได้ลงแต้มอะไร`);
 }
@@ -308,6 +323,15 @@ function placeLibrary(engine, p) {
   const before = p.scSkillLevel || START_SKILL_LEVEL;
   if (before >= MAX_SKILL_LEVEL) return;
   p.scSkillLevel = before + 1;
+  p.scPlaceResult = {
+    place: "library",
+    title: `ระดับทักษะ ${before} → ${p.scSkillLevel}`,
+    detail: p.scSkillLevel === UNLOCK_AT.secondary ? "ปลดล็อก สกิลรอง แล้ว"
+      : p.scSkillLevel === UNLOCK_AT.ultimate ? "ปลดล็อก ท่าไม้ตาย แล้ว"
+      : `อีก ${MAX_SKILL_LEVEL - p.scSkillLevel} ระดับถึงขั้นสูงสุด`,
+    unlock: p.scSkillLevel === UNLOCK_AT.secondary ? "secondary" : p.scSkillLevel === UNLOCK_AT.ultimate ? "ultimate" : null,
+    tone: "cyan"
+  };
   engine.log(`📚 ${p.name} อ่านหนังสือที่ห้องสมุด — ระดับทักษะ ${before} → ${p.scSkillLevel}`);
   if (p.scSkillLevel === UNLOCK_AT.secondary) {
     p.scUnlocked = "secondary";
@@ -500,6 +524,8 @@ function stateFor(engine, viewerId) {
       ultimate: tierUnlocked(me, "ultimate")
     } : null,
     eliminated: me ? !!me.scEliminated : false,
+    placeResult: me ? me.scPlaceResult || null : null,   // ผลของสถานที่ที่เพิ่งไปมา (ของผู้ชมคนนี้เท่านั้น)
+    shopOpen: !isDuelDay(),                              // ซื้อของได้เฉพาะวันสืบสวน
     // --- ข้อมูลสาธารณะ ---
     pairs: pairs.map((pr) => ({
       a: pr.a, b: pr.b,

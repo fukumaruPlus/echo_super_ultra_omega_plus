@@ -102,22 +102,13 @@ export default function PlaceSelect({
         </div>
         <div className="flex flex-col items-end gap-2">
           <DayRail day={day} />
-          {/* นับถอยหลังเป็นวงแหวน ไม่ใช่ตัวเลขโดด ๆ */}
-          <div className="relative w-12 h-12 sm:w-14 sm:h-14 grid place-items-center">
-            <svg viewBox="0 0 40 40" className="absolute inset-0 -rotate-90">
-              <circle cx="20" cy="20" r="17" fill="none" stroke="rgba(255,255,255,.12)" strokeWidth="3" />
-              <circle
-                cx="20" cy="20" r="17" fill="none"
-                stroke={left <= 5 ? "var(--color-sc-red)" : "var(--color-sc-cyan)"}
-                strokeWidth="3" strokeLinecap="round"
-                strokeDasharray={2 * Math.PI * 17}
-                strokeDashoffset={2 * Math.PI * 17 * (1 - Math.max(0, left) / seconds)}
-                style={{ transition: "stroke-dashoffset 1s linear" }}
-              />
-            </svg>
-            <span className="text-lg font-black" style={{ fontFamily: PD, color: left <= 5 ? "var(--color-sc-red)" : "#fff" }}>
-              {Math.max(0, left)}
-            </span>
+          {/* ไม่มีเวลาจำกัด — เฟสนี้ไปต่อเมื่อทุกคนเลือกครบเท่านั้น
+              จึงบอกว่า "เหลืออีกกี่คน" แทนที่จะกดดันด้วยนาฬิกา */}
+          <div className="text-right">
+            <div className="sc-sysline text-[10px] opacity-70">รอผู้เล่น</div>
+            <div className="text-2xl sm:text-3xl font-black leading-none" style={{ fontFamily: PD, color: "var(--color-sc-cyan)" }}>
+              {Math.max(0, totalPlayers - placedCount)}
+            </div>
           </div>
         </div>
       </div>

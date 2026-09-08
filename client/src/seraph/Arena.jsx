@@ -42,40 +42,54 @@ function ringPos(i, n, selfIndex) {
   };
 }
 
-/** ไพ่ที่กางออกจากแผ่นเข้าหาแกนกลาง */
-function CardFan({ cards, count, mine, spread = 15, big = false }) {
-  const n = mine ? (cards ? cards.length : 0) : count || 0;
-  if (!n) return null;
-  const list = Array.from({ length: n }, (_, i) => i);
+/**
+ * ไพ่ในมือของผู้เล่นคนอื่น — คว่ำหน้า วางเรียงเหลื่อมกันข้างแผ่น
+ * ตั้งใจให้เล็กและเป็นแค่ "จำนวน" เพราะไพ่ของคนอื่นเป็นความลับอยู่แล้ว
+ */
+function MiniBacks({ count = 0 }) {
+  if (!count) return null;
   return (
-    <div className="absolute left-1/2 -top-1 -translate-x-1/2" style={{ height: 0 }}>
-      {list.map((i) => {
-        const rot = (i - (n - 1) / 2) * spread;
-        const c = mine && cards ? cards[i] : null;
-        return (
-          <span
-            key={i}
-            className="sc-fan-card"
-            style={{
-              width: big ? 28 : 22,
-              height: big ? 39 : 31,
-              left: big ? -14 : -11,
-              transform: `rotate(${rot}deg) translateY(${big ? -38 : -30}px)`,
-              animationDelay: `${i * 45}ms`,
-              background: c
-                ? `linear-gradient(150deg, ${CARD_COLOR[c.color] || "#888"}, #0b1016)`
-                : "linear-gradient(150deg, #14202b, #05080d)",
-              borderColor: c ? CARD_COLOR[c.color] || "#888" : "rgba(53,230,212,.45)"
-            }}
-          >
-            {c && (
-              <span className={`absolute inset-0 grid place-items-center font-black text-white ${big ? "text-sm" : "text-[11px]"}`}>
-                {c.special ? "★" : c.value}
-              </span>
-            )}
+    <div className="absolute -right-2 top-1 flex flex-col-reverse" style={{ height: 0 }}>
+      {Array.from({ length: Math.min(count, 6) }, (_, i) => (
+        <span
+          key={i}
+          className="sc-card-back"
+          style={{ marginTop: -14, transform: `rotate(${(i % 2 ? 1 : -1) * 4}deg)`, animationDelay: `${i * 45}ms` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * ไพ่ในมือของเรา — กองการ์ดจริง อ่านเลขออกชัด ๆ
+ * วางเป็นแถวแนวนอน "ข้างล่างแผ่นโปรไฟล์" ไม่ใช่กางอยู่เหนือหัวการ์ด
+ * ขนาดอ้างอิงกองการ์ดของโหมดปกติ (w-20 h-28 = 80x112) แล้วขยับขึ้นอีกนิด
+ */
+function HandCards({ cards = [] }) {
+  if (!cards.length) return null;
+  // ไพ่เยอะขึ้น = เหลื่อมกันมากขึ้น เพื่อไม่ให้แถวยาวเกินจอ
+  const overlap = cards.length > 6 ? -34 : cards.length > 4 ? -20 : -6;
+  return (
+    <div className="flex items-end justify-center pointer-events-none">
+      {cards.map((c, i) => (
+        <span
+          key={i}
+          className="sc-hand-card"
+          style={{
+            marginLeft: i === 0 ? 0 : overlap,
+            zIndex: i,
+            transform: `rotate(${(i - (cards.length - 1) / 2) * 3}deg)`,
+            animationDelay: `${i * 55}ms`,
+            background: `linear-gradient(160deg, ${CARD_COLOR[c.color] || "#8a8a8a"}, #080d14)`,
+            borderColor: CARD_COLOR[c.color] || "#8a8a8a"
+          }}
+        >
+          <span className="absolute inset-0 grid place-items-center text-2xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,.9)]">
+            {c.special ? "★" : c.value}
           </span>
-        );
-      })}
+        </span>
+      ))}
     </div>
   );
 }
@@ -103,7 +117,7 @@ function PlayerPlate({ p, pos, mine, matrixLv, isFoe, phase }) {
         animationDelay: `${pos.z * 3}ms`
       }}
     >
-      <CardFan cards={p.cards} count={p.cardCount} mine={mine} big={mine} />
+      {!mine && <MiniBacks count={p.cardCount} />}
 
       <div className="sc-plate-body" style={{ height: h }}>
         {/* ภาพตัวละคร — เงาดำล้วนถ้ายังไม่เคยเห็นตัวตน */}
@@ -205,7 +219,8 @@ export default function Arena({ state, onHit, onLock }) {
       <WatchedFrame on={sc.watchedBy > 0} />
 
       {/* ---------- แถบบน: วัน + นับถอยหลัง ---------- */}
-      <div className="absolute top-0 inset-x-0 z-30 px-3 pt-2 pb-1 flex items-start justify-between gap-3 pointer-events-none">
+      {/* pr-16 = เว้นที่ให้ปุ่มลำโพงที่ลอยอยู่มุมขวาบน (VolumeControl: top-3 right-3 ขนาด 44px) */}
+      <div className="absolute top-0 inset-x-0 z-30 pl-5 pr-16 pt-3 pb-1 flex items-start justify-between gap-3 pointer-events-none">
         <div className="min-w-0">
           <div className="sc-sysline text-[10px] sm:text-xs opacity-80 truncate">
             {`> รอบ ${sc.cycleRound} · วันที่ ${sc.day}/${sc.daysTotal}`}
@@ -222,9 +237,12 @@ export default function Arena({ state, onHit, onLock }) {
             </div>
           )}
         </div>
-        <div className="flex flex-col items-end gap-1.5">
+        <div className="flex flex-col items-end gap-1.5 shrink-0">
           <DayRail day={sc.day} />
-          <div className="text-2xl sm:text-4xl font-black leading-none" style={{ fontFamily: PD, color: state.timeLeft <= 10 ? "var(--color-sc-red)" : "#fff" }}>
+          <div
+            className="text-2xl sm:text-4xl font-black leading-none"
+            style={{ fontFamily: PD, color: state.timeLeft <= 10 ? "var(--color-sc-red)" : "#fff" }}
+          >
             {state.timeLeft}
           </div>
         </div>
@@ -243,15 +261,8 @@ export default function Arena({ state, onHit, onLock }) {
 
         {/* ลำแสงเชื่อมทุกแผ่นเข้าแกนกลาง + เส้น Matrix ข้ามวง */}
         <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 5 }} viewBox="0 0 100 100" preserveAspectRatio="none">
-          {layout.map(({ p, pos }) => (
-            <line
-              key={`b${p.id}`}
-              className="sc-beam"
-              data-live={!p.locked && p.alive}
-              x1={CORE.x} y1={CORE.y} x2={pos.x} y2={pos.y}
-              vectorEffect="non-scaling-stroke"
-            />
-          ))}
+          {/* ไม่มีเส้นเชื่อมเข้าการ์ดโปรไฟล์แล้ว — รกสายตาโดยไม่ได้บอกอะไร
+              เหลือเฉพาะเส้น Matrix ด้านล่างซึ่งสื่อ "ใครกำลังจับตาใคร" จริง ๆ */}
           {/* เส้นจากตัวเราไปยังคนที่เราลง Matrix ไว้ — เห็นเครือข่ายสอดแนมของตัวเองกับตา */}
           {layout.map(({ p, pos }) => {
             const lv = sc.matrixPlaced[p.id] || 0;
@@ -300,20 +311,26 @@ export default function Arena({ state, onHit, onLock }) {
       </div>
 
       {/* ---------- HUD ล่าง: ค่าของโหมดนี้ (ไม่มีหลอดเลือด/สกิลในวันที่ 1-4) ---------- */}
-      <div className="absolute bottom-0 inset-x-0 z-30 p-2 sm:p-3 flex flex-col items-center gap-2">
+      <div className="absolute bottom-0 inset-x-0 z-30 px-4 pb-3 pt-1 flex flex-col items-center gap-2">
+        {/* กองการ์ดในมือของเรา — อยู่เหนือ HUD ติดกับผู้เล่น อ่านเลขออกจากระยะปกติ */}
+        <HandCards cards={(me && me.cards) || []} />
+
+        {/* แถบค่าสถานะ: ทุกช่องมีป้ายกำกับภาษาไทย ไม่ต้องเดาว่าไอคอนไหนคืออะไร */}
         <div
-          className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4 py-1.5"
-          style={{ background: "rgba(4,7,12,.82)", border: "1px solid var(--color-sc-line)", clipPath: "polygon(2% 0,98% 0,100% 100%,0 100%)" }}
+          className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 px-5 py-2"
+          style={{ background: "rgba(4,7,12,.88)", border: "1px solid var(--color-sc-line)", clipPath: "polygon(1.5% 0,98.5% 0,100% 100%,0 100%)" }}
         >
-          <span className="flex items-center gap-1.5 text-[11px] text-white/85">
-            ◆ <MatrixSlots held={sc.matrixHeld} max={sc.matrixMax} />
+          <span className="flex items-center gap-2 text-xs text-white/90">
+            <span className="font-bold" style={{ color: "var(--color-sc-cyan)" }}>Matrix</span>
+            <MatrixSlots held={sc.matrixHeld} max={sc.matrixMax} />
+            <span className="text-white/60">{sc.matrixHeld}/{sc.matrixMax}</span>
           </span>
-          <span className="text-[11px] text-white/85">🪙 {me ? me.gold : 0}</span>
-          <span className="text-[11px] text-white/85">📘 ระดับ {sc.skillLevel}/{sc.skillLevelMax}</span>
-          <span className="text-[11px] text-white/85">⚡ ความจุ {sc.caps ? sc.caps.skill : 4}/8</span>
+          <span className="text-xs text-white/90">🪙 <span className="font-bold text-echo-gold">{me ? me.gold : 0}</span> เหรียญ</span>
+          <span className="text-xs text-white/90">📘 ระดับทักษะ <span className="font-bold">{sc.skillLevel}/{sc.skillLevelMax}</span></span>
+          <span className="text-xs text-white/90">⚡ ความจุสกิล <span className="font-bold">{sc.caps ? sc.caps.skill : 4}/8</span></span>
           {sc.watchedBy > 0 && (
-            <span className="text-[11px] font-black" style={{ color: "var(--color-sc-red)" }}>
-              👁 ถูกจับตา {sc.watchedBy}
+            <span className="text-xs font-black" style={{ color: "var(--color-sc-red)" }}>
+              👁 มีคนจับตาเจ้าอยู่ {sc.watchedBy} คน
             </span>
           )}
         </div>

@@ -76,7 +76,9 @@ export default function App() {
     // (ต่างจากตอนกดยืนยันตัวละครที่ต้องรอ server ตอบแบบไม่รู้เวลาแน่นอน) ถ้าใช้ holdCover ที่นี่จะเจอบั๊กใหม่:
     // ม่านจะปล่อยเปิดทันทีตั้งแต่เฟรมแรก (เพราะ screenKey เปลี่ยนพร้อมกันในเรนเดอร์เดียวกันอยู่แล้ว)
     const onState = (s) => {
-      const matchStates = new Set(["PLAYING", "CUTSCENE", "SUMMARY", "ATTACK", "ATTACKING", "TRANSITION", "GAMEOVER"]);
+      // SERAPH_PLACE ต้องนับเป็น "อยู่ในแมตช์" ด้วย ไม่งั้นทุกครั้งที่เข้าเฟสเลือกสถานที่
+      // ระบบจะคิดว่าออกจากแมตช์แล้วกลับเข้ามาใหม่ (เด้งฉากเปิดตัว + รีเซ็ตเพลงทั้งหมด)
+      const matchStates = new Set(["PLAYING", "SERAPH_PLACE", "CUTSCENE", "SUMMARY", "ATTACK", "ATTACKING", "TRANSITION", "GAMEOVER"]);
       const wasInMatch = matchStates.has(prevGameStateRef.current);
       const nowInMatch = matchStates.has(s.gameState);
       // SE.RA.PH: **ห้ามเล่นฉากเปิดตัวผู้เล่นเด็ดขาด** — GameIntro เผยหน้า+ชื่อตัวละครของทุกคน
@@ -187,6 +189,11 @@ export default function App() {
   useEffect(() => {
     // CUTSCENE: หยุดเพลงพื้นหลัง ปล่อยให้เสียงในวีดีโอเล่น (เพลงสกิลมาหลังวีดีโอ)
     // ร่างแปลง (Ginga/Unicorn): เพลงสกิลทับ | ช่วงต่อสู้: เพลงกลางวัน/กลางคืน | อื่นๆ: main_home
+    // SE.RA.PH คุมเพลงของตัวเองทั้งหมดใน SeraphGame — ต้องออกตั้งแต่บรรทัดแรก
+    //  ⚠️ ห้ามปล่อยให้ไหลลงไปถึง resetMusicPositions() ด้านล่าง: มันสั่ง pause() ทุกแทร็ก
+    //  และ effect ของคอมโพเนนต์ลูกทำงาน "ก่อน" ของพ่อ -> เพลงที่ SeraphGame เพิ่งสั่งเล่นจะถูกหยุดทันที
+    //  (นี่คือสาเหตุที่ฉากเลือกสถานที่เงียบสนิท)
+    if (state && state.seraph) return;
     const battle = phase === "PLAYING" || phase === "SUMMARY" || phase === "ATTACK" || phase === "ATTACKING" || phase === "TRANSITION";
     const inMatch = battle || phase === "CUTSCENE";
 
@@ -204,8 +211,6 @@ export default function App() {
     if (!inMatch) prevCycle.current = null;
 
     // โหมดประหยัด (patch 2.0.6): ข้ามวีดีโอคัตซีน — ระหว่างรอคนอื่นดูวีดีโอ เพลงเล่นต่อตามปกติ
-    // SE.RA.PH คุมเพลงของตัวเองใน SeraphGame — ห้ามให้เอฟเฟกต์เพลงกลางตรงนี้ทับ
-    if (state && state.seraph) return;
     if (phase === "CUTSCENE" && (!lowQ || mandatoryCutscene)) stopMusic();
     else if (skillMusic) playMusic(skillMusic, skillMusicSeq); // seq เปลี่ยน = การเปิดร่างใหม่ -> เริ่มเพลงใหม่
     else if (battle || phase === "CUTSCENE") playMusic(cycle === "night" ? "new_night" : "new_morning", cycleSeq.current);
@@ -223,7 +228,7 @@ export default function App() {
       playSfx(doomShoot || attackSound || "attack");
     }
     prevPhase.current = phase;
-  }, [stage, phase, cycle, skillMusic, skillMusicSeq, lowQ, mandatoryCutscene]);
+  }, [stage, phase, cycle, skillMusic, skillMusicSeq, lowQ, mandatoryCutscene, !!(state && state.seraph)]);
 
   const goCharacter = (n, pos) => {
     setName(n);

@@ -16,9 +16,13 @@ import Arena from "./Arena";
 import PlaceSelect from "./PlaceSelect";
 import MatrixRadar from "./MatrixRadar";
 import SpectatorRail from "./SpectatorRail";
+import StorePanel from "./StorePanel";
 import { preloadWave1, preloadWave2, preloadWave3 } from "./assets";
 import { SystemLines, SeraphBackground } from "./ui";
-import { SeraphBoot, DayBanner, PairingScene, Day5Intro, CharacterReveal, DeletionScene } from "./scenes";
+import { SeraphBoot, DayBanner, PairingScene, Day5Intro, CharacterReveal, DeletionScene, DayWinnerScene } from "./scenes";
+
+const PD = "var(--font-p-display)";
+const PLACE_ICON = { room: "🛏️", church: "⛪", park: "🌳", library: "📚", store: "🏪" };
 
 export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
   const sc = state.seraph;
@@ -122,6 +126,21 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
     }
   }, [outKey]);
 
+  // ---------- แจ้งผลของสถานที่ที่เพิ่งไปมา ----------
+  //  server ส่ง sc.placeResult มาให้เฉพาะเจ้าของ — โชว์เป็นแบนเนอร์ตอนกลับเข้าสนาม
+  const [placeNotice, setPlaceNotice] = useState(null);
+  const prevResult = useRef(null);
+  useEffect(() => {
+    const r = sc && sc.placeResult;
+    const key = r ? `${sc.cycleRound}-${sc.day}-${r.place}-${r.title}` : null;
+    if (!key || prevResult.current === key) return;
+    prevResult.current = key;
+    setPlaceNotice(r);
+    playSfx(r.unlock ? "sc_glitch" : "sc_noti2");
+    const t = setTimeout(() => setPlaceNotice(null), r.unlock ? 5200 : 3800);
+    return () => clearTimeout(t);
+  }, [sc && sc.placeResult, sc && sc.day]);
+
   const closeScene = () => setScene(null);
   const emitPlace = (payload) => { playSfx("sc_glitch"); socket.emit("seraphPlace", payload); setPendingPlace("sent"); };
 
@@ -159,6 +178,17 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
       );
     } else if (scene.kind === "deletion") {
       overlay = <DeletionScene loser={scene.loser} winner={scene.winner} onDone={closeScene} />;
+    } else if (scene.kind === "winner") {
+      overlay = (
+        <DayWinnerScene
+          winner={scene.winner}
+          scores={scene.scores}
+          matrixHeld={sc.matrixHeld}
+          matrixMax={sc.matrixMax}
+          mine={state.youId}
+          onDone={closeScene}
+        />
+      );
     }
   }
 
@@ -205,7 +235,17 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
       </>
     );
   } else if (state.gameState === "SERAPH_PLACE") {
-    if (pendingPlace === "park") {
+    if (pendingPlace === "store") {
+      main = (
+        <StorePanel
+          shop={state.shop || []}
+          gold={me ? me.gold : 0}
+          inventoryCount={me && me.inventory ? me.inventory.length : 0}
+          onBuy={(itemId) => socket.emit("buyShopItem", { itemId })}
+          onDone={() => emitPlace({ key: "store" })}
+        />
+      );
+    } else if (pendingPlace === "park") {
       // สวนสาธารณะ: ลงแต้มบนเรดาร์ให้เสร็จก่อน แล้วส่งผลรวดเดียว
       main = (
         <MatrixRadar
@@ -249,7 +289,8 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
           totalPlayers={sc.totalPlayers}
           onPick={(key) => {
             // 2 สถานที่ที่ต้องถามต่อก่อนส่ง — ที่เหลือส่งได้เลย
-            if (key === "church" || key === "park") { setPendingPlace(key); return; }
+            // 3 สถานที่ที่ต้องทำอะไรต่อก่อนส่ง — ที่เหลือ (ห้องพัก/ห้องสมุด) ส่งได้เลย
+            if (key === "church" || key === "park" || key === "store") { setPendingPlace(key); return; }
             emitPlace({ key });
           }}
         />
@@ -320,6 +361,41 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
       )}
 
       {overlay}
+
+      {/* ผลของสถานที่ที่เพิ่งไปมา — ภาษาไทยล้วน เพราะเป็นข้อมูลที่ต้องอ่านออกทันที */}
+      {placeNotice && !overlay && (
+        <div className="fixed inset-x-0 top-[22%] z-[58] grid place-items-center pointer-events-none px-6">
+          <div
+            className="flex flex-col items-center gap-1 px-6 py-4 text-center"
+            style={{
+              background: "rgba(4,7,12,.94)",
+              border: `2px solid ${placeNotice.tone === "gold" ? "var(--color-echo-gold)" : placeNotice.tone === "mint" ? "var(--color-sc-mint)" : "var(--color-sc-cyan)"}`,
+              clipPath: "polygon(2% 0,98% 0,100% 100%,0 100%)",
+              animation: "scBannerIn 420ms both",
+              minWidth: "min(84vw, 340px)"
+            }}
+          >
+            <span className="text-3xl">{PLACE_ICON[placeNotice.place] || "◆"}</span>
+            <span
+              className="text-xl sm:text-2xl font-black text-white leading-tight"
+              style={{ fontFamily: PD }}
+            >
+              {placeNotice.title}
+            </span>
+            <span className="text-sm text-white/80">{placeNotice.detail}</span>
+            {placeNotice.unlock && (
+              <span className="mt-1 px-3 py-1 text-xs font-black" style={{ background: "var(--color-sc-cyan)", color: "#04070c" }}>
+                🔓 ปลดล็อกแล้ว — ใช้ได้ในวันดวล
+              </span>
+            )}
+            {placeNotice.warn && (
+              <span className="mt-1 text-[11px] px-3 py-1" style={{ background: "rgba(229,179,59,.16)", color: "#ffd977" }}>
+                ⚠️ {placeNotice.warn}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ถูกลบออกจากเกมแล้ว — เหลือสิทธิ์แค่เฝ้าดู */}
       {sc.eliminated && (
