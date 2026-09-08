@@ -22,6 +22,12 @@
   --color-p-ink: #16121c;
   --color-p-paper: #f4efe4;
   --font-p-display: "Chakra Petch", "Kanit", "Segoe UI", sans-serif;
+
+  /* ---------- ธีม SE.RA.PH Moon Cell (โหมดผจญภัย) — รายละเอียดใน seraph/seraph.css ---------- */
+  --color-sc-cyan: #35e6d4;
+  --color-sc-mint: #7cf59b;
+  --color-sc-red: #ff4d5e;
+  --color-sc-void: #04070c;
 }
 
 html,

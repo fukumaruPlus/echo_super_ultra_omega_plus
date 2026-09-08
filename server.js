@@ -64,6 +64,8 @@ const SKILL_COST_MAX = 8;
 const { NETRAMANA_KILL_CHANCE, netramanaActive } = require("./characters/_universal_status");
 // ยูนะ — ไอดอลเอฟเฟกต์สนาม (ไม่ใช่ตัวละครที่เล่นได้ ไม่อยู่ใน CHARACTERS/CHAR_HOOKS — require ตรงๆ เหมือน _universal_status)
 const YunaMod = require("./characters/yuna");
+// SE.RA.PH Moon Cell — โหมดผจญภัย 5 วัน (กติกา: SERAPH_MOONCELL.md · ฉาก: SERAPH_SCENES.md)
+const Seraph = require("./seraph");
 
 const app = express();
 const server = http.createServer(app);
@@ -90,8 +92,9 @@ const staticDir = useReact ? clientDist : path.join(__dirname, "public");
 const ASSET_BASE_URL = process.env.ASSET_BASE_URL; // เช่น https://pub-xxxx.r2.dev
 // โฟลเดอร์สื่อทั้งหมดที่ย้ายไป R2 — /characters (รูป/วิดีโอ/เพลงตัวละคร), /item (ปืนหน่วย GUTS
 //  Select + คีย์/วีดีโอกระสุน), /overload_force (สนาม), /theme_song + /effect_sound (เพลง/เสียง),
-//  /image (พื้นหลัง + สแปลช) — สามอันหลังยัง track ใน git อยู่ ต้องอัปขึ้น R2 ให้ครบก่อนถึงจะ redirect ติด
-const R2_DIRS = ["characters", "item", "overload_force", "theme_song", "effect_sound", "image"];
+//  /image (พื้นหลัง + สแปลช), /mooncell (สื่อโหมด SE.RA.PH: ฉากหลัง GIF + ภาพสถานที่ + เพลง/SFX)
+//  — ต้องอัปขึ้น R2 ให้ครบทุกโฟลเดอร์ก่อนถึงจะ redirect ติด ไม่งั้น 404
+const R2_DIRS = ["characters", "item", "overload_force", "theme_song", "effect_sound", "image", "mooncell"];
 if (ASSET_BASE_URL) {
   for (const dir of R2_DIRS) {
     app.get(`/${dir}/*`, (req, res) => res.redirect(302, ASSET_BASE_URL + req.path));
@@ -168,6 +171,12 @@ function goldCapOf(p) {
 //  ต้องเรียกผ่านตัวนี้เสมอ ไม่งั้นกระปุกออมสินของโคโตเนะจะไม่ทำงาน (สกิลติดตัวผูกกับจังหวะได้รับเหรียญ)
 //  โคโตเนะ: กระปุกออมสิน "แบ่ง" เหรียญที่เพิ่งได้ไปเก็บ (หักออกจากกระเป๋า) จึงคืนยอดสุทธิ ไม่ใช่ยอดก่อนแบ่ง
 function addGold(p, n) {
+  // SE.RA.PH วันที่ 1-4: สกิลติดตัวทุกตัวปิดหมด — กระปุกออมสินของโคโตเนะถูกเรียกตรงจากที่นี่
+  //  (ไม่ผ่าน firePassive/passiveSealed) จึงต้องมีด่านของตัวเอง ไม่งั้นมันทำงานทั้งที่ควรปิด
+  if (Seraph.noCombat() && p && p.characterId === "kotone") {
+    p.gold = Math.max(0, Math.min(goldCapOf(p), (p.gold || 0) + n));
+    return p.gold;
+  }
   if (!p || !(n > 0)) return 0;
   const cap = goldCapOf(p);
   const before = p.gold || 0;
@@ -394,6 +403,8 @@ const UNPLUG_BUFFS = ["upg", "monster", "ginga", "gingastrium", "storium", "abso
 // เลือดจริงสูงสุดของผู้เล่น — Locacaca fruit (ซาโตรุ patch 2.0.8.2) ลด Max HP ได้ (ต่ำสุด 1)
 //  คิชินามิ ฮาคุโนะ (patch 2.2.1): เพดานเลือดจริงคงที่ตามเพศ (ไม่ใช้ MAX_HP ปกติ) — ชาย 6 / หญิง 5
 function maxHpOf(p) {
+  // SE.RA.PH: ค่าพลังเดิมของทุกตัวละครถูกละทิ้ง — ใช้ความจุที่อัปที่โบสถ์เท่านั้น (§14 ข้อ 4)
+  if (Seraph.active() && p && p.id !== YUUKI_ID) return Seraph.maxHp(p);
   if (p && p.id === YUUKI_ID) return Math.max(1, p.yuukiBaseHp || YUUKI_SCALE[1].hp);
   if (p && p.characterId === "escanor") {
     const escanorHp = CHAR_HOOKS.escanor.maxHp(p);
@@ -482,6 +493,9 @@ let dayForceUntil = 0;
 // เสียงไพเราะที่กึกก้อง (ชเรด เอลัน patch พิเศษ): ใช้ท่าไม้ตาย 1 -> รีเซ็ตกลางคืนใหม่ 3 เทิร์น (แบบ Vortigern)
 //  และตราบใดที่มีชเรดร่างสปาด้ายังมีชีวิต ทุกค่ำคืน ฉากหลังจะเป็นราตรีของชเรด (change_fill.jpg)
 function isNightRound(n) {
+  // SE.RA.PH: 1 รอบ (5 วัน) = 1 ช่วงเวลาเต็ม — รอบเลขคี่กลางวัน รอบเลขคู่กลางคืน
+  //  ไม่ผูกกับ CYCLE_TURNS เพราะวันที่ 5 กินหลายเทิร์น (ดวลทีละคู่จนจบคิว)
+  if (Seraph.active()) return Seraph.isNight();
   // มิติมายาบรรเลง (Bard): โลหิต = นับเป็นตอนเช้า / วิญญาณ = นับเป็นตอนกลางคืน (อยู่เหนือทุกวงจร)
   const bardCycle = CHAR_HOOKS.bard.dimCycle(engine);
   if (bardCycle) return bardCycle === "night";
@@ -506,6 +520,7 @@ function nightCycleIndex(n) {
 }
 // patch 2.1.7: แต้มสกิลโบนัสตอนเช้า — แจกเฉพาะเช้าที่ 2, 4, 6, ... (เช้าที่ 1, 3, 5, ... ไม่มีโบนัส)
 function morningBonusActive(n) {
+  if (Seraph.active()) return false; // SE.RA.PH: ปิดโบนัสแต้มสกิลตอนเช้าทั้งโหมด (§12)
   const bardCycle = CHAR_HOOKS.bard.dimCycle(engine);
   if (bardCycle) return bardCycle === "day"; // มิติมายาบรรเลงอยู่เหนือทุกวงจร ไม่นับเช้าคู่/คี่
   if (n <= dayForceUntil) return true;       // บังคับกลางวันชั่วคราว (โอเบรอน) — ให้โบนัสตามปกติ
@@ -556,6 +571,7 @@ const BARD_SONGS = {
 // พลังงานสูงสุดของผู้เล่น (Bard = 9)
 function maxSkillOf(p) {
   if (isYuuki(p)) return 0;
+  if (Seraph.active() && p) return Seraph.maxSkill(p); // SE.RA.PH: ความจุแต้มสกิลเริ่ม 4 เพิ่มได้ถึง 8 ที่โบสถ์
   return (p && p.characterId === "bard") ? BARD_MAX_SKILL : MAX_SKILL;
 }
 // มิติมายาบรรเลงที่เปิดอยู่บนสนาม: "day" (โลหิต) | "night" (วิญญาณ) | null — ย้าย body ไป characters/bard.js
@@ -602,6 +618,9 @@ const TOHNO_DEATH_IMG = CHAR_HOOKS.tohno.DEATH_IMG; // ร่างระหว�
 //  (ใช้เช็คก่อนให้สกิลติดตัวของตัวละครอื่นทำงาน — MOON*CELL มีผลกับทุกคนยกเว้นเจ้าของท่าเอง)
 function passiveSealed(p) {
   if (!p) return false;
+  // SE.RA.PH วันที่ 1-4: ปิดสกิลติดตัวของทุกคน — ปิดที่นี่จุดเดียวจึงครอบคลุมทุก trigger
+  //  ที่ผ่าน passiveSealed (§14 ข้อ 1) ส่วน firePassive มีด่านของตัวเองด้านล่าง
+  if (Seraph.noCombat()) return true;
   if (moonCellActive() && !((p.statuses && p.statuses.moonCell) > 0)) return true;
   return ((p.statuses && p.statuses.nanayaSeal) || 0) > 0;
 }
@@ -1091,6 +1110,7 @@ function resetPregameFlowToLobby() {
 function validGameMode(mode, count = Object.keys(players).length) {
   if (mode === "ffa") return count >= 2;
   if (mode === "overload") return count >= 2;
+  if (mode === "seraph") return count >= 2; // SE.RA.PH: รับผู้เล่นทุกจำนวน (ตั้งแต่ 2 คนขึ้นไป)
   if (mode === "duo") return count >= 4 && count % 2 === 0;
   if (mode === "trio") return count === 6;
   return false;
@@ -1099,6 +1119,7 @@ function modeOptionsFor(count = Object.keys(players).length) {
   return [
     { mode: "ffa", label: "Free For All", size: 1, enabled: validGameMode("ffa", count) },
     { mode: "overload", label: "Over Load", size: 1, enabled: validGameMode("overload", count) },
+    { mode: "seraph", label: "SE.RA.PH Moon Cell", size: 1, enabled: validGameMode("seraph", count) },
     { mode: "duo", label: "Duo", size: 2, enabled: validGameMode("duo", count) },
     { mode: "trio", label: "Trio", size: 3, enabled: validGameMode("trio", count) },
   ];
@@ -1148,7 +1169,8 @@ function startTeamSetup(mode) {
   const count = Object.keys(players).length;
   if (!validGameMode(mode, count)) return;
   resetModeVotes();
-  if (mode === "ffa" || mode === "overload") {
+  if (mode === "ffa" || mode === "overload" || mode === "seraph") {
+    // SE.RA.PH เป็นโหมดเดี่ยวเหมือน ffa — ไม่ผ่านหน้าเลือกทีม
     gameMode = mode;
     teamSize = 1;
     teamCount = 0;
@@ -1207,6 +1229,8 @@ function remainingTeamWinInfo(stillAlive = alivePlayers(), total = Object.keys(p
 const CARD_COLORS = ["red", "blue", "green", "yellow"];
 // รายชื่อการ์ดทั้ง 43 ใบแบบไม่สับ (ลำดับคงที่) — ใช้เป็นแม่แบบแสดงสมุดการ์ด (deckLedger) และเทียบว่าใบไหนถูกจั่วไปแล้ว
 function canonicalDeckCards() {
+  // SE.RA.PH: ถอด King/Queen/Joker ออกทั้งหมด เหลือ 40 ใบ (SERAPH_MOONCELL.md §10)
+  if (Seraph.active()) return Seraph.deckCards(CARD_COLORS);
   const deck = [];
   for (let v = 1; v <= 10; v++) for (const color of CARD_COLORS) deck.push({ value: v, color });
   deck.push({ special: "king" }, { special: "queen" }, { special: "joker" });
@@ -1502,6 +1526,7 @@ const DEBUFF_KEYS = ["discord", "sleep", "stun", "nodraw", "noskill",
 // ระหว่าง Lie Like Vortigern (โอเบรอน) เป้าหมายได้เพดานเกราะ +1
 // ระหว่างเป็นคู่สัญญาเจ้าแห่งเน็ตบ้าน (สนใจใช้บริการเราไหม) เพิ่ม +3
 function maxArmorOf(p) {
+  if (Seraph.active() && p && p.id !== YUUKI_ID) return Seraph.maxArmor(p); // SE.RA.PH: ความจุจากโบสถ์เท่านั้น
   if (p && p.id === YUUKI_ID) {
     const base = p.yuukiBaseArmor != null ? p.yuukiBaseArmor : YUUKI_SCALE[1].armor;
     return base
@@ -2090,6 +2115,12 @@ function mageslayerMarkSteal(target, n) {
   CHAR_HOOKS.mageslayer.onDamageDealt(engine, src, target, n);
 }
 function adjustIncomingDamage(p, n, isNormalAttack) {
+  // SE.RA.PH Matrix ระดับ 2: ลง 2 แต้มบนใคร = รับความเสียหายจากคนนั้นน้อยลง 1 หน่วย (§6)
+  //  ต้นตอของดาเมจอ่านจาก effectSourceId (จุดเดียวกับที่ friendly-fire/ตราล่าเวทใช้)
+  if (Seraph.active() && effectSourceId && effectSourceId !== p.id) {
+    const cut = Seraph.damageReduction(p, effectSourceId);
+    if (cut > 0 && n > 0) n = Math.max(0, n - cut);
+  }
   // เย็นชื่นใจ (escanorCool, WineBarrel ของเอสคานอร์): สถานะ Universal — ไวน์ถูกขโมยไปใช้ได้
   //  ตรรกะจริงอยู่ characters/_universal_status.js (coolReduction)
   if (n > 0) n = Math.max(0, n - coolReduction(p, isNormalAttack));
@@ -2187,6 +2218,7 @@ function applyOne(p, e) {
   }
 }
 function firePassive(p, trigger) {
+  if (Seraph.noCombat()) return; // SE.RA.PH วันที่ 1-4: ไม่มีสกิลติดตัวทำงานเลย
   const ch = CHAR_BY_ID[p.characterId];
   if (ch && ch.passive && ch.passive.trigger === trigger) applyEffect(p, ch.passive.effect);
 }
@@ -2269,6 +2301,7 @@ function resetRoundDisplay(p) {
   p.wasAttacked = false; p.didAttackRound = false; p.isWinner = false; p.isLoser = false;
 }
 function resetCombat(p) {
+  Seraph.resetFields(p); // SE.RA.PH: ล้างฟิลด์ของโหมด (GAME_SYSTEM.md gotcha #11)
   p.ready = false; // ห้องรอ: ต้องกดพร้อมใหม่ทุกครั้งที่กลับมาห้องรอ/เริ่มแมตช์ใหม่
   p.skillPoints = 0; p.alive = true; p.shield = 0;
   p.statuses = {}; p.seen = {}; p.ntdTarget = null; p.transformAt = 0; p.beatAt = 0;
@@ -2476,7 +2509,7 @@ function publicStatuses(p) {
   return out;
 }
 function buildStateFor(viewerId) {
-  const revealAll = gameState !== "PLAYING" && gameState !== "LOBBY" && gameState !== "TEAM_MODE" && gameState !== "TEAM_SETUP";
+  const revealAll = gameState !== "PLAYING" && gameState !== "SERAPH_PLACE" && gameState !== "LOBBY" && gameState !== "TEAM_MODE" && gameState !== "TEAM_SETUP";
   // เพลง ANATA WAAAAAAAA ทับทุกเพลงระหว่างช่วงจั่วการ์ด — จบลงเมื่อทุกคนพร้อมเปิดไพ่แล้ว
   const nightNow = isNightRound(roundNumber);
   // ราตรีกลืนกิน: เปิดเมื่อโอเบรอนใช้ท่าไม้ตาย 2 (Lie Like Vortigern) — ฉากหลังกลางคืนกลายเป็น
@@ -2605,6 +2638,8 @@ function buildStateFor(viewerId) {
     overloadVictory: gameMode === "overload" && yuukiDefeated,
     deckEmpty: centralDeck.length === 0,
     cycle: nightNow ? "night" : "day", // กลางวัน/กลางคืน (สลับทุก 3 เทิร์น)
+    // SE.RA.PH Moon Cell — ก้อนข้อมูลของโหมด (per-viewer ทั้งก้อน ดู SERAPH_SCENES.md §8)
+    seraph: Seraph.stateFor(engine, viewerId),
     oberonBg,
     shradeBg, // ราตรีของชเรด เอลัน (ฉากหลัง change_fill.jpg — ทุกค่ำคืนที่ยังอยู่ในร่างสปาด้า)
     hakunoBg, // MOON*CELL (คิชินามิ ฮาคุโนะ): ฉากหลัง hakuno_fill.jpg ระหว่างท่าไม้ตายทำงาน
@@ -2778,7 +2813,8 @@ function buildStateFor(viewerId) {
       //  อาจารย์ ไบเลธ หลักสูตร "จบการศึกษา": สกิลรอง/ท่าไม้ตายถูกลง 1 แต้ม — หักก่อนกระแสเวทเหมือนใน useSkill()
       const showCost = (pub, tierName) => Math.min(
         SKILL_COST_MAX,
-        Math.max(0, Math.max(0, pub.cost - CHAR_HOOKS.byleth.costDiscount(engine, tierName)) - spellflowAmt) + spellburdenAmt + (p.nightTaxTier === tierName ? 1 : 0),
+        // SE.RA.PH: ฐานราคามาจากระดับทักษะ (2/4/6) ไม่ใช่ค่าของตัวละคร — ต้องตรงกับ useSkill() เป๊ะ
+        Math.max(0, Math.max(0, (Seraph.active() ? Seraph.costOf(tierName) : pub.cost) - CHAR_HOOKS.byleth.costDiscount(engine, tierName)) - spellflowAmt) + spellburdenAmt + (p.nightTaxTier === tierName ? 1 : 0),
       );
       // คอนเนอร์ (วิเคราะห์สถานการณ์ rework 3.4.2): "อ่านขาด" ทั้งลำดับแล้ว = เห็นแต้มการ์ดของเป้าหมาย
       //  คนนั้นคนเดียวตลอดเทิร์นนี้ (เดิมเปิดไพ่ + แต้ม + ประเมินดาเมจของทุกคนพร้อมกัน)
@@ -2786,12 +2822,22 @@ function buildStateFor(viewerId) {
       if (basicPub) basicPub.cost = showCost(basicPub, "basic");
       if (secondaryPub) secondaryPub.cost = showCost(secondaryPub, "secondary");
       if (ultimatePub) ultimatePub.cost = showCost(ultimatePub, "ultimate");
+      // ---------- SE.RA.PH: ตัวละครถูกซ่อนจนกว่าจะลงดวล (SERAPH_MOONCELL.md §9) ----------
+      //  per-viewer: คนที่เคยเห็นตัวละครนั้นลงสนามแล้วจะเห็นตลอดไป คนที่ยังไม่เคยเห็น = ไม่มีข้อมูลเลย
+      //  ชื่อ "ผู้เล่น" ไม่ใช่ความลับ — ที่ซ่อนคือ "ตัวละคร" (ภาพ/ชื่อ/สกิลทั้งชุด)
+      const scHidden = Seraph.active() && !Seraph.canSee(viewer, p);
+      if (scHidden) { basicPub = null; secondaryPub = null; ultimatePub = null; }
       return {
         id: p.id,
         isBoss: isYuuki(p),
         name: p.name,
         avatar: p.avatar,
-        img: displayImg(p),
+        img: scHidden ? null : displayImg(p),
+        scHidden,                                   // client วาดเป็นเงาดำ + ??? (ดู .sc-silhouette)
+        scSpectator: Seraph.active() ? !!p.scSpectator : undefined,
+        scEliminated: Seraph.active() ? !!p.scEliminated : undefined,
+        // Matrix ระดับ 1: ผู้ชมคนนี้เห็นจำนวนไพ่ในมือของคนนี้แบบเรียลไทม์
+        scMatrixLevel: Seraph.active() && viewer ? Seraph.matrixLevelOn(viewer, p) : undefined,
         position: p.position,
         color: POSITION_COLORS[p.position] || "#888",
         teamId: p.teamId || null,
@@ -2802,7 +2848,10 @@ function buildStateFor(viewerId) {
         result: p.result,
         cardCount: p.cards.length,
         cards: blackout ? null : (mine ? p.cards : null),
-        score: blackout ? null : ((show || promoShow || allyShow || connorReads) ? scoreOf(p) : null),
+        // SE.RA.PH Matrix ระดับ 3: ผู้ชมที่ลงครบ 3 แต้มบนคนนี้ เห็นแต้มของเขาตลอดเวลา (§6)
+        //  (ระดับ 1 "เห็นจำนวนไพ่" ใช้ cardCount ที่ส่งให้ทุกคนอยู่แล้ว — client เป็นคนเลือกโชว์ตามระดับ)
+        score: blackout ? null : ((show || promoShow || allyShow || connorReads
+          || (Seraph.active() && viewer && Seraph.matrixLevelOn(viewer, p) >= 3)) ? scoreOf(p) : null),
         // Locacaca (ซาโตรุ): Max HP ลดถาวรได้ / ทาคุมิ: บังตาระหว่างท่าไม้ตายทำงาน (null = ซ่อนทั้งแถบ)
         // แบทแมนร่างรถแบทโมบิล: ส่ง 0/0 เพื่อให้ "ไม่มีพลังชีวิต เหลือแต่เกราะ" ตามสเปค
         //  (LifeBar วาดหัวใจตามจำนวน maxHp — 0 = ไม่มีหัวใจสักดวง แต่ยังไม่ใช่ null จึงไม่ขึ้น "???")
@@ -3004,7 +3053,7 @@ function buildStateFor(viewerId) {
         alive: p.alive,
         statuses: show ? { ...p.statuses, ...((p.ntdTarget || p.ntdRivalId) ? { ntd: 1 } : {}) } : publicStatuses(p),
         statusAmt: p.statusAmt || {}, // จำนวน (amount) ของบัฟ/ดีบัฟพื้นฐาน (patch 2.0.8)
-        character: {
+        character: scHidden ? { id: null, img: null, name: "???", passive: null, passive2: null, passive3: null, basic: null, secondary: null, ultimate: null } : {
           // โอเบรอน: กลางคืนสลับชื่อ + สกิลรอง/ท่าไม้ตายเป็นเวอร์ชันกลางคืน (ฝันร้ายยามค่ำคืน / Lie Like Vortigern)
           id: ch.id,
           // ภาพประจำตัวละคร (ไม่ผูกกับร่าง/แฝดที่กำลังคุมอยู่) — ฉากเปิดตัวตอนแมตช์เริ่มใช้ภาพนี้
@@ -3157,6 +3206,12 @@ function startMatch() {
   kaiOverhaulSlots = []; // ไค ชิซากิ: ล้าง tracker Overhaul ทุกครั้งที่เริ่มแมตช์ใหม่
   // อาริมะ มิยาโกะ (characters/miyako.js): เจอ โทโนะ ชิกิ หรือ นานายะ ชิกิ ในเกมเดียวกัน -> เล่นวีดีโอ arima_shiki.mp4 ก่อนเริ่มเทิร์นแรก
   cutsceneQueue = [];
+  // SE.RA.PH: ตั้งค่าเริ่มต้นของโหมด (วัน 1 รอบ 1) + บังคับสเตตัสทุกตัวละครให้เท่ากันหมด
+  Seraph.reset();
+  if (gameMode === "seraph") {
+    Seraph.startMatch(engine);
+    for (const m of Seraph.takeLog()) lastLog.push(m);
+  }
   if (gameMode === "overload") {
     // โหมดบอสต้องเปิดด้วยวิดีโอยูกิเสมอ ห้ามคิวเปิดตัวอื่นหรือ Overload Force แทรกนำหน้า
     cutsceneQueue = [];
@@ -3461,11 +3516,16 @@ function dealRound() {
   anataMusicSeq = 0;
   // Mana Rupture ทำงานต้นเทิร์นถัดไป ก่อนแจกไพ่/เริ่มการกระทำ
   CHAR_HOOKS.mageslayer.resolveDueRuptures(engine);
+  // SE.RA.PH: ตั้งว่าใครลงสนามเทิร์นนี้ (วันที่ 5 = เฉพาะคู่ที่ดวล คนอื่นเป็นผู้ชม)
+  Seraph.onDealRound(engine);
   // ร้านค้ามายา (patch 2.2 full): เปิดทุกๆ 5 เทิร์น ตอนเริ่มเทิร์นใหม่
-  if (roundNumber % SHOP_INTERVAL_TURNS === 0) openShop();
+  //  SE.RA.PH: เติมสต็อกใหม่ทุกวัน เพราะ "ร้านสะดวกซื้อ" เป็น 1 ใน 5 สถานที่ที่เลือกได้ทุกวัน
+  if (Seraph.active()) { if (Seraph.currentDay() === 1) openShop(); } // เปิดครั้งเดียวต่อรอบ ใช้สต็อกเดิมทั้ง 5 วัน
+  else if (roundNumber % SHOP_INTERVAL_TURNS === 0) openShop();
   // ยูนะ ไอดอลประจำสนาม: ม้วนลูกเต๋าทุกๆ 5 เทิร์น เริ่มจากเทิร์นที่ 16 (16, 21, 26, ...)
   //  เอจิ: ระหว่างท่าไม้ตาย ไม่ว่ายังก็ตาม บังคับเปิดสนามอยู่ ยูนะจะไม่เกิดขึ้นเองแบบปกติ
-  if (roundNumber >= 16 && (roundNumber - 16) % 5 === 0 && !eijiUltFieldActive()) YunaMod.rollWindow(engine, roundNumber);
+  //  SE.RA.PH: ยูนะปิดทั้งโหมด (SERAPH_MOONCELL.md §12)
+  if (!Seraph.active() && roundNumber >= 16 && (roundNumber - 16) % 5 === 0 && !eijiUltFieldActive()) YunaMod.rollWindow(engine, roundNumber);
   // รีเซ็ตเวลากลางคืน (Lie Like Vortigern): นับกลางคืนใหม่ — เทิร์นนี้เป็นคืนที่ 1 จาก 3
   const prevNight = isNightRound(roundNumber - 1); // เช็คด้วยวงจรเดิมก่อนเลื่อน (กันแบนเนอร์สลับเวลาเด้งผิด)
   if (nightResetPending) {
@@ -3519,6 +3579,8 @@ function dealRound() {
     // ยุย: สมบัติล้ำค่าที่สุด..... — ครบกำหนดแล้วชุบชีวิตเป้าหมายที่จองไว้ (ตัวยุยเองต้องยังอยู่)
     if (p.characterId === "yui") CHAR_HOOKS.yui.maybeRevive(engine, p);
     if (!p.alive) { p.cards = []; p.locked = true; p.busted = false; p.overloadDrawReady = false; continue; }
+    // SE.RA.PH วันที่ 5: คนที่ไม่ใช่คู่ที่กำลังลงสนาม = ผู้ชม ไม่ได้รับไพ่และไม่ถ่วงการเปิดไพ่
+    if (Seraph.active() && !Seraph.inCurrentDuel(p)) { p.cards = []; p.locked = true; p.busted = false; p.overloadDrawReady = false; continue; }
 
     if (isYuuki(p) && p.hp <= 4) {
       p.statuses.fortune = Math.min(BARD_FORTUNE_MAX, (p.statuses.fortune || 0) + 1);
@@ -3611,7 +3673,7 @@ function dealRound() {
     // ผุพัง (สถานะ Universal patch 2.2 beta — ไวท์เล็น "ฉันขอรับไปนะคะ"): เกราะไม่ฟื้นระหว่างมีผล
     //  แบทแมนร่างรถ: เกราะคือ "พลังชีวิตของรถ" ไม่ใช่เกราะจริง — ห้ามฟื้นเอง ไม่งั้นรถซ่อมตัวเองฟรีทุก 2 เทิร์น
     //  และจะไม่มีวันพังเลยถ้าโดนตีเบาๆ (สเปคระบุว่า "ขึ้นรถถาวรจนกว่ารถจะพัง" = ต้องพังได้จริง)
-    if (!p.armorLocked && !((p.statuses.decay || 0) > 0) && !moonCellActive() && roundNumber % 2 === 0
+    if (!p.armorLocked && !((p.statuses.decay || 0) > 0) && !moonCellActive() && !Seraph.noCombat() && roundNumber % 2 === 0
         && !CHAR_HOOKS.bat_ben.blocksArmorRegen(p)) {
       healArmor(p, 1);
     }
@@ -3895,6 +3957,13 @@ function useSkill(id, tier, targets, item) {
   if (!p || !p.alive) return;
   if (gameState !== "PLAYING") return;
   if (!["basic", "secondary", "ultimate"].includes(tier)) return;
+  // ---------- SE.RA.PH (SERAPH_MOONCELL.md §5 + §3) ----------
+  //  วันที่ 1-4: ไม่มีสกิลเลย · วันที่ 5: ต้องปลดล็อก tier นั้นด้วยระดับทักษะก่อน
+  if (Seraph.active()) {
+    if (Seraph.noCombat()) return;
+    if (!Seraph.tierUnlocked(p, tier)) return;
+    if (p.scSpectator) return; // ผู้ชมกดอะไรไม่ได้
+  }
   // ผู้วิงวอน (patch 3.4): คนที่ติด "ลูกแกะน้อยรู้แจ้ง" เล็งผู้วิงวอนด้วยสกิลไม่ได้เลย
   //  กันที่ปากทางจุดเดียว จึงครอบคลุมทุกท่าของทุกตัวละครที่ส่ง targets มา โดยไม่ต้องแก้ prepareXTarget ทีละตัว
   if (Array.isArray(targets) && targets.some((tid) => CHAR_HOOKS.the_supplicant.targetBlocked(p, players[tid]))) return;
@@ -4089,6 +4158,9 @@ function useSkill(id, tier, targets, item) {
     ignisImpactTarget = CHAR_HOOKS.ignis.prepareImpactTarget(engine, p, targets);
     if (!ignisImpactTarget) return;
   }
+  // SE.RA.PH: ราคาสกิลมาจาก "ระดับทักษะ" ไม่ใช่ค่าของตัวละคร — 2 / 4 / 6 ตายตัว (§3)
+  //  ต้องคิดสูตรเดียวกันเป๊ะกับ showCost() ใน publicState ไม่งั้นราคาบนปุ่มไม่ตรงกับที่หักจริง
+  if (Seraph.active()) cost = Seraph.costOf(tier);
   // อาจารย์ ไบเลธ หลักสูตร "จบการศึกษา": สกิลรอง/ท่าไม้ตายของทุกคนใช้แต้มสกิลลดลง 1 (สูตรเดียวกับที่ publicState โชว์บนปุ่ม)
   cost = Math.max(0, cost - CHAR_HOOKS.byleth.costDiscount(engine, tier));
   // กระแสเวท / ภาระเวท (สถานะพื้นฐาน patch 2.0.8): ใช้พลังงานลดลง/เพิ่มขึ้นตามจำนวนที่ระบุ
@@ -5424,7 +5496,8 @@ function resolveRound() {
     return;
   }
 
-  const combatants = alivePlayers();
+  // SE.RA.PH: วันที่ 1-4 = ทุกคน · วันที่ 5 = เฉพาะคู่ที่กำลังดวล (คนอื่นเป็นผู้ชม)
+  const combatants = Seraph.active() ? Seraph.combatants(engine) : alivePlayers();
   roundWinnerId = null;
 
   if (combatants.length < 2) {
@@ -5440,7 +5513,8 @@ function resolveRound() {
   if (best >= 0) {
     const tied = combatants.filter((p) => val(p) === best);
     // สนาม Overload ต้องสุ่มก่อน Rip and Tear ของ DoomGuy เสมอ และเกิดได้เฉพาะตอนแต้มสูงสุดเสมอกันจริง
-    if (!overloadForceActive && !CHAR_HOOKS.muimi.blocksOverloadForce(engine) && tied.length >= 2 && Math.random() < OVERLOAD_FORCE_CHANCE) {
+    // SE.RA.PH: Overload Force ทำงานเฉพาะวันที่ 5 และห้ามเรียกบอสยูกิทุกกรณี (§7 + §12)
+    if (!Seraph.noCombat() && !overloadForceActive && !CHAR_HOOKS.muimi.blocksOverloadForce(engine) && tied.length >= 2 && Math.random() < OVERLOAD_FORCE_CHANCE) {
       triggerOverloadForce();
       return;
     }
@@ -5470,6 +5544,8 @@ function resolveRound() {
     CHAR_HOOKS.brian.onRoundWin(engine, w);
     // ระบบเหรียญ (patch 2.2 full): ชนะการจั่วได้เหรียญเพิ่ม +1 (เพดาน 30)
     if (!isYuuki(w)) addGold(w, GOLD_WIN_BONUS);
+    // SE.RA.PH วันที่ 1-4: รางวัลผู้ชนะคือ Matrix +1 (มาแทนเฟสโจมตีของเกมปกติ)
+    Seraph.onRoundWinner(engine, w);
     // patch 2.1.3.5: ชนะจั่วการ์ดไม่ได้แต้มสกิลอีกต่อไป
     firePassive(w, "win");
     if (tied.length > 1) {
@@ -5495,7 +5571,16 @@ function resolveRound() {
     }
   }
 
-  if (best !== worst) {
+  // SE.RA.PH วันที่ 1-4: **ไม่มีใครเสียเลือด/เกราะ และไม่มีใครได้แต้มสกิล** (§5 + §14 ข้อ 3)
+  //  วันธรรมดาคือการแข่งแต้มล้วนเพื่อชิงรางวัล ไม่ใช่การต่อสู้ — ยังปักธง isLoser ไว้ให้ UI โชว์อันดับได้
+  if (Seraph.noCombat()) {
+    if (best !== worst) {
+      for (const l of combatants.filter((p) => val(p) === worst && p.id !== roundWinnerId)) {
+        l.isLoser = true;
+        l.result = "lose";
+      }
+    }
+  } else if (best !== worst) {
     for (const l of combatants.filter((p) => val(p) === worst && p.id !== roundWinnerId)) {
       l.isLoser = true;
       l.result = "lose";
@@ -5712,10 +5797,30 @@ let iconFxSeq = 0;
 function attackableTargets(atkId) {
   const attacker = players[atkId];
   // ผู้วิงวอน (patch 3.4): คนที่ติด "ลูกแกะน้อยรู้แจ้ง" เล็งผู้วิงวอนไม่ได้เลย — กรองออกจากรายชื่อเป้าหมายตั้งแต่ต้นทาง
-  return alivePlayers().filter((p) => p.id !== atkId && !sameTeam(attacker, p) && !sealActive(p)
+  // SE.RA.PH วันที่ 5: ดวลตัวต่อตัว — เล็งได้เฉพาะคู่ของตัวเองเท่านั้น ผู้ชมแตะไม่ได้
+  const pool = Seraph.active() ? Seraph.combatants(engine) : alivePlayers();
+  return pool.filter((p) => p.id !== atkId && !sameTeam(attacker, p) && !sealActive(p)
     && !CHAR_HOOKS.the_supplicant.targetBlocked(attacker, p));
 }
+// ---------- SE.RA.PH: เฟสเลือกสถานที่ (SERAPH_MOONCELL.md §5 ขั้นที่ 3 · ฉาก S4) ----------
+//  เปิดหลังสรุปแต้มของวันที่ 1-4 · ทุกคนเลือกพร้อมกัน · ครบคนหรือหมดเวลาแล้วจึงขึ้นวันถัดไป
+function beginSeraphPlacePhase() {
+  clearPhaseTimer();
+  Seraph.startPlacePhase(engine, finishSeraphPlacePhase);
+  gameState = "SERAPH_PLACE";
+  startPhaseTimer(Seraph.PLACE_SECONDS, finishSeraphPlacePhase);
+  broadcastState();
+}
+function finishSeraphPlacePhase() {
+  if (gameState !== "SERAPH_PLACE") return; // กันถูกเรียกซ้ำ (ครบคน + หมดเวลาพร้อมกัน)
+  clearPhaseTimer();
+  Seraph.finishPlacePhase(engine);
+  endTurn();
+}
+
 function afterSummary() {
+  // SE.RA.PH วันที่ 1-4: ไม่มีเฟสโจมตีเลย — ต่อด้วยเฟส "เลือกสถานที่" แทน (§5 ขั้นที่ 3)
+  if (Seraph.noCombat()) { beginSeraphPlacePhase(); return; }
   // คอนเนอร์ RK800 (สกิลติดตัว 2): ระหว่างการไล่ล่า ทุกเทิร์นเหลือแค่ จั่ว -> สรุปแต้ม ไม่มีเฟสโจมตีเลย
   if (CHAR_HOOKS.conner.chaseActive(engine)) { endTurn(); return; }
   // ไบรอัน (สกิลรอง หลีกทางไป): พุ่งชนคนที่แต้มสูงสุดที่มากกว่าเรา — วีดีโอก่อน แล้วค่อยลงความเสียหาย
@@ -5973,6 +6078,9 @@ function doAttack(byId, targetId) {
     if (isYuuki(attacker)) postAttackFollowup(attacker);
     return;
   }
+  // SE.RA.PH วันที่ 5: ดวลตัวต่อตัว — เล็งได้เฉพาะคู่ของตัวเองเท่านั้น
+  //  ต้องกันที่นี่ด้วย ไม่ใช่แค่กรองรายชื่อใน attackableTargets() เพราะ targetId มาจาก client ตรง ๆ
+  if (Seraph.active() && !Seraph.inCurrentDuel(target)) return;
   if (CHAR_HOOKS.princess_shiki.cannotAttack(attacker)) return;       // เจ้าหญิงราก (patch 2.2.7): โจมตีไม่ได้ เว้นแต่ติดชักดาบ
   if (CHAR_HOOKS.producer_lumi.cannotAttack(attacker)) return;                            // โปรดิวเซอร์: ระหว่าง "เตรียมซ้อม" โจมตีปกติไม่ได้
   // ไค ชิซากิ: โทสะระงับด้วยโทสะ — มีคู่ปรับ (kaiRival1/kaiRival2 ยังไม่หมด) บังคับเป้าหมายมีแค่คู่ปรับเท่านั้น
@@ -6694,6 +6802,55 @@ function finishYuukiVictory() {
   broadcastState();
 }
 
+// ============================================================
+//  SE.RA.PH — ตัวเดินวัน/รอบ (เรียกจากท้าย endTurn เท่านั้น)
+//  คืน true = จัดการเฟสถัดไปเองแล้ว ผู้เรียกต้อง return ทันที
+// ============================================================
+function seraphAdvance() {
+  // เหลือผู้รอดคนเดียว = จบเกมทั้งแมตช์
+  const finish = () => {
+    const left = Seraph.survivors(engine);
+    if (left.length <= 1) {
+      winningTeamId = null;
+      if (left.length === 1) lastLog.push(`🏆 ${left[0].name} คือผู้รอดคนสุดท้ายของ SE.RA.PH — คำขอถูกมอบให้!`);
+      else lastLog.push("ไม่มีผู้รอด — เสมอ");
+      gameState = "GAMEOVER";
+      timeLeft = 0;
+      broadcastState();
+      return true;
+    }
+    return false;
+  };
+
+  if (Seraph.isDuelDay()) {
+    // วันที่ 5: คู่นี้จบหรือยัง
+    const st = Seraph.checkDuelProgress(engine);
+    if (st === "continue") return false;      // ดวลคู่เดิมต่อในเทิร์นถัดไป
+    if (st === "nextPair") {
+      if (finish()) return true;
+      gameState = "TRANSITION";
+      startPhaseTimer(TRANSITION_TIME, dealRound); // ขึ้นคู่ถัดไป
+      broadcastState();
+      return true;
+    }
+    // หมดคิวคู่ดวลแล้ว -> จบรอบ
+    if (finish()) return true;
+    Seraph.endCycle(engine);
+    gameState = "TRANSITION";
+    startPhaseTimer(TRANSITION_TIME, dealRound);
+    broadcastState();
+    return true;
+  }
+
+  // วันที่ 1-4: ขึ้นวันถัดไป (จบวันที่ 2 = ประกาศคู่ดวล · จบวันที่ 4 = เข้าวันดวล)
+  const { next } = Seraph.advanceDay(engine);
+  if (next === "duelDay") Seraph.beginDuelDay(engine);
+  gameState = "TRANSITION";
+  startPhaseTimer(TRANSITION_TIME, dealRound);
+  broadcastState();
+  return true;
+}
+
 function endTurn() {
   // โปรดิวเซอร์ (luminous burst): ตาข่ายสำรอง — ถ้าหมัดที่ทำให้ครบ "ถูกหลบ" doAttack จะ return
   //  ตั้งแต่ด่านหลบ ไม่ผ่าน postAttackFollowup เลย รางวัลจึงไม่มีวันจ่าย (และ luminous มีการหลบ 40%
@@ -6935,7 +7092,7 @@ function endTurn() {
   }
   if (dayBonus && !yuukiBoss()) lastLog.push("☀️ จบเทิร์นช่วงกลางวัน — ทุกคนได้แต้มสกิลเพิ่ม +1");
   // ระบบเหรียญ (patch 2.2 full): จบเทิร์น +1 เหรียญให้ทุกคน (เพดาน 30 — เต็มแล้วไม่ได้เพิ่มจน spending ลดลง)
-  for (const p of alivePlayers()) {
+  if (!Seraph.active()) for (const p of alivePlayers()) {
     if (isYuuki(p)) { p.gold = 0; continue; }
     const goldGain = GOLD_PER_TURN + (p.characterId === "hisakawa_sister" ? CHAR_HOOKS.hisakawa_sister.extraGoldRegen(p) : 0) + (p.characterId === "ignis" ? CHAR_HOOKS.ignis.extraGoldRegen(engine, p) : 0);
     addGold(p, goldGain);
@@ -7090,6 +7247,11 @@ function endTurn() {
 
     const stillAlive = alivePlayers();
     const total = Object.keys(players).length;
+
+    // ---------- SE.RA.PH: เดินวัน / จบคู่ดวล / จบรอบ / ประกาศผู้ชนะคนสุดท้าย ----------
+    if (Seraph.active()) {
+      if (seraphAdvance()) return;
+    }
 
     if (gameMode === "overload" && yuukiDefeated) {
       winningTeamId = null;
@@ -7465,6 +7627,9 @@ io.on('connection', (socket) => {
   }, 4);
   onPlayerEvent(socket, 'contractAnswer', (id, { accept, fromId } = {}) => withEffectSource(players[fromId] || players[id], () => answerContract(id, !!accept, fromId)), 4);
   onPlayerEvent(socket, 'attack', (id, { targetId } = {}) => doAttack(id, targetId), 6);
+  // SE.RA.PH: เลือกสถานที่ประจำวัน (option = แท่นที่โบสถ์ · targets = เป้าหมายที่ลง Matrix ที่สวนสาธารณะ)
+  onPlayerEvent(socket, 'seraphPlace', (id, { key, option, targets } = {}) =>
+    withEffectSource(players[id], () => Seraph.choosePlace(engine, id, key, { option, targets })), 8);
   onPlayerEvent(socket, 'nanayaToggleEye', (id) => nanayaToggleEye(id), 4);
   onPlayerEvent(socket, 'eijiOrdinalScale', (id) => withEffectSource(players[id], () => eijiOrdinalScale(id)), 8);
   onPlayerEvent(socket, 'nanayaCancelReattack', (id) => nanayaCancelReattack(id), 4);

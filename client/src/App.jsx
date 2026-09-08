@@ -6,6 +6,7 @@ import Setup from "./screens/Setup";
 import CharacterSelect from "./screens/CharacterSelect";
 import Lobby from "./screens/Lobby";
 import Game from "./screens/Game";
+import SeraphGame from "./seraph/SeraphGame";
 import VolumeControl from "./components/VolumeControl";
 import TransitionCurtain from "./components/TransitionCurtain";
 import GameIntro from "./components/GameIntro";
@@ -200,6 +201,8 @@ export default function App() {
     if (!inMatch) prevCycle.current = null;
 
     // โหมดประหยัด (patch 2.0.6): ข้ามวีดีโอคัตซีน — ระหว่างรอคนอื่นดูวีดีโอ เพลงเล่นต่อตามปกติ
+    // SE.RA.PH คุมเพลงของตัวเองใน SeraphGame — ห้ามให้เอฟเฟกต์เพลงกลางตรงนี้ทับ
+    if (state && state.seraph) return;
     if (phase === "CUTSCENE" && (!lowQ || mandatoryCutscene)) stopMusic();
     else if (skillMusic) playMusic(skillMusic, skillMusicSeq); // seq เปลี่ยน = การเปิดร่างใหม่ -> เริ่มเพลงใหม่
     else if (battle || phase === "CUTSCENE") playMusic(cycle === "night" ? "new_night" : "new_morning", cycleSeq.current);
@@ -299,6 +302,10 @@ export default function App() {
     // แมตช์เพิ่งเริ่ม -> เผยผู้เล่นทีละคนก่อนเสมอ (ควบคุมด้วย navigate เอง ไม่ผูกกับ state ของเกมที่เดินต่อไปเรื่อยๆ)
     screen = <GameIntro players={introPlayers} onDone={finishIntro} />;
     screenKey = "gameintro";
+  } else if (state.seraph) {
+    // SE.RA.PH Moon Cell: มีฉาก/HUD ของตัวเอง (วันที่ 5 ส่งต่อให้ <Game> ข้างในอีกที)
+    screen = <SeraphGame state={state} lowQ={lowQ} skillConfirmOn={skillConfirmOn} />;
+    screenKey = "game";
   } else {
     screen = <Game state={state} lowQ={lowQ} skillConfirmOn={skillConfirmOn} />;
     screenKey = "game";

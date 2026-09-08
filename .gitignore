@@ -14,3 +14,6 @@ client/public/characters/
 client/public/overload_force/
 # ไฟล์ไอเทม (ปืนหน่วย GUTS Select + คีย์/วีดีโอกระสุน) — เก็บบน R2 เหมือนกัน
 client/public/item/
+
+# สื่อโหมด SE.RA.PH Moon Cell (ฉากหลัง GIF ~18 MB + ภาพสถานที่ + เพลง/SFX) — เก็บบน R2 เหมือนสื่ออื่น
+client/public/mooncell/

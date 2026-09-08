@@ -148,6 +148,16 @@ const FILES = {
   lumi_voice_kohaku: "/characters/producer_lumi/kohaku/kohaku_idol_voice.m4a",
   lumi_luminous: "/characters/producer_lumi/luminus/luminus_song.m4a",
   byleth_hit: "/characters/byleth/hit_sound.mp3", // เสียงโจมตีของ "ดาบต้องสาป"
+  // ---------- SE.RA.PH Moon Cell (โหมดผจญภัย) — ดู SERAPH_SCENES.md §6 ----------
+  //  sc_day <-> sc_rest สลับกันหลายครั้งต่อวัน จึงอยู่กลุ่มตำแหน่งเดียวกัน (เล่นต่อจากวินาทีเดิม)
+  //  sc_duel_* อยู่คนละกลุ่ม -> เข้าวันที่ 5 ทีไรเริ่มจากต้นเสมอ (ต้องการความกระแทก)
+  sc_day: "/mooncell/theme/day1-4.mp3",
+  sc_rest: "/mooncell/theme/rest_time.mp3",
+  sc_duel_day: "/mooncell/day5theme/day_mooncell.mp3",
+  sc_duel_night: "/mooncell/day5theme/night_mooncell.mp3",
+  sc_glitch: "/mooncell/sond_effect/cut_glit.mp3",
+  sc_noti: "/mooncell/sond_effect/noti.mp3",
+  sc_noti2: "/mooncell/sond_effect/noti2.mp3",
   action_button: "/effect_sound/action_button.wav",
   trun_change: "/effect_sound/trun_change.wav",
   attack: "/effect_sound/attack.wav",
@@ -176,6 +186,8 @@ const MUSIC_POSITION_GROUPS = {
   byleth_normal_day: "byleth_normal", byleth_normal_night: "byleth_normal",
   byleth_ex_day: "byleth_ex", byleth_ex_night: "byleth_ex",
   byleth_end_day: "byleth_end", byleth_end_night: "byleth_end",
+  // SE.RA.PH: เพลงวันธรรมดา <-> เพลงช่วงพัก สลับกันวันละหลายรอบ ต้องไม่เริ่มนับหนึ่งใหม่ทุกครั้ง
+  sc_day: "seraph_field", sc_rest: "seraph_field",
 };
 
 // ระดับเสียงพื้นฐานต่อชนิด (ก่อนคูณ master) — บาลานซ์ให้ดังใกล้เคียงกัน
