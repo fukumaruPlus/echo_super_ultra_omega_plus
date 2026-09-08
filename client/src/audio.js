@@ -1,6 +1,6 @@
 ﻿// ============================================================
 //  ระบบเสียง ECHO + master volume
-//  - master volume คุมทุกเสียง: เพลงใช้ค่าตรงจากหลอด ส่วนเอฟเฟกต์/วีดีโอใช้ curve ยกกำลังสอง
+//  - เพลง/เอฟเฟกต์ใช้ค่าตรงจากหลอด · วีดีโอและเสียงลูปใช้ curve ยกกำลังสอง
 //  - เพลงเล่นต่อจากจุดเดิมเฉพาะ "ในแมตช์เดียวกัน" — เริ่มเกมใหม่รีเซ็ตทั้งหมด (resetMusicPositions)
 //  - เพลงสกิล/ท่าไม้ตาย: ส่ง seq มาด้วย ถ้า seq เปลี่ยน (เปิดท่าใหม่ / ถูกทับด้วยเพลงเดียวกัน
 //    ของอีกคน) เพลงจะเริ่มใหม่จากต้น
@@ -148,8 +148,7 @@ const FILES = {
   lumi_luminous: "/characters/producer_lumi/luminus/luminus_song.m4a",
   byleth_hit: "/characters/byleth/hit_sound.mp3", // เสียงโจมตีของ "ดาบต้องสาป"
   // ---------- SE.RA.PH Moon Cell (โหมดผจญภัย) — ดู SERAPH_SCENES.md §6 ----------
-  //  sc_day <-> sc_rest สลับกันหลายครั้งต่อวัน จึงอยู่กลุ่มตำแหน่งเดียวกัน (เล่นต่อจากวินาทีเดิม)
-  //  sc_duel_* อยู่คนละกลุ่ม -> เข้าวันที่ 5 ทีไรเริ่มจากต้นเสมอ (ต้องการความกระแทก)
+  //  แต่ละเพลงจำตำแหน่งของตัวเอง · วันดวลวันที่ 7 ใช้ seq ของรอบเพื่อเริ่มจากต้น
   sc_day: "/mooncell/theme/day1-4.mp3",
   sc_rest: "/mooncell/theme/rest_time.mp3",
   sc_duel_day: "/mooncell/day5theme/day_mooncell.mp3",
@@ -196,6 +195,8 @@ const MUSIC_BASE = 1;
 const SFX_BASE = 0.85;
 const CLICK_BASE = 0.55;
 const VIDEO_BASE = 0.8;
+const activeSfx = new Map();
+const musicSuspensions = new Set();
 
 // เพลงบางเพลงต้นฉบับดังกว่าเพลงอื่นมาก (เพลงคุวากาตะทั้ง 2 แบบ) — ลดเฉพาะตัวให้สมดุลกับเพลงอื่น
 const MUSIC_TRACK_SCALE = {
@@ -230,6 +231,7 @@ export function setMasterVolume(v) {
   try { localStorage.setItem("echo_vol", String(masterVolume)); } catch {}
   if (currentMusic) getMusic(currentMusic).volume = trackVolume(currentMusic);
   if (loopSfx) loopSfx.volume = SFX_BASE * vcurve(); // ลูปเสียงเฉพาะกิจต้องตามหลอดเสียงด้วย
+  for (const [a, base] of activeSfx) a.volume = base * masterVolume;
   volListeners.forEach((fn) => fn(masterVolume));
 }
 
@@ -245,20 +247,42 @@ function getMusic(name) {
     const a = new Audio(sequence ? sequence[0] : FILES[name]);
     a.loop = !sequence;
     a._echoSequenceStage = 0;
+    a.addEventListener("playing", () => {
+      // A delayed play() must not revive a track after a cutscene or another song took over.
+      if (currentMusic !== name || musicSuspensions.size) a.pause();
+    });
     if (sequence) {
       a.addEventListener("ended", () => {
-        if (currentMusic !== name) return;
+        if (currentMusic !== name || musicSuspensions.size) return;
         a._echoSequenceStage = 1;
         a.src = sequence[1];
         a.loop = true;
         a.currentTime = 0;
-        a.play().catch(() => {});
+        playCurrentMusic(name, a);
       });
     }
     musicCache[name] = a;
   }
   musicCache[name].volume = trackVolume(name);
   return musicCache[name];
+}
+
+function playCurrentMusic(name, a) {
+  if (musicSuspensions.size || currentMusic !== name) return;
+  a.play().then(() => {
+    if (musicSuspensions.size || currentMusic !== name) a.pause();
+  }).catch(() => {});
+}
+
+// Foreground video/voice owns the audio until its component releases this lease.
+export function suspendMusic() {
+  const token = {};
+  musicSuspensions.add(token);
+  for (const a of Object.values(musicCache)) a.pause();
+  return () => {
+    if (!musicSuspensions.delete(token)) return;
+    if (!musicSuspensions.size && currentMusic) playMusic(currentMusic);
+  };
 }
 
 // seq: identity ของการเปิดเพลงสกิล — เปิดท่าใหม่/คนใหม่ทับเพลงเดิม = seq ใหม่ -> เริ่มจากต้น
@@ -290,13 +314,10 @@ export function playMusic(name, seq) {
     const dur = a.duration;
     try { a.currentTime = dur && isFinite(dur) && dur > 0 ? carryPos % dur : carryPos; } catch { /* metadata ยังไม่มา */ }
   }
-  if (currentMusic === name) {
-    if (isNewSeq || a.paused) a.play().catch(() => {}); // ไม่ใช่ seq ใหม่ = เล่นต่อจากตำแหน่งเดิม
-    return;
-  }
-  if (currentMusic) getMusic(currentMusic).pause(); // พักเพลงเดิม เก็บตำแหน่งไว้ (ในแมตช์)
+  const changed = currentMusic !== name;
   currentMusic = name;
-  a.play().catch(() => {}); // seq เดิม (เช่น กลับมาหลัง cutscene) -> เล่นต่อจากจุดเดิม ไม่เริ่มใหม่
+  stopMusicExcept(name);
+  if (changed || isNewSeq || a.paused) playCurrentMusic(name, a);
 }
 // หยุดทุกแทร็กยกเว้นตัวที่ระบุ — ตาข่ายกันเพลงซ้อน
 //  playMusic พักเฉพาะแทร็กที่ currentMusic ชี้อยู่ ถ้าตัวแปรนั้นหลุดซิงก์เมื่อไหร่
@@ -307,12 +328,10 @@ export function stopMusicExcept(keep) {
     if (name === keep) continue;
     if (!a.paused) a.pause();
   }
-  if (keep == null) currentMusic = null;
+  if (currentMusic !== keep) currentMusic = musicCache[keep] ? keep : null;
 }
 export function stopMusic() {
-  if (!currentMusic) return;
-  getMusic(currentMusic).pause(); // พักไว้ ไม่รีเซ็ต -> กลับมาเล่นต่อจากจุดเดิม (ในแมตช์)
-  currentMusic = null;
+  stopMusicExcept(null);
 }
 // เริ่มเกมใหม่ / จบแมตช์: รีเซ็ตตำแหน่งเพลงทุกเพลง -> ครั้งถัดไปเริ่มจากต้นทั้งหมด
 export function resetMusicPositions() {
@@ -334,9 +353,20 @@ export function resetMusicPositions() {
 export function playSfx(name) {
   if (!FILES[name]) return null;
   const a = new Audio(FILES[name]);
-  a.volume = (name === "action_button" ? CLICK_BASE : SFX_BASE) * vcurve();
-  a.play().catch(() => {});
+  const base = name === "action_button" ? CLICK_BASE : SFX_BASE;
+  a.volume = base * masterVolume;
+  activeSfx.set(a, base);
+  const release = () => activeSfx.delete(a);
+  a.addEventListener("ended", release);
+  a.addEventListener("pause", release);
+  a.addEventListener("error", release);
+  a.play().then(() => { if (!activeSfx.has(a)) a.pause(); }).catch(release);
   return a;
+}
+export function stopSfx(a) {
+  if (!a) return;
+  activeSfx.delete(a);
+  a.pause();
 }
 export function clickSound() { playSfx("action_button"); }
 
@@ -351,10 +381,12 @@ export function startLoopSfx(name) {
   const a = new Audio(FILES[name]);
   a.loop = true;
   a.volume = SFX_BASE * vcurve();
-  a.play().catch(() => {});
   loopSfx = a;
   musicDuck = DUCK_LEVEL;
   if (currentMusic) getMusic(currentMusic).volume = trackVolume(currentMusic);
+  const release = () => { if (loopSfx === a) stopLoopSfx(); };
+  a.addEventListener("error", release);
+  a.play().then(() => { if (loopSfx !== a) a.pause(); }).catch(release);
   return a;
 }
 export function stopLoopSfx() {
@@ -380,7 +412,52 @@ export const DOOM_WEAPON_SOUNDS = {
 function resumeCurrent() {
   if (currentMusic) {
     const a = getMusic(currentMusic);
-    if (a.paused) a.play().catch(() => {});
+    if (a.paused) playCurrentMusic(currentMusic, a);
   }
 }
-if (typeof window !== "undefined") window.addEventListener("pointerdown", resumeCurrent);
+if (typeof window !== "undefined") {
+  window.addEventListener("pointerdown", resumeCurrent);
+  window.addEventListener("keydown", resumeCurrent);
+}
+
+// Start a foreground clip and restore sound on the next gesture if autoplay required muting.
+// Cleanup prevents a rejected play promise from restarting a clip that has already unmounted.
+export function playCutsceneVideo(video) {
+  const releaseMusic = suspendMusic();
+  let disposed = false;
+  let awaitingGesture = false;
+  const updateVolume = () => { video.volume = videoVolume(); };
+  updateVolume();
+  video.currentTime = 0;
+  video.muted = false;
+  const play = () => video.play().then(() => {
+    if (disposed) video.pause();
+  });
+  const restoreSound = () => {
+    if (disposed || !awaitingGesture) return;
+    video.muted = false;
+    awaitingGesture = false;
+    play().catch(() => { if (!disposed) { video.muted = true; awaitingGesture = true; } });
+  };
+  if (typeof window !== "undefined") {
+    window.addEventListener("pointerdown", restoreSound);
+    window.addEventListener("keydown", restoreSound);
+  }
+  play().catch((error) => {
+    if (disposed || error?.name !== "NotAllowedError") return;
+    video.muted = true;
+    awaitingGesture = true;
+    play().catch(() => {});
+  });
+  const unsubscribe = onVolumeChange(updateVolume);
+  return () => {
+    disposed = true;
+    video.pause();
+    unsubscribe();
+    if (typeof window !== "undefined") {
+      window.removeEventListener("pointerdown", restoreSound);
+      window.removeEventListener("keydown", restoreSound);
+    }
+    releaseMusic();
+  };
+}

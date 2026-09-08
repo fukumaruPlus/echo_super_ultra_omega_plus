@@ -566,6 +566,11 @@ qtePending() / sweepQte()                กันสรุปรอบ + กว
 
 ## 8. คัตซีน / แปลงร่าง
 
+- **เสียงฝั่ง client:** `audioPolicy.js` กำหนดลำดับคัตซีน/เสียงพากย์ → เพลงสกิล → เพลงสนาม ทั้งเกมปกติและ Moon Cell
+  คัตซีนที่ถูกซ่อนจากผู้ชมไม่หยุดเพลงของผู้ชมคนนั้น · โหมดประหยัดเล่นเพลงต่อได้เมื่อข้ามวิดีโอ
+  `playCutsceneVideo()` พักเพลงด้วย `suspendMusic()` จนกว่าจะออกจากคลิป และคืนเสียงหลัง autoplay บังคับปิดเสียงเมื่อผู้เล่นคลิก/กดแป้นพิมพ์
+  เสียงพากย์ประกาศร่างต้องหยุดเมื่อออกจากฉาก · เสียงจบเทิร์นติดตามจาก PLAYING ผ่านคัตซีนถึง SUMMARY และเสียงโจมตีนับตาม `attack.id`
+
 - `TRANSFORMS` (`characters/_transforms.js`) = metadata ต่อ status key: `{ img, video, title, label, seconds, music, voice, afterReveal }`
 - `queueCutscene(p,key,onlyFor)` เข้าคิว · `triggerCutscene(p,key)` เล่นทันที (ครั้งแรกวีดีโอเต็ม ครั้งถัดไปแค่การ์ดแจ้งเตือน — ดู `p.cutsceneShown`)
 - `runCutsceneQueue(onDone)` `:2542` — ตั้ง `gameState = "CUTSCENE"` เล่นเรียงทีละคลิป แล้วเรียก `onDone`

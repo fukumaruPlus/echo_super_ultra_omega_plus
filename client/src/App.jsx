@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { socket } from "./socket";
 import { playMusic, playSfx, stopMusic, resetMusicPositions, DOOM_WEAPON_SOUNDS } from "./audio";
+import { musicForState, createPhaseSoundTracker } from "./audioPolicy";
 import Splash from "./screens/Splash";
 import Setup from "./screens/Setup";
 import CharacterSelect from "./screens/CharacterSelect";
@@ -177,7 +178,7 @@ export default function App() {
   }, []);
 
   // ---------- เพลงพื้นหลัง + เสียงเปลี่ยนเทิร์น ----------
-  const prevPhase = useRef(null);
+  const soundTracker = useRef(createPhaseSoundTracker());
   const prevInMatch = useRef(false);
   const prevCycle = useRef(null); // ช่วงเวลาเดิม (day/night) — เปลี่ยนเมื่อไหร่ เพลงประจำช่วงต้องเริ่มใหม่จากต้น
   const cycleSeq = useRef(0);     // seq เพลงกลางวัน/กลางคืน: +1 ทุกครั้งที่สลับช่วงเวลา -> เริ่มเพลงใหม่
@@ -189,7 +190,7 @@ export default function App() {
   useEffect(() => {
     // CUTSCENE: หยุดเพลงพื้นหลัง ปล่อยให้เสียงในวีดีโอเล่น (เพลงสกิลมาหลังวีดีโอ)
     // ร่างแปลง (Ginga/Unicorn): เพลงสกิลทับ | ช่วงต่อสู้: เพลงกลางวัน/กลางคืน | อื่นๆ: main_home
-    const seraphMode = !!(state && state.seraph);
+    const seraphMode = stage === "connected" && !!state?.seraph && !["LOBBY", "TEAM_MODE", "TEAM_SETUP"].includes(phase);
     const battle = phase === "PLAYING" || phase === "SUMMARY" || phase === "ATTACK" || phase === "ATTACKING" || phase === "TRANSITION";
     const inMatch = battle || phase === "CUTSCENE";
 
@@ -212,25 +213,24 @@ export default function App() {
     //  แต่ "เสียงเอฟเฟกต์" ด้านล่างต้องทำงานทุกโหมด (เดิม early-return ตรงนี้ทำให้เสียงหายไปทั้งโหมด)
     if (!seraphMode) {
       // โหมดประหยัด (patch 2.0.6): ข้ามวีดีโอคัตซีน — ระหว่างรอคนอื่นดูวีดีโอ เพลงเล่นต่อตามปกติ
-      if (phase === "CUTSCENE" && (!lowQ || mandatoryCutscene)) stopMusic();
-      else if (skillMusic) playMusic(skillMusic, skillMusicSeq); // seq เปลี่ยน = การเปิดร่างใหม่ -> เริ่มเพลงใหม่
-      else if (battle || phase === "CUTSCENE") playMusic(cycle === "night" ? "new_night" : "new_morning", cycleSeq.current);
-      else playMusic("main_home");
+      const track = musicForState(stage === "connected" ? state : null, { lowQ, cycleSeq: cycleSeq.current });
+      if (track.name) playMusic(track.name, track.seq);
+      else stopMusic();
     }
 
     // เปลี่ยนจาก "เลือกการ์ด" ไปสรุปผล -> เสียง trun_change (ยกเว้นเข้า cutscene)
-    if (prevPhase.current === "PLAYING" && phase && phase !== "PLAYING" && phase !== "CUTSCENE") {
+    const sounds = soundTracker.current(stage === "connected" ? state : null);
+    if (sounds.roundEnded) {
       playSfx("trun_change");
     }
     // เข้าเฟสโจมตี -> เสียง attack (DoomGuy: เสียงยิงตามอาวุธที่ถืออยู่ตอนโจมตี แทนเสียงทั่วไป)
-    if (prevPhase.current !== "ATTACKING" && phase === "ATTACKING") {
+    if (sounds.attack) {
       const doomWeapon = state?.attack?.byDoomWeapon;
       const doomShoot = doomWeapon && DOOM_WEAPON_SOUNDS[doomWeapon]?.shoot;
       const attackSound = state?.attack?.byAttackSound;
       playSfx(doomShoot || attackSound || "attack");
     }
-    prevPhase.current = phase;
-  }, [stage, phase, cycle, skillMusic, skillMusicSeq, lowQ, mandatoryCutscene, !!(state && state.seraph)]);
+  }, [stage, phase, cycle, skillMusic, skillMusicSeq, lowQ, mandatoryCutscene, state?.cutscene?.id, state?.attack?.id, state?.roundNumber, !!(state && state.seraph)]);
 
   const goCharacter = (n, pos) => {
     setName(n);

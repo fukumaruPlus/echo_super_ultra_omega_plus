@@ -10,7 +10,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { socket } from "../socket";
-import { playMusic, playSfx, stopMusic, stopMusicExcept } from "../audio";
+import { playMusic, playSfx, stopMusic, resetMusicPositions, stopLoopSfx } from "../audio";
+import { musicForState } from "../audioPolicy";
 import Game from "../screens/Game";
 import Arena from "./Arena";
 import PlaceSelect from "./PlaceSelect";
@@ -40,6 +41,11 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
   const bootShown = useRef(false);
   const prevOut = useRef(null);
 
+  useEffect(() => {
+    resetMusicPositions();
+    return () => { stopLoopSfx(); stopMusic(); };
+  }, []);
+
   // ---------- โหลดสื่อเป็นระลอกตามที่กำลังจะใช้จริง (assets.js) ----------
   //  ห้ามยิงทุกระลอกพร้อมกัน: สื่อทั้งชุด ~33 MB ถ้าโหลดพร้อมกันตอนเข้าเกมจะแย่งแบนด์วิดท์
   //  และเธรดถอดรหัสภาพกับ GIF ฉากหลังที่กำลังเล่นอยู่ = เกมกระตุกช่วงต้นเกม
@@ -55,18 +61,11 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
   // ---------- เพลง (SERAPH_SCENES.md §6) ----------
   //  คิดเป็น "แทร็กเดียวที่ควรดังตอนนี้" แล้วค่อยสั่งครั้งเดียว — กันเพลงซ้อน
   //  S6/S7 เปิดด้วยความเงียบ (null) เพราะความเงียบเป็นส่วนหนึ่งของฉาก
-  const wantTrack = !sc ? null
-    : (scene && (scene.kind === "pairing" || scene.kind === "duelIntro")) ? null
-    : sc.day === duelDay ? (sc.night ? "sc_duel_night" : "sc_duel_day")
-    : state.gameState === "SERAPH_PLACE" ? "sc_rest"
-    : "sc_day";
+  const { name: wantTrack, seq: trackSeq } = musicForState(state, { lowQ, scene: scene?.kind });
   useEffect(() => {
-    // stopMusicExcept ก่อนเสมอ: playMusic พักเฉพาะแทร็กที่ currentMusic ชี้อยู่
-    // ถ้าตัวแปรนั้นหลุดซิงก์เมื่อไหร่จะมีแทร็กเก่าค้างเล่นทับกัน
-    stopMusicExcept(wantTrack);
     if (!wantTrack) { stopMusic(); return; }
-    playMusic(wantTrack, wantTrack.startsWith("sc_duel") ? sc.cycleRound : undefined);
-  }, [wantTrack, sc && sc.cycleRound]);
+    playMusic(wantTrack, trackSeq);
+  }, [wantTrack, trackSeq]);
 
   // ---------- ล้างตัวเลือกค้างเมื่อเข้าเฟสเลือกสถานที่รอบใหม่ ----------
   useEffect(() => {

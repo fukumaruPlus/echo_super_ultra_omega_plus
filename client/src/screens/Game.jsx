@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Card from "../components/Card";
 import Button from "../components/Button";
 import { socket } from "../socket";
-import { clickSound, playSfx, startLoopSfx, stopLoopSfx, videoVolume, onVolumeChange, DOOM_WEAPON_SOUNDS } from "../audio";
+import { clickSound, playSfx, stopSfx, startLoopSfx, stopLoopSfx, playCutsceneVideo, suspendMusic, DOOM_WEAPON_SOUNDS } from "../audio";
 
 const P_DISPLAY = "var(--font-p-display)";
 const TEAM_COLORS = { A: "#22d3ee", B: "#f97316", C: "#a3e635" };
@@ -105,11 +105,7 @@ function Cutscene({ cs }) {
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
-    v.volume = videoVolume(); // ผ่าน master volume curve เดียวกับเสียงอื่น
-    v.currentTime = 0;
-    v.play().catch(() => { v.muted = true; v.play().catch(() => {}); }); // กัน autoplay block
-    // เลื่อนหลอดเสียงระหว่างวีดีโอ -> อัปเดตทันที
-    return onVolumeChange(() => { if (ref.current) ref.current.volume = videoVolume(); });
+    return playCutsceneVideo(v);
   }, [cs.id]); // remount ต่อ cutscene -> เล่นวีดีโอใหม่เสมอ (กันจอดำตอนท่าเดียวกันต่อกัน)
   useEffect(() => {
     // noIntro (โมโรโบชิ ดัน "ครูฝึกสุดเหี้ยม"): คลิปสั้นมาก — ข้ามการ์ดเปิดตัวไปเข้าวีดีโอเลย
@@ -166,10 +162,7 @@ function YunaCutscene({ cs }) {
     if (stage !== 1) return;
     const v = ref.current;
     if (!v) return;
-    v.volume = videoVolume();
-    v.currentTime = 0;
-    v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
-    return onVolumeChange(() => { if (ref.current) ref.current.volume = videoVolume(); });
+    return playCutsceneVideo(v);
   }, [cs.id, stage]);
 
   return (
@@ -229,10 +222,7 @@ function OverloadForceCutscene({ cs }) {
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
-    v.volume = videoVolume();
-    v.currentTime = 0;
-    v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
-    return onVolumeChange(() => { if (ref.current) ref.current.volume = videoVolume(); });
+    return playCutsceneVideo(v);
   }, [cs.id]);
   return (
     <div className="fixed inset-0 z-50 bg-black overflow-hidden">
@@ -376,8 +366,11 @@ function AttackFx({ a }) {
 //  แดง = สวมเกราะราชัน | เขียว = Beat Mode
 function TransformAnnounce({ cs }) {
   useEffect(() => {
-    if (cs.voice) playSfx(cs.voice); // เสียงแปลงร่าง เล่นต่อจากวีดีโอบนกระดาน
-  }, [cs.id]);
+    if (!cs.voice) return undefined;
+    const releaseMusic = suspendMusic();
+    const voice = playSfx(cs.voice);
+    return () => { stopSfx(voice); releaseMusic(); };
+  }, [cs.id, cs.voice]);
   const red = cs.kind === "rachan";
   return (
     <div className="fixed inset-0 z-50 grid place-items-center pointer-events-none overflow-hidden">
