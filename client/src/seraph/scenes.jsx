@@ -24,22 +24,21 @@ function useTimeline(steps, deps = []) {
    S0 — บูตระบบ SE.RA.PH · 4.2s
    แทน GameIntro เดิมของเกม เพราะของเดิมเผยหน้า+ชื่อตัวละครทุกคนตั้งแต่วินาทีแรก
    ========================================================================= */
-export function SeraphBoot({ players = [], onDone }) {
-  const [stage, setStage] = useState(0); // 0 ตาราง+ข้อความ · 1 โลโก้ · 2 วงกลมเงาดำ
+export function SeraphBoot({ players = [], day = 1, cycleRound = 1, onDone }) {
+  const [stage, setStage] = useState(0); // 0 ข้อความระบบ · 1 คำต้อนรับ · 2 วงกลมเงาดำ
   const [glitch, setGlitch] = useState(0);
 
   useTimeline([
     [0, () => playSfx("sc_noti")],
-    [1400, () => setGlitch((g) => g + 1)],
-    [1500, () => setStage(1)],
-    [2600, () => { setStage(2); playSfx("sc_noti2"); }],
-    [4200, () => onDone && onDone()]
+    [1300, () => setGlitch((g) => g + 1)],
+    [1400, () => setStage(1)],
+    [2800, () => { setStage(2); playSfx("sc_noti2"); }],
+    [4400, () => onDone && onDone()]
   ], [players.length]);
 
   const lines = useMemo(() => [
-    "> CONNECTING TO SE.RA.PH ...",
-    "> MOON CELL AUTOMATON : ONLINE",
-    `> PARTICIPANTS REGISTERED : ${players.length}`,
+    "> CONNECTING ...",
+    `> PARTICIPANTS : ${players.length}`,
     "> IDENTITY MASK : ENABLED",
     "> ELIMINATION CYCLE : 5 DAYS"
   ], [players.length]);
@@ -54,9 +53,10 @@ export function SeraphBoot({ players = [], onDone }) {
         </div>
       )}
 
+      {/* คำต้อนรับ — ชื่อโหมดคือ "Moon Cell" (ไม่ใช่ SE.RA.PH ซึ่งเป็นชื่อของโลกที่เกมตั้งอยู่) */}
       {stage === 1 && (
-        <div className="absolute inset-0 grid place-items-center">
-          {/* โลโก้ประกอบร่างจากเศษข้อมูลที่บินมารวมกัน */}
+        <div className="absolute inset-0 grid place-items-center px-6">
+          {/* เศษข้อมูลบินมารวมกันเป็นตัวหนังสือ */}
           {Array.from({ length: 22 }, (_, i) => {
             const a = (i / 22) * Math.PI * 2;
             return (
@@ -75,8 +75,37 @@ export function SeraphBoot({ players = [], onDone }) {
               />
             );
           })}
-          <div className="glitch-p text-4xl sm:text-6xl font-black italic tracking-[0.18em]" data-text="SE.RA.PH" style={{ fontFamily: PD }}>
-            SE.RA.PH
+          <div className="relative flex flex-col items-center gap-2 text-center">
+            <div
+              className="text-lg sm:text-2xl font-bold text-white/90"
+              style={{ fontFamily: PD, animation: "scBannerIn 500ms both" }}
+            >
+              ยินดีต้อนรับสู่
+            </div>
+            <div
+              className="glitch-p text-5xl sm:text-7xl font-black italic tracking-[0.14em] leading-none"
+              data-text="Moon Cell"
+              style={{ fontFamily: PD }}
+            >
+              Moon Cell
+            </div>
+            <div
+              className="mt-1 h-[3px] w-[min(60vw,420px)]"
+              style={{
+                background: "linear-gradient(90deg, transparent, var(--color-sc-cyan), transparent)",
+                transform: "skewX(-24deg)",
+                animation: "bannerUnderline 320ms 260ms ease-out both"
+              }}
+            />
+            <div
+              className="mt-2 flex items-baseline gap-4"
+              style={{ fontFamily: PD, animation: "scBannerIn 460ms 420ms both" }}
+            >
+              <span className="text-2xl sm:text-4xl font-black text-white">วันที่ {day}</span>
+              <span className="text-lg sm:text-2xl font-black" style={{ color: "var(--color-sc-cyan)" }}>
+                รอบ {cycleRound}
+              </span>
+            </div>
           </div>
         </div>
       )}

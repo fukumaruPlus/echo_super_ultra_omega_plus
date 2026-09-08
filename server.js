@@ -1119,7 +1119,7 @@ function modeOptionsFor(count = Object.keys(players).length) {
   return [
     { mode: "ffa", label: "Free For All", size: 1, enabled: validGameMode("ffa", count) },
     { mode: "overload", label: "Over Load", size: 1, enabled: validGameMode("overload", count) },
-    { mode: "seraph", label: "SE.RA.PH Moon Cell", size: 1, enabled: validGameMode("seraph", count) },
+    { mode: "seraph", label: "Moon Cell", size: 1, enabled: validGameMode("seraph", count) },
     { mode: "duo", label: "Duo", size: 2, enabled: validGameMode("duo", count) },
     { mode: "trio", label: "Trio", size: 3, enabled: validGameMode("trio", count) },
   ];

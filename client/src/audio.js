@@ -186,8 +186,10 @@ const MUSIC_POSITION_GROUPS = {
   byleth_normal_day: "byleth_normal", byleth_normal_night: "byleth_normal",
   byleth_ex_day: "byleth_ex", byleth_ex_night: "byleth_ex",
   byleth_end_day: "byleth_end", byleth_end_night: "byleth_end",
-  // SE.RA.PH: เพลงวันธรรมดา <-> เพลงช่วงพัก สลับกันวันละหลายรอบ ต้องไม่เริ่มนับหนึ่งใหม่ทุกครั้ง
-  sc_day: "seraph_field", sc_rest: "seraph_field",
+  // SE.RA.PH: **ห้ามจับ sc_day กับ sc_rest เป็นกลุ่มเดียวกัน** — กลุ่มตำแหน่งมีไว้สำหรับ
+  //  "เพลงเดียวกันคนละเวอร์ชัน" (กลางวัน/กลางคืนของหลักสูตรไบเลธ) เท่านั้น
+  //  สองเพลงนี้เป็นคนละเพลงกันและยาวไม่เท่ากัน: ถ้าอยู่กลุ่มเดียวกัน ตอนสลับจะ carry ตำแหน่งข้ามมา
+  //  แล้วเพลงใหม่ที่ยังไม่โหลด metadata จะมี duration = NaN -> seek เลยจุดจบเพลง = เงียบสนิท
 };
 
 // ระดับเสียงพื้นฐานต่อชนิด (ก่อนคูณ master) — บาลานซ์ให้ดังใกล้เคียงกัน

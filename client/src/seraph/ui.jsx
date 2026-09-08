@@ -106,6 +106,7 @@ export function SeraphBackground({ phase = "draw", night = false, hot = false, g
     <div className="sc-bg">
       {/* key = src: เปลี่ยนฉากหลังแล้วให้ <img> สร้างใหม่ GIF จะได้เริ่มเฟรมแรก */}
       <img key={src} src={src} alt="" className="sc-bg-img" />
+      <span className="sc-bg-dim" />
       <span className={`sc-bg-tint ${tint}`} />
       {gridCls && <span className={gridCls} />}
       <span className="sc-scanlines" />

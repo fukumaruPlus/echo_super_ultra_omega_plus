@@ -34,8 +34,15 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
   const prevOut = useRef(null);
 
   // ---------- โหลดสื่อเป็นระลอกตามที่กำลังจะใช้จริง (assets.js) ----------
+  //  ห้ามยิงทุกระลอกพร้อมกัน: สื่อทั้งชุด ~33 MB ถ้าโหลดพร้อมกันตอนเข้าเกมจะแย่งแบนด์วิดท์
+  //  และเธรดถอดรหัสภาพกับ GIF ฉากหลังที่กำลังเล่นอยู่ = เกมกระตุกช่วงต้นเกม
   useEffect(() => { preloadWave1(); }, []);
-  useEffect(() => { preloadWave2(); }, []);
+  useEffect(() => {
+    // ระลอก 2 (ฉากพัก + ภาพสถานที่) แอบโหลดตอนเครื่องว่าง หลังฉากเปิดเล่นจบแล้ว
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 5000));
+    const id = idle(() => preloadWave2(), { timeout: 9000 });
+    return () => { if (window.cancelIdleCallback) window.cancelIdleCallback(id); else clearTimeout(id); };
+  }, []);
   useEffect(() => { if (sc && sc.day >= 4) preloadWave3(sc.night); }, [sc && sc.day, sc && sc.night]);
 
   // ---------- เพลง (SERAPH_SCENES.md §6) ----------
@@ -121,7 +128,7 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
   // ---------- ฉากซ้อนทับ ----------
   let overlay = null;
   if (scene) {
-    if (scene.kind === "boot") overlay = <SeraphBoot players={state.players} onDone={closeScene} />;
+    if (scene.kind === "boot") overlay = <SeraphBoot players={state.players} day={sc.day} cycleRound={sc.cycleRound} onDone={closeScene} />;
     else if (scene.kind === "day") overlay = <DayBanner day={scene.day} short={scene.short} onDone={closeScene} />;
     else if (scene.kind === "day5") overlay = <Day5Intro players={state.players} night={sc.night} onDone={closeScene} />;
     else if (scene.kind === "pairing") {

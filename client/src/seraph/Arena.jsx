@@ -15,6 +15,17 @@ import { SeraphBackground, DayRail, MatrixSlots, WatchedFrame } from "./ui";
 const PD = "var(--font-p-display)";
 const CARD_COLOR = { red: "#e2564a", blue: "#4a8fe2", green: "#4ae27a", yellow: "#e2c74a" };
 
+// ---------- ผังสนาม (ตัวเลขทั้งหมดรวมไว้ที่เดียว แก้ที่นี่จุดเดียว) ----------
+//  เผื่อที่ให้แถบหัวจอ (~11%) และแผง HUD ล่าง (~16%) เสมอ วงรีจึงอยู่ในช่วง 29%-67%
+//  ry = 22 มาจากการวัดจริง: ถ้ามีผู้เล่น 2 คน การ์ดฝั่งหลังจะอยู่ "เหนือกองไพ่พอดี" (มุม 270 องศา)
+//  ค่าต่ำกว่านี้การ์ดจะทับกองไพ่ ค่าสูงกว่านี้การ์ดจะชนแถบหัวจอ
+const RING = { cx: 50, cy: 48, rx: 33, ry: 22 };  // ศูนย์กลางวงรี + รัศมี (หน่วย % ของจอ)
+const CORE = { x: 50, y: 42 };                    // กองไพ่กลาง — เยื้องลงจากศูนย์วงรีให้พ้นการ์ดฝั่งหลัง
+//  ขนาดการ์ด: โหมดปกติใช้ w-28 h-32 (112x128px) — ของโหมดนี้ต้อง "ใหญ่กว่า" ไม่ใช่เล็กกว่า
+const PLATE_W = 124;        // ผู้เล่นอื่น
+const PLATE_W_SELF = 176;   // ตัวเรา
+const PLATE_RATIO = 1.24;   // สูง = กว้าง x ค่านี้
+
 /** ตำแหน่งบนวงรี: มุม a -> พิกัด % + ความลึก (0 = หลังสุด, 1 = หน้าสุด) */
 function ringPos(i, n, selfIndex) {
   // หมุนให้ "ตัวเรา" มาอยู่หน้าสุดเสมอ (มุม 90° = ด้านล่างจอ)
@@ -22,16 +33,17 @@ function ringPos(i, n, selfIndex) {
   const a = ((i - offset) / n) * Math.PI * 2 + Math.PI / 2;
   const depth = (Math.sin(a) + 1) / 2;           // 0 หลังสุด -> 1 หน้าสุด
   return {
-    x: 50 + Math.cos(a) * 34,                     // วงรี: กว้างกว่าสูง = มุมมองเฉียง
-    y: 40 + Math.sin(a) * 20,
+    x: RING.cx + Math.cos(a) * RING.rx,           // วงรี: กว้างกว่าสูง = มุมมองเฉียง
+    y: RING.cy + Math.sin(a) * RING.ry,
     depth,
-    scale: 0.62 + depth * 0.5,                    // หน้าใหญ่ หลังเล็ก
+    // ย่อตามระยะลึกแค่พอให้รู้สึกมีมิติ — เดิมย่อถึง 0.62 ทำให้การ์ดหลังเหลือ ~57px (เล็กกว่าโหมดปกติครึ่งหนึ่ง)
+    scale: 0.86 + depth * 0.2,
     z: Math.round(depth * 100)
   };
 }
 
 /** ไพ่ที่กางออกจากแผ่นเข้าหาแกนกลาง */
-function CardFan({ cards, count, mine, spread = 15 }) {
+function CardFan({ cards, count, mine, spread = 15, big = false }) {
   const n = mine ? (cards ? cards.length : 0) : count || 0;
   if (!n) return null;
   const list = Array.from({ length: n }, (_, i) => i);
@@ -45,8 +57,10 @@ function CardFan({ cards, count, mine, spread = 15 }) {
             key={i}
             className="sc-fan-card"
             style={{
-              left: -10,
-              transform: `rotate(${rot}deg) translateY(-26px)`,
+              width: big ? 28 : 22,
+              height: big ? 39 : 31,
+              left: big ? -14 : -11,
+              transform: `rotate(${rot}deg) translateY(${big ? -38 : -30}px)`,
               animationDelay: `${i * 45}ms`,
               background: c
                 ? `linear-gradient(150deg, ${CARD_COLOR[c.color] || "#888"}, #0b1016)`
@@ -55,7 +69,7 @@ function CardFan({ cards, count, mine, spread = 15 }) {
             }}
           >
             {c && (
-              <span className="absolute inset-0 grid place-items-center text-[11px] font-black text-white">
+              <span className={`absolute inset-0 grid place-items-center font-black text-white ${big ? "text-sm" : "text-[11px]"}`}>
                 {c.special ? "★" : c.value}
               </span>
             )}
@@ -68,8 +82,8 @@ function CardFan({ cards, count, mine, spread = 15 }) {
 
 /** แผ่นข้อมูลผู้เล่น 1 คน */
 function PlayerPlate({ p, pos, mine, matrixLv, isFoe, phase }) {
-  const w = mine ? 132 : 92;
-  const h = mine ? 168 : 116;
+  const w = mine ? PLATE_W_SELF : PLATE_W;
+  const h = Math.round(w * PLATE_RATIO);
   const hidden = p.scHidden;
   const live = !p.locked && p.alive && phase === "draw";
   return (
@@ -89,7 +103,7 @@ function PlayerPlate({ p, pos, mine, matrixLv, isFoe, phase }) {
         animationDelay: `${pos.z * 3}ms`
       }}
     >
-      <CardFan cards={p.cards} count={p.cardCount} mine={mine} />
+      <CardFan cards={p.cards} count={p.cardCount} mine={mine} big={mine} />
 
       <div className="sc-plate-body" style={{ height: h }}>
         {/* ภาพตัวละคร — เงาดำล้วนถ้ายังไม่เคยเห็นตัวตน */}
@@ -111,21 +125,21 @@ function PlayerPlate({ p, pos, mine, matrixLv, isFoe, phase }) {
         </span>
 
         <div className="absolute inset-x-0 bottom-0 p-1.5 flex flex-col gap-0.5">
-          <span className="text-[10px] font-black text-white leading-none truncate" style={{ fontFamily: PD }}>
+          <span className={`font-black text-white leading-tight truncate ${mine ? "text-sm" : "text-xs"}`} style={{ fontFamily: PD }}>
             {p.name}
           </span>
-          <span className={`text-[9px] leading-none truncate ${hidden ? "sc-unknown" : ""}`} style={hidden ? undefined : { color: p.color }}>
+          <span className={`leading-none truncate ${mine ? "text-[11px]" : "text-[10px]"} ${hidden ? "sc-unknown" : ""}`} style={hidden ? undefined : { color: p.color }}>
             {hidden ? "???" : (p.character && p.character.name) || ""}
           </span>
         </div>
 
         {/* แถบบนสุด: จำนวนไพ่ + สถานะเปิดไพ่ */}
         <div className="absolute top-1 inset-x-1 flex items-center justify-between">
-          <span className="sc-sysline text-[9px] leading-none px-1" style={{ background: "rgba(0,0,0,.6)" }}>
+          <span className="sc-sysline text-[11px] leading-none px-1" style={{ background: "rgba(0,0,0,.65)" }}>
             {/* Matrix ระดับ 1 = เห็นจำนวนไพ่แบบเรียลไทม์ (คนอื่นไม่รู้ตัว) */}
             {mine || matrixLv >= 1 ? `🂠${p.cardCount}` : "🂠?"}
           </span>
-          {p.locked && <span className="text-[9px] text-echo-gold leading-none">✔</span>}
+          {p.locked && <span className="text-sm text-echo-gold leading-none">✔</span>}
         </div>
 
         {/* Matrix ระดับ 3 = เห็นแต้มของเขาตลอดเวลา */}
@@ -183,8 +197,6 @@ export default function Arena({ state, onHit, onLock }) {
   const selfIndex = players.findIndex((p) => p.id === state.youId);
   const layout = players.map((p, i) => ({ p, pos: ringPos(i, players.length, selfIndex) }));
 
-  // แกนกลางอยู่ที่ 50% / 40% ของกรอบ — ใช้พิกัดเดียวกันทั้งลำแสงและ SVG
-  const CORE = { x: 50, y: 40 };
   const canAct = me && me.alive && !me.locked && state.gameState === "PLAYING";
 
   return (
@@ -193,12 +205,13 @@ export default function Arena({ state, onHit, onLock }) {
       <WatchedFrame on={sc.watchedBy > 0} />
 
       {/* ---------- แถบบน: วัน + นับถอยหลัง ---------- */}
-      <div className="absolute top-0 inset-x-0 z-30 p-2 sm:p-3 flex items-start justify-between gap-2 pointer-events-none">
-        <div>
-          <div className="sc-sysline text-[10px] sm:text-xs opacity-80">
-            {`> CYCLE ${sc.cycleRound} · DAY ${sc.day}/${sc.daysTotal}`}
+      <div className="absolute top-0 inset-x-0 z-30 px-3 pt-2 pb-1 flex items-start justify-between gap-3 pointer-events-none">
+        <div className="min-w-0">
+          <div className="sc-sysline text-[10px] sm:text-xs opacity-80 truncate">
+            {`> รอบ ${sc.cycleRound} · วันที่ ${sc.day}/${sc.daysTotal}`}
           </div>
-          <div className="text-xl sm:text-3xl font-black italic text-white leading-none" style={{ fontFamily: PD }}>
+          {/* leading-tight ไม่ใช่ leading-none: ฟอนต์ไทยมีสระบน/ล่าง ถ้าบีบบรรทัดสนิทหัวอักษรจะโดนตัด */}
+          <div className="text-2xl sm:text-4xl font-black italic text-white leading-tight truncate" style={{ fontFamily: PD }}>
             {sc.day === 5 ? "วันคัดออก" : "วันสืบสวน"}
           </div>
           {sc.myOpponent && (
@@ -269,7 +282,7 @@ export default function Arena({ state, onHit, onLock }) {
               </span>
             </div>
           </div>
-          <div className="sc-sysline text-[9px] text-center mt-1 opacity-70">DECK</div>
+          <div className="sc-sysline text-[10px] text-center mt-1 opacity-75">DECK</div>
         </div>
 
         {/* แผ่นผู้เล่นทุกคน */}
