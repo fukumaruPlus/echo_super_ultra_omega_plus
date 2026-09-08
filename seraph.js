@@ -1,12 +1,12 @@
 // ============================================================
-//  SE.RA.PH Moon Cell — โหมดผจญภัย (รอบละ 5 วัน)
+//  SE.RA.PH Moon Cell — โหมดผจญภัย (รอบละ 7 วัน)
 //  กติกา: SERAPH_MOONCELL.md · งานภาพ: SERAPH_SCENES.md
 //
 //  โมดูลนี้ถือ state ของ "โหมด" ทั้งหมด (วัน/เฟส/คู่ดวล/คิว) แล้วให้ server.js
 //  เรียกผ่านจุดเชื่อมที่กำหนดไว้ไม่กี่จุด — ไม่ require server.js กลับ (จะ circular)
 //  เข้าถึง state ของเกมผ่าน engine.* เหมือน characters/<id>.js ทุกตัว
 //
-//  หลักการ: วันที่ 1-4 = แข่งแต้มล้วน ไม่มีดาเมจ ไม่มีสกิล · วันที่ 5 = ดวลคัดออกตัวต่อตัว
+//  หลักการ: วันที่ 1-6 = แข่งแต้มล้วน ไม่มีดาเมจ ไม่มีสกิล · วันที่ 7 = ดวลคัดออกตัวต่อตัว
 // ============================================================
 
 // ---------- ค่าเริ่มต้นของผู้เล่น (SERAPH_MOONCELL.md §2) ----------
@@ -20,9 +20,10 @@ const MAX_SKILL_LEVEL = 6;
 
 const MATRIX_MAX = 4;          // สะสมได้สูงสุด 4 แต้ม
 const MATRIX_PER_TARGET = 3;   // ลงบนเป้าหมายเดียวได้สูงสุด 3
-const DAYS_PER_CYCLE = 5;
+const INVESTIGATION_DAYS = 6;
+const DAYS_PER_CYCLE = INVESTIGATION_DAYS + 1;
 const PAIRING_DAY = 2;         // จบวันนี้ = ประกาศคู่ดวล
-const DUEL_DAY = 5;
+const DUEL_DAY = DAYS_PER_CYCLE;
 
 const PLACE_SECONDS = 20;      // เวลาเลือกสถานที่ (SERAPH_SCENES.md S4)
 const DUEL_START_SKILL = 4;    // แต้มสกิลตอนเริ่มดวล
@@ -31,7 +32,7 @@ const CYCLE_END_GOLD = 5;      // จบรอบทุกคนได้ +5
 // ระดับทักษะ -> tier ที่ปลดล็อก (SERAPH_MOONCELL.md §3)
 const UNLOCK_AT = { basic: 1, secondary: 3, ultimate: 6 };
 
-const PLACES = ["room", "church", "park", "library", "store"];
+const PLACES = ["room", "church", "park", "library"];
 const PLACE_NAME = {
   room: "ห้องพัก", church: "โบสถ์", park: "สวนสาธารณะ",
   library: "ห้องสมุด", store: "ร้านสะดวกซื้อ"
@@ -57,14 +58,15 @@ let cycleRound = 1;
 let phase = "draw";      // draw | place | duel
 let places = {};         // { playerId: placeKey } ของวันนี้
 let placeDone = {};      // { playerId: true } ส่งผลเรียบร้อยแล้ว
-let pairs = [];          // มีได้แค่ 1 คู่ต่อรอบ (กติกา: วันที่ 5 ดวลคู่เดียวแล้ววนกลับ)
+let ready = {};          // ยืนยันจบวันแล้ว: ซื้อของ/เลือกสถานที่เพิ่มไม่ได้
+let pairs = [];          // มีได้แค่ 1 คู่ต่อรอบ (กติกา: วันที่ 7 ดวลคู่เดียวแล้ววนกลับ)
 let byeIds = [];         // ทุกคนที่เหลือ = ผ่านเข้ารอบถัดไปโดยไม่ต้องดวล
 let duelIndex = 0;       // คู่ที่กำลังลงสนาม
 let pendingLog = [];
 
 function reset() {
   on = false; day = 1; cycleRound = 1; phase = "draw";
-  places = {}; placeDone = {}; pairs = []; byeIds = []; duelIndex = 0;
+  places = {}; placeDone = {}; ready = {}; pairs = []; byeIds = []; duelIndex = 0;
   onAllPlaced = null;
   pendingLog = [];
 }
@@ -75,7 +77,7 @@ const currentDay = () => day;
 const currentCycle = () => cycleRound;
 const currentPhase = () => phase;
 const isDuelDay = () => on && day === DUEL_DAY;
-/** วันที่ 1-4: ไม่มีดาเมจ ไม่มีสกิล ไม่มีเฟสโจมตี (SERAPH_MOONCELL.md §5) */
+/** วันที่ 1-6: ไม่มีดาเมจ ไม่มีสกิล ไม่มีเฟสโจมตี (SERAPH_MOONCELL.md §5) */
 const noCombat = () => on && day < DUEL_DAY;
 /** รอบเลขคู่ = กลางคืนทั้งรอบ (SERAPH_SCENES.md §6 — 1 รอบ = 1 ช่วงเวลา) */
 const isNight = () => on && cycleRound % 2 === 0;
@@ -87,7 +89,7 @@ function startMatch(engine) {
   reset();
   on = true;
   for (const p of Object.values(engine.players)) initPlayer(engine, p);
-  pendingLog.push(`🌙 SE.RA.PH Moon Cell — รอบที่ ${cycleRound} เริ่มขึ้น · วันที่ 1 จาก 5`);
+  pendingLog.push(`🌙 SE.RA.PH Moon Cell — รอบที่ ${cycleRound} เริ่มขึ้น · วันที่ 1 จาก ${DAYS_PER_CYCLE}`);
 }
 
 /** ค่าเริ่มต้นรายผู้เล่น — **ค่าพลังเดิมของตัวละครถูกละทิ้งทั้งหมด ทุกตัวเท่ากันหมด** */
@@ -99,7 +101,7 @@ function initPlayer(engine, p) {
   p.scMatrix = 0;              // แต้มที่ถืออยู่ (ยังไม่ได้ลง)
   p.scPlaced = {};             // { targetId: 1..3 } แต้มที่ลงบนคนอื่น
   p.scSeen = [];               // playerId ที่เราเคยเห็นตัวละครแล้ว (เห็นของตัวเองเสมอ)
-  p.scSpectator = false;       // วันที่ 5: ไม่ได้ลงสนามคู่นี้
+  p.scSpectator = false;       // วันที่ 7: ไม่ได้ลงสนามคู่นี้
   p.scEliminated = false;
   p.hp = START_HP;
   p.armor = START_ARMOR;
@@ -146,7 +148,7 @@ function deckCards(CARD_COLORS) {
 
 // ============================================================
 //  ใครลงสนามในเทิร์นนี้
-//   วันที่ 1-4 = ทุกคนที่ยังไม่ตกรอบ · วันที่ 5 = เฉพาะคู่ที่กำลังดวล
+//   วันที่ 1-6 = ทุกคนที่ยังไม่ตกรอบ · วันที่ 7 = เฉพาะคู่ที่กำลังดวล
 // ============================================================
 function combatants(engine) {
   const alive = Object.values(engine.players).filter((p) => p.alive && !p.scEliminated);
@@ -181,7 +183,7 @@ function onDealRound(engine) {
 }
 
 // ============================================================
-//  วันที่ 1-4: ผู้ชนะรับรางวัลแทนเฟสโจมตี (SERAPH_MOONCELL.md §5 ขั้นที่ 2)
+//  วันที่ 1-6: ผู้ชนะรับรางวัลแทนเฟสโจมตี (SERAPH_MOONCELL.md §5 ขั้นที่ 2)
 // ============================================================
 function onRoundWinner(engine, w) {
   if (!noCombat() || !w) return;
@@ -193,7 +195,7 @@ function onRoundWinner(engine, w) {
 }
 
 // ============================================================
-//  เฟสเลือกสถานที่ (S4) — เปิดหลังสรุปแต้มของวันที่ 1-4
+//  เฟสเลือกสถานที่ (S4) — เปิดหลังสรุปแต้มของวันที่ 1-6
 // ============================================================
 // server.js เป็นเจ้าของ startPhaseTimer/clearPhaseTimer (มีตัวเดียวทั้งเกม) โมดูลนี้จึงถือแค่ข้อมูล
 // แล้วให้ server เป็นคนตั้งเวลา/ปิดเฟส — onAllPlaced คือ callback ที่ server ฝากไว้ให้เรียกเมื่อครบคน
@@ -203,6 +205,7 @@ function startPlacePhase(engine, allPlacedCb) {
   phase = "place";
   places = {};
   placeDone = {};
+  ready = {};
   onAllPlaced = allPlacedCb;
   for (const p of Object.values(engine.players)) { p.scPlace = null; p.scPlaceResult = null; }
 }
@@ -216,16 +219,33 @@ function finishPlacePhase(engine) {
 
 /** ยังมีคนที่ยังไม่ส่งผลอยู่ไหม */
 function placePending(engine) {
-  return Object.values(engine.players).filter((p) => p.alive && !p.scEliminated && !placeDone[p.id]);
+  return Object.values(engine.players).filter((p) => p.alive && !p.scEliminated && !ready[p.id]);
+}
+
+function canShop(p) {
+  return !!(noCombat() && phase === "place" && p && p.alive && !p.scEliminated && !ready[p.id]);
+}
+
+function readyPlace(engine, id) {
+  const p = engine.players[id];
+  if (!canShop(p)) return;
+  ready[id] = true;
+  if (!placePending(engine).length && onAllPlaced) {
+    const done = onAllPlaced;
+    onAllPlaced = null;
+    done();
+  } else engine.broadcastState();
 }
 
 /** หมดเวลาแล้วยังไม่เลือก -> สุ่มให้ (ธรรมเนียมเดียวกับเฟส ATTACK) */
 function autoAssign(engine) {
   for (const p of placePending(engine)) {
+    if (placeDone[p.id]) { ready[p.id] = true; continue; }
     const options = PLACES.filter((k) => placeAvailable(engine, p, k));
     const key = options[Math.floor(Math.random() * options.length)] || "room";
     engine.log(`⏱️ ${p.name} ไม่ได้เลือกทันเวลา — ระบบจัดให้ที่ ${PLACE_NAME[key]}`);
     applyPlace(engine, p, key, {});
+    ready[p.id] = true;
   }
 }
 
@@ -233,21 +253,17 @@ function autoAssign(engine) {
 function placeAvailable(engine, p, key) {
   if (key === "park") return (p.scMatrix || 0) > 0;
   if (key === "library") return (p.scSkillLevel || 1) < MAX_SKILL_LEVEL;
-  if (key === "store") return (p.gold || 0) > 0;
-  return true;
+  return PLACES.includes(key);
 }
 
 /** ผู้เล่นเลือกสถานที่ + ส่งตัวเลือกย่อยมาพร้อมกัน */
 function choosePlace(engine, id, key, opts = {}) {
-  if (!on || phase !== "place") return;
   const p = engine.players[id];
-  if (!p || !p.alive || p.scEliminated) return;
+  if (!canShop(p)) return;
   if (placeDone[id]) return;
   if (!PLACES.includes(key) || !placeAvailable(engine, p, key)) return;
   applyPlace(engine, p, key, opts);
-  // ทุกคนส่งผลครบแล้ว -> ให้ server ปิดเฟสทันที ไม่ต้องรอหมดเวลา
-  if (!placePending(engine).length && onAllPlaced) onAllPlaced();
-  else engine.broadcastState();
+  engine.broadcastState();
 }
 
 function applyPlace(engine, p, key, opts) {
@@ -260,11 +276,6 @@ function applyPlace(engine, p, key, opts) {
   if (key === "church") return placeChurch(engine, p, opts.option);
   if (key === "park") return placePark(engine, p, opts.targets);
   if (key === "library") return placeLibrary(engine, p);
-  if (key === "store") {
-    // การซื้อของเกิดขึ้นก่อนหน้านี้แล้ว (client เปิดแผงร้านค้าให้เลือกซื้อ แล้วค่อยส่งยืนยันมา)
-    p.scPlaceResult = { place: "store", title: "แวะร้านสะดวกซื้อ", detail: `เหลือ ${p.gold} เหรียญ`, tone: "gold" };
-    return;
-  }
 }
 
 // ---------- ห้องพัก: สุ่มของฟรี 1 ชิ้น (คนละคลังกับร้านค้า) ----------
@@ -372,7 +383,7 @@ function advanceDay(engine) {
 
 /**
  * จับคู่ดวล — **สุ่มมาแค่ 1 คู่ต่อรอบเท่านั้น** คนที่เหลือทั้งหมดผ่านเข้ารอบถัดไปฟรี
- * (กติกา: วันที่ 5 เกิดการต่อสู้แค่คู่เดียว จบแล้ววนกลับไปวันที่ 1 ของรอบใหม่
+ * (กติกา: วันที่ 7 เกิดการต่อสู้แค่คู่เดียว จบแล้ววนกลับไปวันที่ 1 ของรอบใหม่
  *  ดังนั้นประกาศคู่ตอนจบวันที่ 2 จึงแสดงแค่คู่เดียวด้วย)
  */
 function makePairs(engine) {
@@ -386,7 +397,7 @@ function makePairs(engine) {
   if (pool.length >= 2) {
     const a = pool.shift(), b = pool.shift();
     pairs.push({ a: a.id, b: b.id, done: false, winnerId: null });
-    engine.log(`⚔️ คู่ดวลวันที่ 5 — ${a.name} ปะทะ ${b.name}`);
+    engine.log(`⚔️ คู่ดวลวันที่ 7 — ${a.name} ปะทะ ${b.name}`);
   }
   byeIds = pool.map((p) => p.id);
   if (byeIds.length) {
@@ -395,7 +406,7 @@ function makePairs(engine) {
   duelIndex = 0;
 }
 
-/** เข้าวันที่ 5: ทุกคนได้แต้มสกิลเริ่มต้น 4 + เปิดเผยตัวละครของคู่ที่ลงสนาม */
+/** เข้าวันที่ 7: ทุกคนได้แต้มสกิลเริ่มต้น 4 + เปิดเผยตัวละครของคู่ที่ลงสนาม */
 function beginDuelDay(engine) {
   day = DUEL_DAY;
   phase = "duel";
@@ -427,7 +438,7 @@ function charName(engine, p) {
 }
 
 /**
- * เช็คหลังจบเทิร์นของวันที่ 5 ว่าคู่นี้จบหรือยัง
+ * เช็คหลังจบเทิร์นของวันที่ 7 ว่าคู่นี้จบหรือยัง
  * คืน: "continue" ดวลต่อ · "nextPair" ไปคู่ถัดไป · "cycleEnd" หมดคิวแล้ว
  */
 function checkDuelProgress(engine) {
@@ -474,7 +485,7 @@ function endCycle(engine) {
   cycleRound++;
   phase = "draw";
   engine.log(`🌙 จบรอบที่ ${cycleRound - 1} — ทุกคนได้ +${CYCLE_END_GOLD} เหรียญ · ฟื้นพลังชีวิตและเกราะเต็ม`);
-  engine.log(`🌗 รอบที่ ${cycleRound} เริ่มขึ้น (${isNight() ? "กลางคืน" : "กลางวัน"}) · วันที่ 1 จาก 5`);
+  engine.log(`🌗 รอบที่ ${cycleRound} เริ่มขึ้น (${isNight() ? "กลางคืน" : "กลางวัน"}) · วันที่ 1 จาก ${DAYS_PER_CYCLE}`);
 }
 
 /** เหลือผู้รอดคนเดียว = จบเกม */
@@ -517,9 +528,13 @@ function stateFor(engine, viewerId) {
     phase,
     noCombat: noCombat(),
     daysTotal: DAYS_PER_CYCLE,
+    investigationDays: INVESTIGATION_DAYS,
+    duelDay: DUEL_DAY,
     // --- ของผู้ชมคนนี้เท่านั้น ---
     place: me ? me.scPlace || null : null,
     placedCount: Object.keys(placeDone).length,
+    ready: !!ready[viewerId],
+    readyCount: alive.filter((p) => ready[p.id]).length,
     totalPlayers: alive.length,
     matrixHeld: me ? me.scMatrix || 0 : 0,
     matrixMax: MATRIX_MAX,
@@ -535,7 +550,7 @@ function stateFor(engine, viewerId) {
     } : null,
     eliminated: me ? !!me.scEliminated : false,
     placeResult: me ? me.scPlaceResult || null : null,   // ผลของสถานที่ที่เพิ่งไปมา (ของผู้ชมคนนี้เท่านั้น)
-    shopOpen: !isDuelDay(),                              // ซื้อของได้เฉพาะวันสืบสวน
+    shopOpen: canShop(me),
     stat: me ? me.scStat || null : null,                  // สถิติของผู้ชมคนนี้ (ใช้ในฉากจบเกม)
     // สรุปตอนจบเกม: ใครรอด ใครถูกลบ + สถิติของทุกคน (เปิดเผยได้แล้วเพราะเกมจบ)
     finalBoard: Object.values(engine.players).map((o) => ({
@@ -560,7 +575,7 @@ function stateFor(engine, viewerId) {
     placeSeconds: PLACE_SECONDS,
     places: PLACES.map((k) => ({
       key: k, name: PLACE_NAME[k],
-      available: me ? placeAvailable(engine, me, k) : false
+      available: canShop(me) && !placeDone[viewerId] && placeAvailable(engine, me, k)
     }))
   };
 }
@@ -597,7 +612,7 @@ module.exports = {
   // ค่าคงที่
   START_HP, START_ARMOR, START_SKILL_CAP, MAX_SKILL_CAP, START_GOLD,
   START_SKILL_LEVEL, MAX_SKILL_LEVEL, MATRIX_MAX, MATRIX_PER_TARGET,
-  DAYS_PER_CYCLE, PAIRING_DAY, DUEL_DAY, PLACE_SECONDS, DUEL_START_SKILL,
+  INVESTIGATION_DAYS, DAYS_PER_CYCLE, PAIRING_DAY, DUEL_DAY, PLACE_SECONDS, DUEL_START_SKILL,
   CYCLE_END_GOLD, UNLOCK_AT, TIER_COST, PLACES, PLACE_NAME,
   // สถานะโหมด
   active, reset, startMatch, initPlayer, resetFields,
@@ -606,7 +621,7 @@ module.exports = {
   maxHp, maxArmor, maxSkill, tierUnlocked, costOf, deckCards,
   combatants, inCurrentDuel, onDealRound, onRoundWinner,
   // เฟสสถานที่
-  startPlacePhase, finishPlacePhase, choosePlace, placeAvailable, placePending,
+  startPlacePhase, finishPlacePhase, choosePlace, placeAvailable, placePending, canShop, readyPlace,
   // วัน/คู่ดวล/รอบ
   advanceDay, makePairs, beginDuelDay, revealCurrentPair, checkDuelProgress,
   endCycle, survivors, opponentOf,

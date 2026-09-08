@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import { playMusic, stopMusic } from "../audio";
 import { preloadWave1, preloadWave2, preloadWave3 } from "./assets";
 import { SeraphBackground, DayRail, MatrixSlots, ShadowPortrait, WatchedFrame, ToastStack, useToasts, DataCube } from "./ui";
-import { SeraphBoot, DayBanner, PairingScene, Day5Intro, CharacterReveal, DeletionScene } from "./scenes";
+import { SeraphBoot, DayBanner, PairingScene, DuelIntro, CharacterReveal, DeletionScene } from "./scenes";
 import PlaceSelect from "./PlaceSelect";
 import MatrixRadar from "./MatrixRadar";
 
@@ -36,14 +36,14 @@ const RADAR_TARGETS = PLAYERS.slice(1).map((p, i) => ({
 }));
 
 const SCENES = [
-  { key: "board", label: "S2 กระดานวัน 1-4", music: "sc_day" },
+  { key: "board", label: "S2 กระดานวัน 1-6", music: "sc_day" },
   { key: "boot", label: "S0 บูตระบบ", music: null },
   { key: "day1", label: "S1 เปิดวัน (วันแรก)", music: "sc_day" },
-  { key: "day4", label: "S1 เปิดวัน (วันที่ 4)", music: "sc_day" },
+  { key: "day6", label: "S1 เปิดวัน (วันที่ 6)", music: "sc_day" },
   { key: "place", label: "S4 เลือกสถานที่", music: "sc_rest" },
   { key: "radar", label: "S5.3 สวนสาธารณะ (Matrix)", music: "sc_rest" },
   { key: "pairing", label: "S6 ประกาศคู่ดวล", music: null },
-  { key: "day5", label: "S7 เข้าวันที่ 5", music: null },
+  { key: "day7", label: "S7 เข้าวันที่ 7", music: null },
   { key: "reveal", label: "S8c เปิดเผยตัวละคร", music: "sc_duel_day" },
   { key: "revealSeen", label: "S8c (เคยเห็นแล้ว)", music: "sc_duel_day" },
   { key: "deletion", label: "S10 ตกรอบ", music: "sc_duel_night" }
@@ -78,7 +78,7 @@ export default function SeraphPreview() {
           <div className="relative z-10 min-h-screen flex flex-col items-center justify-center gap-6 px-4">
             <div className="text-center">
               <div className="sc-sysline text-xs mb-1">{"> IDENTITY MASK : ENABLED"}</div>
-              <div className="text-white/60 text-sm">กระดานวันที่ 1–4 — ทุกคนเป็นเงาดำ ไม่มีหลอดเลือด/เกราะ/สกิล</div>
+              <div className="text-white/60 text-sm">กระดานวันที่ 1–6 — ทุกคนเป็นเงาดำ ไม่มีหลอดเลือด/เกราะ/สกิล</div>
             </div>
             <div className="flex flex-wrap justify-center gap-4">
               {PLAYERS.map((p, i) => <ShadowPortrait key={p.id} name={p.name} img={p.img} revealed={i === 0} color={p.color} />)}
@@ -96,7 +96,7 @@ export default function SeraphPreview() {
 
       {scene === "boot" && <SeraphBoot key={runId} players={PLAYERS} onDone={done} />}
       {scene === "day1" && <><SeraphBackground phase="draw" night={night} /><DayBanner key={runId} day={1} onDone={done} /></>}
-      {scene === "day4" && <><SeraphBackground phase="draw" night={night} /><DayBanner key={runId} day={4} onDone={done} /></>}
+      {scene === "day6" && <><SeraphBackground phase="draw" night={night} /><DayBanner key={runId} day={6} onDone={done} /></>}
       {scene === "place" && (
         <PlaceSelect
           key={runId} me={ME} day={3} night={night} seconds={20} placedCount={4} totalPlayers={6}
@@ -110,7 +110,7 @@ export default function SeraphPreview() {
         />
       )}
       {scene === "pairing" && <PairingScene key={runId} pairs={PAIRS} myId="p1" byes={[{ id: "p7", name: "ยูนะ", img: AVATAR(7) }]} onDone={done} />}
-      {scene === "day5" && <Day5Intro key={runId} players={PLAYERS} night={night} onDone={done} />}
+      {scene === "day7" && <DuelIntro key={runId} players={PLAYERS} night={night} onDone={done} />}
       {scene === "reveal" && <CharacterReveal key={runId} player={{ ...PLAYERS[0], night }} onDone={done} />}
       {scene === "revealSeen" && <CharacterReveal key={runId} player={{ ...PLAYERS[1], night }} seen onDone={done} />}
       {scene === "deletion" && <DeletionScene key={runId} loser={PLAYERS[1]} winner={PLAYERS[0]} onDone={done} />}

@@ -1,10 +1,10 @@
 // ============================================================
 //  SE.RA.PH — ตัวคุมฉากของโหมด (เชื่อม state จาก server เข้ากับฉากที่เขียนไว้)
 //
-//  หลักการแบ่ง (SERAPH_SCENES.md หลักการข้อ 5 — วันที่ 1-4 กับวันที่ 5 ต้องเหมือนคนละเกม):
-//    วันที่ 1-4  -> สนามของโหมดนี้เอง (Arena วงแหวน / PlaceSelect / MatrixRadar)
+//  หลักการแบ่ง (SERAPH_SCENES.md หลักการข้อ 5 — วันที่ 1-6 กับวันที่ 7 ต้องเหมือนคนละเกม):
+//    วันที่ 1-6  -> สนามของโหมดนี้เอง (Arena วงแหวน / PlaceSelect / MatrixRadar)
 //                  เพราะ HUD ต่างกันสิ้นเชิง: ไม่มีหลอดเลือด ไม่มีแถบสกิล ไม่มีไอเทม
-//    วันที่ 5    -> ส่งต่อให้กระดานเดิม <Game> ทั้งดุ้น (สกิล/ไอเทม/ทริกเกอร์สี/เฟสโจมตีกลับมาครบ)
+//    วันที่ 7    -> ส่งต่อให้กระดานเดิม <Game> ทั้งดุ้น (สกิล/ไอเทม/ทริกเกอร์สี/เฟสโจมตีกลับมาครบ)
 //                  แล้วซ้อนฉากของโหมด (เปิดเผยตัวละคร / ตกรอบ) ทับด้านบน
 // ============================================================
 
@@ -19,7 +19,7 @@ import SpectatorRail from "./SpectatorRail";
 import StorePanel from "./StorePanel";
 import { preloadWave1, preloadWave2, preloadWave3 } from "./assets";
 import { SystemLines, SeraphBackground } from "./ui";
-import { SeraphBoot, DayBanner, PairingScene, Day5Intro, CharacterReveal, DeletionScene, DayWinnerScene } from "./scenes";
+import { SeraphBoot, DayBanner, PairingScene, DuelIntro, CharacterReveal, DeletionScene, DayWinnerScene } from "./scenes";
 import { FaceOffScene, CycleEndScene, FinalWinnerScene } from "./finale";
 
 const PD = "var(--font-p-display)";
@@ -28,6 +28,7 @@ const PLACE_ICON = { room: "🛏️", church: "⛪", park: "🌳", library: "�
 export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
   const sc = state.seraph;
   const me = state.players.find((p) => p.id === state.youId);
+  const duelDay = sc.duelDay || sc.daysTotal;
 
   const [scene, setScene] = useState(null);            // ฉากที่ซ้อนทับอยู่ตอนนี้
   const [pendingPlace, setPendingPlace] = useState(null); // เลือกสถานที่ไว้แต่ยังไม่ยืนยันกับ server
@@ -49,14 +50,14 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
     const id = idle(() => preloadWave2(), { timeout: 9000 });
     return () => { if (window.cancelIdleCallback) window.cancelIdleCallback(id); else clearTimeout(id); };
   }, []);
-  useEffect(() => { if (sc && sc.day >= 4) preloadWave3(sc.night); }, [sc && sc.day, sc && sc.night]);
+  useEffect(() => { if (sc && sc.day >= duelDay - 1) preloadWave3(sc.night); }, [sc && sc.day, sc && sc.night]);
 
   // ---------- เพลง (SERAPH_SCENES.md §6) ----------
   //  คิดเป็น "แทร็กเดียวที่ควรดังตอนนี้" แล้วค่อยสั่งครั้งเดียว — กันเพลงซ้อน
   //  S6/S7 เปิดด้วยความเงียบ (null) เพราะความเงียบเป็นส่วนหนึ่งของฉาก
   const wantTrack = !sc ? null
-    : (scene && (scene.kind === "pairing" || scene.kind === "day5")) ? null
-    : sc.day === 5 ? (sc.night ? "sc_duel_night" : "sc_duel_day")
+    : (scene && (scene.kind === "pairing" || scene.kind === "duelIntro")) ? null
+    : sc.day === duelDay ? (sc.night ? "sc_duel_night" : "sc_duel_day")
     : state.gameState === "SERAPH_PLACE" ? "sc_rest"
     : "sc_day";
   useEffect(() => {
@@ -69,7 +70,7 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
 
   // ---------- ล้างตัวเลือกค้างเมื่อเข้าเฟสเลือกสถานที่รอบใหม่ ----------
   useEffect(() => {
-    if (state.gameState === "SERAPH_PLACE") setPendingPlace(null);
+    setPendingPlace(null);
   }, [state.gameState, sc && sc.day]);
 
   // ---------- คิวฉาก: อะไรเปลี่ยน -> เล่นฉากที่ตรงกับเหตุการณ์นั้น ----------
@@ -97,21 +98,21 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
     }
     prevCycle.current = sc.cycleRound;
 
-    // S7 เข้าวันที่ 5
-    if (prevDay.current !== 5 && sc.day === 5) {
+    // S7 เข้าวันที่ 7
+    if (prevDay.current !== duelDay && sc.day === duelDay) {
       prevDay.current = sc.day;
-      setScene({ kind: "day5" });
+      setScene({ kind: "duelIntro" });
       return;
     }
     // S6 ประกาศคู่ดวล — คู่ถูกประกาศแล้วและยังไม่เคยโชว์ในรอบนี้
-    if (sc.pairs.length && !seenPairing.current && sc.day > 2 && sc.day < 5) {
+    if (sc.pairs.length && !seenPairing.current && sc.day > 2 && sc.day < duelDay) {
       seenPairing.current = true;
       prevDay.current = sc.day;
       setScene({ kind: "pairing" });
       return;
     }
-    // S1 เปิดวันใหม่ (วันที่ 1-4) — วันแรกของรอบเล่นเต็ม วันถัดไปย่อ
-    if (prevDay.current !== sc.day && sc.day < 5) {
+    // S1 เปิดวันใหม่ (วันที่ 1-6) — วันแรกของรอบเล่นเต็ม วันถัดไปย่อ
+    if (prevDay.current !== sc.day && sc.day < duelDay) {
       const first = sc.day === 1;
       prevDay.current = sc.day;
       if (first) seenPairing.current = false; // รอบใหม่ -> ประกาศคู่ได้อีกครั้ง
@@ -120,8 +121,8 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
     }
     prevDay.current = sc.day;
 
-    // S8c เปิดเผยตัวละคร — ขึ้นคู่ใหม่ในวันที่ 5
-    if (sc.day === 5 && sc.duelPair && prevDuelIndex.current !== sc.duelIndex) {
+    // S8c เปิดเผยตัวละคร — ขึ้นคู่ใหม่ในวันที่ 7
+    if (sc.day === duelDay && sc.duelPair && prevDuelIndex.current !== sc.duelIndex) {
       prevDuelIndex.current = sc.duelIndex;
       const a = state.players.find((p) => p.id === sc.duelPair.a);
       const b = state.players.find((p) => p.id === sc.duelPair.b);
@@ -133,7 +134,7 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
   // ---------- S10 ตกรอบ: มีคนถูกลบเพิ่ม ----------
   const outKey = state.players.filter((p) => p.scEliminated).map((p) => p.id).sort().join(",");
   useEffect(() => {
-    if (!sc || sc.day !== 5) return;
+    if (!sc || sc.day !== duelDay) return;
     if (prevOut.current === null) { prevOut.current = outKey; return; }
     if (outKey !== prevOut.current) {
       const before = prevOut.current.split(",").filter(Boolean);
@@ -188,8 +189,8 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
   let overlay = null;
   if (scene) {
     if (scene.kind === "boot") overlay = <SeraphBoot players={state.players} day={sc.day} cycleRound={sc.cycleRound} onDone={closeScene} />;
-    else if (scene.kind === "day") overlay = <DayBanner day={scene.day} short={scene.short} onDone={closeScene} />;
-    else if (scene.kind === "day5") overlay = <Day5Intro players={state.players} night={sc.night} onDone={closeScene} />;
+    else if (scene.kind === "day") overlay = <DayBanner duelDay={duelDay} day={scene.day} short={scene.short} onDone={closeScene} />;
+    else if (scene.kind === "duelIntro") overlay = <DuelIntro day={duelDay} players={state.players} night={sc.night} onDone={closeScene} />;
     else if (scene.kind === "pairing") {
       overlay = (
         <PairingScene
@@ -257,8 +258,8 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
 
   // ---------- ฉากหลัก ----------
   let main;
-  if (sc.day === 5) {
-    // วันที่ 5: ใช้กระดานเดิมทั้งดุ้น แต่ **เอาผู้ชมออกจากที่นั่งในสนามก่อน**
+  if (sc.day === duelDay) {
+    // วันที่ 7: ใช้กระดานเดิมทั้งดุ้น แต่ **เอาผู้ชมออกจากที่นั่งในสนามก่อน**
     //  กระดานเดิมวางผู้เล่นทุกคนที่อยู่ใน state.players ลง SLOTS ตามลำดับ ถ้าปล่อยไว้
     //  คนที่ไม่ได้ลงสนามจะนั่งปนอยู่ในวงเหมือนเป็นเป้าโจมตีได้ ซึ่งไม่ใช่
     //  -> กรองเหลือแค่คู่ที่ดวลจริง (+ ตัวเราเอง ถ้าเราเป็นผู้ชม กระดานต้องมี "เรา" ถึงจะวาด HUD ได้)
@@ -298,17 +299,19 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
       </>
     );
   } else if (state.gameState === "SERAPH_PLACE") {
-    if (pendingPlace === "store") {
+    if (pendingPlace === "store" && sc.shopOpen) {
       main = (
         <StorePanel
           shop={state.shop || []}
           gold={me ? me.gold : 0}
           inventoryCount={me && me.inventory ? me.inventory.length : 0}
+          inventory={me?.inventory || []}
+          characterId={me?.characterId || me?.character?.id}
           onBuy={(itemId) => socket.emit("buyShopItem", { itemId })}
-          onDone={() => emitPlace({ key: "store" })}
+          onDone={() => setPendingPlace(null)}
         />
       );
-    } else if (pendingPlace === "park") {
+    } else if (pendingPlace === "park" && !sc.ready && !sc.place && me?.alive && !sc.eliminated) {
       // สวนสาธารณะ: ลงแต้มบนเรดาร์ให้เสร็จก่อน แล้วส่งผลรวดเดียว
       main = (
         <MatrixRadar
@@ -346,16 +349,20 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
             cheapestItem: 1
           }}
           day={sc.day}
+          duelDay={duelDay}
           night={sc.night}
-          placedCount={sc.placedCount}
+          placedCount={sc.readyCount}
           totalPlayers={sc.totalPlayers}
-          submitted={pendingPlace === "sent" || !!sc.place}
+          submitted={pendingPlace === "sent" || !!sc.place || sc.ready || !me?.alive || sc.eliminated}
+          ready={sc.ready}
+          canAct={!!me?.alive && !sc.eliminated && !sc.ready}
+          onShop={() => { if (sc.shopOpen) setPendingPlace("store"); }}
+          onReady={() => { setPendingPlace(null); socket.emit("seraphReady"); }}
           pending={pendingPlace}
           chosen={sc.place}
           onPick={(key) => {
-            // 2 สถานที่ที่ต้องถามต่อก่อนส่ง — ที่เหลือส่งได้เลย
-            // 3 สถานที่ที่ต้องทำอะไรต่อก่อนส่ง — ที่เหลือ (ห้องพัก/ห้องสมุด) ส่งได้เลย
-            if (key === "church" || key === "park" || key === "store") { setPendingPlace(key); return; }
+            // โบสถ์/สวนต้องถามตัวเลือกก่อนส่ง — ห้องพัก/ห้องสมุดส่งได้เลย
+            if (key === "church" || key === "park") { setPendingPlace(key); return; }
             emitPlace({ key });
           }}
         />
@@ -378,7 +385,7 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
       {/* โบสถ์: เลือกแท่นเพิ่มความจุ
           คำเตือนเรื่องท่าไม้ตายต้องขึ้นทุกครั้งที่ความจุยังไม่ถึง 6 —
           SERAPH_MOONCELL.md §3 ระบุตรง ๆ ว่า "นี่คือความตั้งใจของดีไซน์ แต่ UI ต้องสื่อสารให้ชัด" */}
-      {pendingPlace === "church" && sc.caps && (
+      {state.gameState === "SERAPH_PLACE" && !sc.ready && !sc.place && pendingPlace === "church" && sc.caps && (
         <div className="fixed inset-0 z-[86] grid place-items-center px-5" style={{ background: "rgba(4,7,12,.9)" }}>
           <div className="p-panel w-full max-w-lg p-5 flex flex-col gap-4" style={{ animation: "popIn 300ms both" }}>
             <SystemLines lines={["> SANCTUARY — CAPACITY UPGRADE"]} speed={18} className="text-sm" />
@@ -429,7 +436,7 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
 
       {/* ผลของสถานที่ที่เพิ่งไปมา — ภาษาไทยล้วน เพราะเป็นข้อมูลที่ต้องอ่านออกทันที */}
       {placeNotice && !overlay && (
-        <div className="fixed inset-x-0 top-[22%] z-[58] grid place-items-center pointer-events-none px-6">
+        <div className="fixed inset-x-0 top-[22%] z-[88] grid place-items-center pointer-events-none px-6">
           <div
             className="flex flex-col items-center gap-1 px-6 py-4 text-center"
             style={{

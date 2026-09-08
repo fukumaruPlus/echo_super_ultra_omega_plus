@@ -1,5 +1,5 @@
 // ============================================================
-//  สนาม SE.RA.PH — "วงแหวนข้อมูล" (วันที่ 1-4)
+//  สนาม SE.RA.PH — "วงแหวนข้อมูล" (วันที่ 1-6)
 //
 //  ตั้งใจไม่ทำเป็นการ์ดเรียงแถว: ผู้เล่นลอยอยู่บน "วงรี" รอบแกนกลางในมุมเปอร์สเปกทีฟ
 //   - คนที่อยู่ลึกเข้าไปด้านหลังวง เล็กลง+จางลง (ระยะชัดลึกจริง ไม่ใช่ทุกคนขนาดเท่ากัน)
@@ -229,7 +229,7 @@ export default function Arena({ state, onHit, onLock }) {
           </div>
           {/* leading-tight ไม่ใช่ leading-none: ฟอนต์ไทยมีสระบน/ล่าง ถ้าบีบบรรทัดสนิทหัวอักษรจะโดนตัด */}
           <div className="text-2xl sm:text-4xl font-black italic text-white leading-tight truncate" style={{ fontFamily: PD }}>
-            {sc.day === 5 ? "วันคัดออก" : "วันสืบสวน"}
+            {sc.day === sc.daysTotal ? "วันคัดออก" : "วันสืบสวน"}
           </div>
           {sc.myOpponent && (
             <div className="mt-1 inline-flex items-center gap-1.5 px-2 py-0.5" style={{ background: "rgba(255,77,94,.16)", borderLeft: "3px solid var(--color-sc-red)" }}>
@@ -240,7 +240,7 @@ export default function Arena({ state, onHit, onLock }) {
           )}
         </div>
         <div className="flex flex-col items-end gap-1.5 shrink-0">
-          <DayRail day={sc.day} />
+          <DayRail duelDay={sc.daysTotal} day={sc.day} />
           <div
             className="text-2xl sm:text-4xl font-black leading-none"
             style={{ fontFamily: PD, color: state.timeLeft <= 10 ? "var(--color-sc-red)" : "#fff" }}
@@ -312,7 +312,7 @@ export default function Arena({ state, onHit, onLock }) {
         ))}
       </div>
 
-      {/* ---------- HUD ล่าง: ค่าของโหมดนี้ (ไม่มีหลอดเลือด/สกิลในวันที่ 1-4) ---------- */}
+      {/* ---------- HUD ล่าง: ค่าของโหมดนี้ (ไม่มีหลอดเลือด/สกิลในวันที่ 1-6) ---------- */}
       <div className="absolute bottom-0 inset-x-0 z-40 px-4 pb-3 pt-1 flex flex-col items-center gap-2">
         {/* กองการ์ดในมือของเรา — อยู่เหนือ HUD ติดกับผู้เล่น อ่านเลขออกจากระยะปกติ */}
         <HandCards cards={(me && me.cards) || []} />
@@ -329,7 +329,7 @@ export default function Arena({ state, onHit, onLock }) {
           </span>
           <span className="text-xs text-white/90">🪙 <span className="font-bold text-echo-gold">{me ? me.gold : 0}</span> เหรียญ</span>
           <span className="text-xs text-white/90">📘 ระดับทักษะ <span className="font-bold">{sc.skillLevel}/{sc.skillLevelMax}</span></span>
-          {/* ป้ายนี้คือ "ความจุ" (หลอดสูงสุด) ไม่ใช่ "แต้มที่มีอยู่" — วันที่ 1-4 แต้มสกิลคงที่ 0 เสมอ
+          {/* ป้ายนี้คือ "ความจุ" (หลอดสูงสุด) ไม่ใช่ "แต้มที่มีอยู่" — วันที่ 1-6 แต้มสกิลคงที่ 0 เสมอ
               และกดสกิลไม่ได้เลยตามกติกา จึงต้องเขียนกำกับไว้ ไม่งั้นอ่านแล้วเข้าใจผิดว่ากดได้แต่กดไม่ออก */}
           <span className="text-xs text-white/90">
             ⚡ ความจุสกิล <span className="font-bold">{sc.caps ? sc.caps.skill : 4}/8</span>

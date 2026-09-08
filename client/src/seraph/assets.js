@@ -14,10 +14,10 @@ const U = (p) => encodeURI(`${BASE}/${p}`);
 
 // ---------- ฉากหลังเคลื่อนไหว (GIF) ----------
 export const SC_BG = {
-  normal: U("update/background_normal.gif"), // วันที่ 1-4 (S1-S3)          5.2 MB
+  normal: U("update/background_normal.gif"), // วันที่ 1-6 (S1-S3)          5.2 MB
   rest: U("update/background_rest.gif"),     // เลือกสถานที่ + ในสถานที่     2.8 MB
-  day5: U("update/background_day_5.gif"),    // วันที่ 5 รอบกลางวัน          7.1 MB
-  night5: U("update/background_night_5.gif") // วันที่ 5 รอบกลางคืน          2.8 MB
+  day5: U("update/background_day_5.gif"),    // วันที่ 7 รอบกลางวัน          7.1 MB
+  night5: U("update/background_night_5.gif") // วันที่ 7 รอบกลางคืน          2.8 MB
 };
 
 // ---------- เอฟเฟกต์กลิตช์เต็มจอ ----------

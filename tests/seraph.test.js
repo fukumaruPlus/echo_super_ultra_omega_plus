@@ -51,16 +51,16 @@ test("กองไพ่เหลือ 40 ใบ — ไม่มี King/Queen
   assert.strictEqual(deck.filter((c) => c.value === 10).length, 4);
 });
 
-test("วันที่ 1-4 คือช่วงไม่มีการต่อสู้ · วันที่ 5 คือวันดวล", () => {
+test("วันที่ 1-6 คือช่วงไม่มีการต่อสู้ · วันที่ 7 คือวันดวล", () => {
   const e = startWith(4);
-  for (let d = 1; d <= 4; d++) {
+  for (let d = 1; d <= 6; d++) {
     assert.strictEqual(Seraph.noCombat(), true, `วันที่ ${d} ต้องไม่มีการต่อสู้`);
     assert.strictEqual(Seraph.isDuelDay(), false);
     const { next } = Seraph.advanceDay(e);
-    if (d === 4) assert.strictEqual(next, "duelDay");
+    if (d === 6) assert.strictEqual(next, "duelDay");
   }
   Seraph.beginDuelDay(e);
-  assert.strictEqual(Seraph.currentDay(), 5);
+  assert.strictEqual(Seraph.currentDay(), 7);
   assert.strictEqual(Seraph.isDuelDay(), true);
   assert.strictEqual(Seraph.noCombat(), false);
 });
@@ -73,9 +73,9 @@ test("ผู้ชนะวันธรรมดาได้ Matrix +1 · เพ
   assert.ok(e.logs.some((m) => m.includes("Matrix เต็มแล้ว")));
 });
 
-test("ผู้ชนะไม่ได้ Matrix ในวันที่ 5 (รางวัลมีเฉพาะวันธรรมดา)", () => {
+test("ผู้ชนะไม่ได้ Matrix ในวันที่ 7 (รางวัลมีเฉพาะวันธรรมดา)", () => {
   const e = startWith(4);
-  for (let d = 1; d <= 4; d++) Seraph.advanceDay(e);
+  for (let d = 1; d <= 6; d++) Seraph.advanceDay(e);
   Seraph.beginDuelDay(e);
   const w = e.players.p1;
   const before = w.scMatrix || 0;
@@ -172,7 +172,7 @@ test("ตัวตนถูกซ่อนจนกว่าจะลงดว�
 });
 
 test("จับคู่: ดวลแค่ 1 คู่ต่อรอบ ที่เหลือผ่านฟรีทั้งหมด", () => {
-  // กติกา: วันที่ 5 เกิดการต่อสู้แค่คู่เดียว จบแล้ววนกลับวันที่ 1 ของรอบใหม่
+  // กติกา: วันที่ 7 เกิดการต่อสู้แค่คู่เดียว จบแล้ววนกลับวันที่ 1 ของรอบใหม่
   const e5 = startWith(5);
   Seraph.makePairs(e5);
   let st = Seraph.stateFor(e5, "p1");
@@ -190,7 +190,7 @@ test("จับคู่: ดวลแค่ 1 คู่ต่อรอบ ท�
   assert.ok(st.byes.every((b) => !inPair.has(b.id)));
 });
 
-test("วันที่ 5: ลงสนามแค่คู่ที่กำลังดวล คนอื่นเป็นผู้ชม", () => {
+test("วันที่ 7: ลงสนามแค่คู่ที่กำลังดวล คนอื่นเป็นผู้ชม", () => {
   const e = startWith(4);
   Seraph.makePairs(e);
   Seraph.beginDuelDay(e);
@@ -283,7 +283,13 @@ test("เฟสเลือกสถานที่: ครบทุกคนแ
   Seraph.choosePlace(e, "p1", "room", {});
   assert.strictEqual(fired, 0, "ยังไม่ครบทุกคน");
   Seraph.choosePlace(e, "p2", "room", {});
-  assert.strictEqual(fired, 1, "ครบแล้วต้องปิดเฟสทันที");
+  assert.strictEqual(fired, 0, "เลือกสถานที่ครบแล้วยังซื้อของต่อได้");
+  Seraph.readyPlace(e, "p1");
+  assert.strictEqual(fired, 0);
+  Seraph.readyPlace(e, "p2");
+  assert.strictEqual(fired, 1, "กดพร้อมครบแล้วต้องปิดเฟสทันที");
+  Seraph.readyPlace(e, "p2");
+  assert.strictEqual(fired, 1, "กดพร้อมซ้ำต้องไม่จบวันซ้ำ");
 
   // หมดเวลาโดยไม่มีใครเลือก -> สุ่มให้ทุกคน
   Seraph.startPlacePhase(e, () => {});

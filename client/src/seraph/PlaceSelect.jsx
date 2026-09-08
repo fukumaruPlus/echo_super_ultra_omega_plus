@@ -1,6 +1,6 @@
 // ============================================================
 //  S4 — หน้าเลือกสถานที่ · เมนูปลายทางแบบ Persona
-//  ใช้ภาพจริง 5 ใบใน client/public/mooncell/ (ชื่อไฟล์ภาษาไทย)
+//  สถานที่ 4 แห่ง + ปุ่มร้านค้าแยก ใน client/public/mooncell/
 //
 //  ความลับที่ต้องรักษา: ไม่บอกว่าใครเลือกที่ไหน — บอกแค่ "เลือกแล้วกี่คน"
 //  (สถานที่ที่คู่แข่งไป คือข้อมูลสืบสวนที่มีค่าที่สุดในโหมดนี้)
@@ -54,12 +54,17 @@ function placeState(key, me) {
 export default function PlaceSelect({
   me = {},
   day = 1,
+  duelDay = 7,
   night = false,
   placedCount = 0,
   totalPlayers = 1,
   submitted = false,   // ส่งให้ server แล้วจริง ๆ (ยกเลิกไม่ได้) — พ่อเป็นคนคุม
-  pending = null,      // เลือกไว้แต่ยังไม่ยืนยัน (โบสถ์/สวน/ร้านค้า) — ยกเลิกได้
+  pending = null,      // เลือกไว้แต่ยังไม่ยืนยัน (โบสถ์/สวน) — ยกเลิกได้
   chosen = null,       // สถานที่ที่ server ยืนยันแล้ว
+  ready = false,
+  canAct = true,
+  onShop,
+  onReady,
   onPick
 }) {
   const [hover, setHover] = useState("room");
@@ -87,8 +92,8 @@ export default function PlaceSelect({
           </div>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <DayRail day={day} />
-          {/* ไม่มีเวลาจำกัด — เฟสนี้ไปต่อเมื่อทุกคนเลือกครบเท่านั้น
+          <DayRail day={day} duelDay={duelDay} />
+          {/* เฟสนี้ไปต่อเมื่อทุกคนกดพร้อมครบ
               จึงบอกว่า "เหลืออีกกี่คน" แทนที่จะกดดันด้วยนาฬิกา */}
           <div className="text-right">
             <div className="sc-sysline text-[10px] opacity-70">รอผู้เล่น</div>
@@ -99,10 +104,10 @@ export default function PlaceSelect({
         </div>
       </div>
 
-      {/* การ์ด 5 ใบเรียงทแยงเหลื่อมกัน + แผงคำอธิบายด้านขวา */}
+      {/* การ์ดสถานที่ 4 ใบ + แผงคำอธิบายด้านขวา */}
       <div className="absolute inset-x-0 top-[20%] bottom-[16%] flex items-center justify-center gap-4 px-3 sm:px-8">
         <div className="flex items-center gap-1.5 sm:gap-3">
-          {SC_PLACE_ORDER.map((key, i) => {
+          {SC_PLACE_ORDER.filter((key) => key !== "store").map((key, i) => {
             const p = SC_PLACE[key];
             const st = placeState(key, me);
             const isPicked = pending === key || chosen === key;
@@ -160,7 +165,17 @@ export default function PlaceSelect({
       <div className="absolute bottom-4 inset-x-0 flex flex-col items-center gap-2">
         {submitted && (
           <div className="text-sm font-bold" style={{ animation: "scBannerIn 300ms both", color: "var(--color-sc-mint)" }}>
-            ✔ เลือกเรียบร้อยแล้ว — รอผู้เล่นคนอื่น
+            {ready ? "✔ พร้อมแล้ว — รอผู้เล่นคนอื่น" : "✔ เลือกสถานที่แล้ว — ซื้อของเพิ่มหรือกดพร้อมได้"}
+          </div>
+        )}
+        {canAct && (
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={onShop} className="p-btn-cut px-5 py-2 font-bold text-echo-gold border border-white/30">
+              🏪 ร้านค้า
+            </button>
+            <button type="button" onClick={onReady} className="p-btn-cut p-slash-btn px-6 py-2 font-bold text-white">
+              พร้อม
+            </button>
           </div>
         )}
         <div className="flex items-center gap-2">

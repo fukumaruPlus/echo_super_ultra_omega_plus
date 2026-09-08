@@ -117,17 +117,17 @@ export function SeraphBackground({ phase = "draw", night = false, hot = false, g
   );
 }
 
-/* ---------- แถบวัน 5 จุด: HUD ถาวรมุมขวาบน (S1) ---------- */
-export function DayRail({ day = 1, compact = false }) {
+/* ---------- แถบวัน 7 จุด: HUD ถาวรมุมขวาบน (S1) ---------- */
+export function DayRail({ day = 1, duelDay = 7, compact = false }) {
   return (
     <div className={`sc-day-rail ${compact ? "" : "px-3 py-1.5"} items-center`}>
       {!compact && (
         <span className="sc-sysline text-[10px] mr-1 opacity-70">DAY</span>
       )}
-      {[1, 2, 3, 4].map((d) => (
+      {Array.from({ length: duelDay - 1 }, (_, i) => i + 1).map((d) => (
         <span key={d} className="sc-day-dot" data-done={d < day} data-now={d === day} />
       ))}
-      <span className="sc-day-dot sc-day-dot-duel grid place-items-center" data-now={day === 5}>
+      <span className="sc-day-dot sc-day-dot-duel grid place-items-center" data-now={day === duelDay}>
         <span className="text-[9px] leading-none" style={{ transform: "translateY(-0.5px)" }}>⚔</span>
       </span>
     </div>
@@ -158,7 +158,7 @@ export function ShadowPortrait({ name, img, revealed = false, color = "#35e6d4",
   );
 }
 
-/* ---------- ช่อง Matrix 4 ช่อง (HUD วันที่ 1-4) ---------- */
+/* ---------- ช่อง Matrix 4 ช่อง (HUD วันที่ 1-6) ---------- */
 export function MatrixSlots({ held = 0, max = 4, justGained = false }) {
   return (
     <span className="inline-flex items-center gap-1.5">

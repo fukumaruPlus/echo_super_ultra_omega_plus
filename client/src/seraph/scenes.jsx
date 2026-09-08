@@ -147,20 +147,20 @@ export function SeraphBoot({ players = [], day = 1, cycleRound = 1, onDone }) {
 /* =========================================================================
    S1 — แบนเนอร์เปิดวัน · 2.4s (วันแรกของรอบ) / 1.4s (วันถัดไป)
    ========================================================================= */
-export function DayBanner({ day = 1, short = false, onDone }) {
+export function DayBanner({ day = 1, duelDay = 7, short = false, onDone }) {
   // ยืดจากเดิม (1.4s / 2.4s) — ของเดิมหายเร็วจนอ่านไม่ทัน
   const dur = short ? 2600 : 3800;
-  const last = day === 4;
+  const last = day === duelDay - 1;
   useTimeline([
     [0, () => playSfx(last ? "sc_noti2" : "sc_noti")],
     [dur, () => onDone && onDone()]
   ], [day, short]);
 
-  const sub = day === 5
+  const sub = day === duelDay
     ? "วันคัดออก"
     : last
       ? "พรุ่งนี้คือวันคัดออก"
-      : `วันสืบสวน · เหลืออีก ${4 - day} วันก่อนการคัดออก`;
+      : `วันสืบสวน · เหลืออีก ${duelDay - day} วันก่อนการคัดออก`;
 
   return (
     <div className={`fixed inset-0 z-[70] pointer-events-none overflow-hidden grid place-items-center ${last ? "sc-shake" : ""}`}>
@@ -268,7 +268,7 @@ export function PairingScene({ pairs = [], byes = [], myId = null, onDone }) {
               );
             })}
           </div>
-          {/* วันที่ 5 ดวลแค่คู่เดียวต่อรอบ — ที่เหลือทั้งหมดผ่านเข้ารอบถัดไปโดยไม่ต้องดวล */}
+          {/* วันที่ 7 ดวลแค่คู่เดียวต่อรอบ — ที่เหลือทั้งหมดผ่านเข้ารอบถัดไปโดยไม่ต้องดวล */}
           {byes.length > 0 && (
             <div
               className="flex flex-col items-center gap-2 px-4 py-3"
@@ -292,11 +292,11 @@ export function PairingScene({ pairs = [], byes = [], myId = null, onDone }) {
 }
 
 /* =========================================================================
-   S7 — เข้าวันที่ 5 · 3.6s
+   S7 — เข้าวันที่ 7 · 3.6s
    จุดหักของทั้งรอบ: จอแตก -> ตารางแดง -> หลอดเลือด/เกราะกลับมาทีละคน
    ========================================================================= */
-export function Day5Intro({ players = [], night = false, onDone }) {
-  const [stage, setStage] = useState(0); // 0 เงียบ · 1 จอแตก+DAY 5 · 2 หลอดค่ากลับมา · 3 ปิดท้าย
+export function DuelIntro({ day = 7, players = [], night = false, onDone }) {
+  const [stage, setStage] = useState(0); // 0 เงียบ · 1 จอแตก+DAY {day} · 2 หลอดค่ากลับมา · 3 ปิดท้าย
   const [glitch, setGlitch] = useState(0);
 
   useTimeline([
@@ -344,7 +344,7 @@ export function Day5Intro({ players = [], night = false, onDone }) {
         <div className="absolute inset-0 grid place-items-center pointer-events-none">
           <div className="relative flex flex-col items-center">
             <div className="sc-day-num" style={{ color: "#fff", textShadow: "0 6px 0 rgba(0,0,0,.85), 0 0 70px rgba(255,77,94,.7)" }}>
-              DAY 5
+              DAY {day}
             </div>
             <div
               className="sc-vs text-3xl sm:text-5xl absolute top-1/2 -translate-y-1/2"
@@ -544,7 +544,7 @@ export function DeletionScene({ loser, winner, onDone }) {
 }
 
 /* =========================================================================
-   S3 — ประกาศผู้ชนะประจำวัน (วันที่ 1-4) · 3.6s
+   S3 — ประกาศผู้ชนะประจำวัน (วันที่ 1-6) · 3.6s
    วันธรรมดาไม่มีเฟสโจมตี ฉากนี้จึงต้องรับน้ำหนักความสะใจของทั้งวันไว้เอง
    ภาษาไทยล้วน เพราะเป็นการแจ้งเตือนสำคัญที่ผู้เล่นต้องอ่านออกทันที
    ========================================================================= */
