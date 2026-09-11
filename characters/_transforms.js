@@ -14,7 +14,8 @@ const ippoImg = require("./ippo").IMG;     // มาคุโนะอุจิ 
 const brianImg = require("./brian").IMG;   // ไบรอัน (GT-R34): เหตุผลเดียวกัน
 const lumiChar = require("./producer_lumi"); // โปรดิวเซอร์ (luminous): เหตุผลเดียวกัน
 const muimiImg = require("./muimi").IMG;   // มุยมิ: ใช้ path รูปจาก hook กลาง
-const cayChar = require("./cayenne");      // คาเยนน์ ซูซูชิโระ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
+const cayChar = require("./cayenne");
+const daichiChar = require("./daichi");     // ไดจิ โอโซระ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร      // คาเยนน์ ซูซูชิโระ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
 const BAT_CAR_IMG = "/characters/bat_ben/bat_update/bat_ben_car.webp";
 const BAT_SHOT_IMG = "/characters/bat_ben/bat_update/skill1.2/bat_ben_skill1.2.jpg";
 const BAT_GUN_IMG = "/characters/bat_ben/bat_update/skill2.2/bat_ben_skill2.2.png";
@@ -42,6 +43,14 @@ module.exports = function buildTransforms(img) {
     cayGepard:  { img: cayChar.IMG.gepard, video: cayChar.VIDEO.gepard, title: "ร่วมร่างสหายแห่งเทพ", label: "เกพาร์ด", seconds: 24, music: null, afterReveal: false },
     cayBarrage: { img: cayChar.IMG.skill2, video: cayChar.VIDEO.skill2, title: "แน่จริงก็หลบสิ", label: "ยิงรัว 3 ครั้ง", seconds: 5, music: null, afterReveal: false },
     cayMissile: { img: cayChar.IMG.skill3, video: cayChar.VIDEO.skill3, title: "มิสไซล์แห่งคำอำลา", label: "ปล่อยท่าไม้ตาย", seconds: 14, music: null, afterReveal: false },
+    // ---------- ไดจิ โอโซระ ----------
+    //  คิวเองจากโค้ดผ่าน triggerCutscene (เล่นอย่างละ 1 ครั้งต่อเกม) จึงต้อง afterReveal: false
+    //  seconds วัดจากความยาวจริง (21.51 / 17.29 / 16.64 / 17.71 วิ) แล้วปัดขึ้นเผื่อเวลาตัดฉาก
+    //  เพลง daichi_theme มาจาก activeMusic ของตัวละคร (ค้างตลอด unite) ไม่ใช่ฟิลด์ music ตรงนี้
+    daichiUnite:   { img: daichiChar.IMG.skill3, video: daichiChar.UNITE_VIDEO, title: "มาUNITEกัน", label: "ULTRAMAN X", seconds: 23, music: null, afterReveal: false },
+    daichiGomora:  { img: daichiChar.CARDS.gomora.armorImg, video: daichiChar.CARDS.gomora.video, title: "เกราะโกโมร่า", label: "ไพ่ตายของฉัน", seconds: 19, music: null, afterReveal: false },
+    daichiEleking: { img: daichiChar.CARDS.eleking.armorImg, video: daichiChar.CARDS.eleking.video, title: "เกราะเอเลคิง", label: "ไพ่ตายของฉัน", seconds: 18, music: null, afterReveal: false },
+    daichiBemstar: { img: daichiChar.CARDS.bemstar.armorImg, video: daichiChar.CARDS.bemstar.video, title: "เกราะเบมสตาร์", label: "ไพ่ตายของฉัน", seconds: 19, music: null, afterReveal: false },
     lumiBurst:    { img: lumiChar.IMG.luminous, video: "/characters/producer_lumi/luminus/luminus_burst.mp4", title: "LUMINOUS BURST", label: "ทุกคนตีครบแล้ว", seconds: 16, music: null, afterReveal: false },
     // ---------- ไบรอัน (GT-R34) (patch 3.5 new) ----------
     //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก — ทุกคลิปเรียกผ่าน queueCutscene = เล่นทุกครั้ง

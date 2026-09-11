@@ -134,6 +134,7 @@ const FILES = {
   // ---------- คาเยนน์ ซูซูชิโระ ----------
   cayenne_theme: "/characters/cayenne/cayenne_theme.m4a", // เพลงประจำร่างเกพาร์ด (ขึ้นหลังวีดีโอแปลงร่าง)
   cayenne_gun: "/characters/cayenne/gun_sound.mp3",       // เสียงโจมตีปกติในร่างเกพาร์ด
+  daichi_theme: "/characters/daichi/daichi_theme.mp3",    // ไดจิ โอโซระ: เพลงระหว่าง unite
   // ---------- SE.RA.PH Moon Cell (โหมดผจญภัย) — ดู SERAPH_SCENES.md §6 ----------
   //  แต่ละเพลงจำตำแหน่งของตัวเอง · วันดวลวันที่ 7 ใช้ seq ของรอบเพื่อเริ่มจากต้น
   sc_day: "/mooncell/theme/day1-4.mp3",

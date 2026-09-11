@@ -9,7 +9,7 @@ const P_DISPLAY = "var(--font-p-display)";
 // ---------- กลุ่มความยากในการเล่น (แบ่งหน้าเลือกตัวละคร) ----------
 //  order = ลำดับการแสดงในกลุ่ม — ตัวที่ไม่อยู่ในลิสต์จะต่อท้ายตามลำดับ roster
 const DIFFICULTY_GROUPS = [
-  { key: "easy", label: "ง่าย", color: "#2E9E4B", order: ["hikaru", "mageslayer", "ignis"] },
+  { key: "easy", label: "ง่าย", color: "#2E9E4B", order: ["hikaru", "mageslayer", "ignis", "daichi"] },
   { key: "medium", label: "กลาง", color: "#E5B33B", order: ["temari", "miyako", "bat_ben", "escanor", "hisakawa_sister", "ippo", "cayenne"] },
   { key: "hard", label: "ยาก", color: "#C0392B", order: ["oberon", "kotone", "bard", "shiki", "kai", "takumi", "the_supplicant"] },
   { key: "fun", label: "เอาฮา", color: "#9B4F96", order: ["appleguy", "dan"] },

@@ -1158,6 +1158,7 @@ function drawToScore(p, target) {
     p.cards.push(c);
     onCardDrawn(p, c);
   }
+  CHAR_HOOKS.daichi.onDrawCheck(engine, p); // ไดจิ: การจั่วบังคับจากสกิลก็นับว่า "การ์ดแต้มเกิน" เหมือนกัน
   p.busted = bustedOf(p);
 }
 function calculateScore(cards) {
@@ -1454,6 +1455,8 @@ function displayImg(p) {
   if (p.characterId === "producer_lumi") { const limg = CHAR_HOOKS.producer_lumi.displayImg(p); if (limg) return limg; }
   // คาเยนน์: ระหว่างร่าง "เกพาร์ด" = ภาพ gepard.webp (null = ใช้ภาพปกติ)
   if (p.characterId === "cayenne") { const cimg = CHAR_HOOKS.cayenne.displayImg(p); if (cimg) return cimg; }
+  // ไดจิ โอโซระ: สวมเกราะ = ภาพเกราะ · unite = ultraman_x.webp (null = ใช้ภาพปกติ)
+  if (p.characterId === "daichi") { const dimg = CHAR_HOOKS.daichi.displayImg(p); if (dimg) return dimg; }
   // โอเบรอน: ร่างสลับตามช่วงเวลากลางวัน/กลางคืนเสมอ
   if (p.characterId === "oberon") return isNightRound(roundNumber) ? OBERON_NIGHT_IMG : OBERON_MORNING_IMG;
   // เรียวกิ ชิกิ: ระหว่างท่าไม้ตาย ฉันมองเห็นมันแล้ว / ความตายที่โรยรา = ภาพสถานะท่าไม้ตาย
@@ -1554,6 +1557,9 @@ function activeSkillMusic() {
   // คาเยนน์ (characters/cayenne.js): เพลงประจำร่างเกพาร์ด — ขึ้นหลังวีดีโอแปลงร่างจบ ค้างตลอดที่ร่างยังอยู่
   const bestCay = CHAR_HOOKS.cayenne.activeMusic(engine);
   if (bestCay) return bestCay;
+  // ไดจิ โอโซระ (characters/daichi.js): เพลง daichi_theme ค้างตลอด unite
+  const bestDaichi = CHAR_HOOKS.daichi.activeMusic(engine);
+  if (bestDaichi) return bestDaichi;
   // อิปโป (characters/ippo.js): เพลงประจำท่า Dempsey roll — เล่นค้างตลอดที่บัฟยังอยู่
   const bestIppo = CHAR_HOOKS.ippo.activeMusic(engine);
   if (bestIppo) return bestIppo;
@@ -1997,7 +2003,8 @@ function resetCombat(p) {
   CHAR_HOOKS.shido.resetCombat(p); // อิสึกะ ชิโด: ดาเมจที่บันทึกไว้ / กับดักฝากด้วยนะตัวฉัน / คิวเกิดใหม่
   CHAR_HOOKS.dan.resetCombat(p); // โมโรโบชิ ดัน: เป้าหมาย "จงหลบแต่อย่าหนี" / ศิษย์ / สตรีคแพ้แต้มติดกัน
   CHAR_HOOKS.eiji.resetCombat(p); // eijiOrdinal (สแตค Ordinal Scale ของเทิร์นนี้) + eijiDodgeUsedRound (โควตาหลบ 1 ครั้ง/เทิร์น)
-  CHAR_HOOKS.cayenne.resetCombat(p); // คาเยนน์: กระสุน / แรงใจ / ชุดกระสุนที่บรรจุไว้ / คิวความเสียหายที่เลื่อนไว้
+  CHAR_HOOKS.cayenne.resetCombat(p);
+  CHAR_HOOKS.daichi.resetCombat(p); // ไดจิ: การ์ดไซเบอร์ / เกราะ / การ์ดที่ตัดเก็บไว้ / สตั้นค้างจากเกราะเอเลคิง (ติดที่ผู้เล่นทุกคน) // คาเยนน์: กระสุน / แรงใจ / ชุดกระสุนที่บรรจุไว้ / คิวความเสียหายที่เลื่อนไว้
   CHAR_HOOKS.muimi.resetCombat(p); // มุยมิ: โควตาเสบียง / สตรีคหัวใจนักสู้ / จำนวนครั้งท่าไม้ตาย
   // ---------- ชเรด เอลัน (patch พิเศษ) ----------
   // (patch พิเศษ: ราตรีของชเรดไม่ถาวรแล้ว — ใช้ nightResetPending รีเซ็ตกลางคืน 3 เทิร์นแทน)
@@ -2278,6 +2285,11 @@ function buildStateFor(viewerId) {
         secondaryPub = pub(CHAR_HOOKS.hisakawa_sister.dynamicSkillFor(p, ch, "secondary"));
         ultimatePub = pub(CHAR_HOOKS.hisakawa_sister.dynamicSkillFor(p, ch, "ultimate"));
       }
+      // ไดจิ โอโซระ: ภาพ/ชื่อช่องพื้นฐานและรองเปลี่ยนตามการ์ดไซเบอร์ที่ถืออยู่ (สูตรเดียวกับ useSkill)
+      if (ch.id === "daichi") {
+        basicPub = pub(CHAR_HOOKS.daichi.dynamicSkillFor(p, ch, "basic"));
+        secondaryPub = pub(CHAR_HOOKS.daichi.dynamicSkillFor(p, ch, "secondary"));
+      }
       if (ch.id === "ignis") {
         basicPub = pub(CHAR_HOOKS.ignis.dynamicSkillFor(p, ch, "basic"));
         secondaryPub = pub(CHAR_HOOKS.ignis.dynamicSkillFor(p, ch, "secondary"));
@@ -2507,6 +2519,8 @@ function buildStateFor(viewerId) {
         } : undefined,
         // คาเยนน์: กระสุน / แรงใจ / เกพาร์ด / ชุดกระสุนที่บรรจุไว้ / ความเสียหายที่เลื่อนไว้ (ข้อมูลสนาม ทุกคนเห็นได้)
         cayenne: p.characterId === "cayenne" ? CHAR_HOOKS.cayenne.publicState(p) : undefined,
+        // ไดจิ: การ์ดที่ถือ / เกราะที่สวม / โควตาการ์ดไซเบอร์ / การ์ดที่ตัดเก็บไว้ (ข้อมูลสนาม ทุกคนเห็นได้)
+        daichi: p.characterId === "daichi" ? CHAR_HOOKS.daichi.publicState(p) : undefined,
         eijiDodge: p.characterId === "eiji" ? CHAR_HOOKS.eiji.dodgeChance(p) : undefined,        // % หลบหลีกรวมของเทิร์นนี้
         eijiOrdinal: p.characterId === "eiji" ? CHAR_HOOKS.eiji.ordinalStacks(p) : undefined,    // สแตค Ordinal Scale ที่กดไปแล้ว
         eijiOrdinalMax: p.characterId === "eiji" ? CHAR_HOOKS.eiji.ORDINAL_MAX : undefined,
@@ -3209,6 +3223,8 @@ function dealRound() {
     // อิปโป (characters/ippo.js): Uper Cut ตั้งสตั้นไว้เมื่อเทิร์นก่อน -> เริ่มมีผลตอนนี้
     //  ต้องอยู่ "ก่อน" บล็อกเช็คสตั้นด้านล่าง ไม่งั้นสตั้นจะเลื่อนไปมีผลอีกเทิร์นหนึ่ง
     CHAR_HOOKS.ippo.applyPendingStun(engine, p);
+    // ไดจิ เกราะเอเลคิง: สตั้นที่ติดไว้เมื่อเทิร์นก่อน -> เริ่มมีผลตอนนี้ (ก่อนบล็อกเช็คสตั้นด้านล่างด้วยเหตุผลเดียวกัน)
+    CHAR_HOOKS.daichi.applyPendingStun(engine, p);
     // ---------- ผู้วิงวอน (characters/the_supplicant.js): รีเซ็ตโควตาสกิล 2 ครั้ง + ต่ออายุ "กระแสเวท" ถาวร ----------
     CHAR_HOOKS.the_supplicant.onRoundStartTick(engine, p);
     // ---------- ไบรอัน (characters/brian.js): รถกินน้ำมัน (แปลงเป็นเลือด) หรือเติมน้ำมันประจำเทิร์น ----------
@@ -3217,6 +3233,8 @@ function dealRound() {
     CHAR_HOOKS.producer_lumi.onRoundStartTick(engine, p);
     // ---------- คาเยนน์ ทหารผ่านศึก: ความเสียหายที่เลื่อนไว้เมื่อเทิร์นก่อนลงผลตอนนี้ ----------
     CHAR_HOOKS.cayenne.onRoundStartTick(engine, p);
+    // ---------- ไดจิ โอโซระ: โควตาการ์ดไซเบอร์ · การ์ดที่ตัดไว้บวกเข้ามือ · เกราะเบมสตาร์ฟื้นเลือด ----------
+    CHAR_HOOKS.daichi.onRoundStartTick(engine, p);
     // ---------- "เยียวยา" (สถานะ Universal patch 3.4): ฟื้นพลังชีวิตต่อเทิร์นตามจำนวนหน่วย ----------
     //  วางไว้ที่นี่ (ต้นเทิร์น) เหมือนลุกไหม้/เลือดไหล การลดเทิร์นทำที่ลูปกลางของ endTurn ตามปกติ
     tickMend(engine, p);
@@ -3343,6 +3361,8 @@ function hit(id) {
   if (drawn) CHAR_HOOKS.conner.onCardDraw(engine, p);
   // ยุย (characters/yui.js): my soul your beats — ใครจั่ว คนอื่นในวงจั่วตามด้วย (กันลูปในฮุคเอง)
   if (drawn) CHAR_HOOKS.yui.onCardDraw(engine, p);
+  // ไดจิ โอโซระ: การ์ดทำให้แต้มเกิน -> มาUNITEกัน ตัดใบนั้นเก็บไว้ (ก่อน) / ข้อมูลจำลอง ล้างมือจั่วใหม่ (หลัง)
+  CHAR_HOOKS.daichi.onDrawCheck(engine, p);
   p.busted = bustedOf(p);
   if (p.busted) { voidUltimateOnBust(p); CHAR_HOOKS.mageslayer.onBustOrLoseRoll(engine, p); }
   // ไพ่แตก: ไม่ล็อกอัตโนมัติ — ยังกดสกิล/ใช้ไอเทมได้ต่อไป จนกว่าจะกดเปิดไพ่เอง หรือทุกคนเปิดไพ่ครบ
@@ -3483,6 +3503,8 @@ function useSkill(id, tier, targets, item) {
   if (ch && ch.id === "brian" && tier === "ultimate" && CHAR_HOOKS.brian.n2oSlot(engine, p)) skill = ch.ultimate2;
   // โปรดิวเซอร์: ช่องแรกสลับ "สลับไอดอล"/"ชุบไอดอล" · ช่องท่าไม้ตายสลับตามไอดอล 5 คน + luminous
   if (ch && ch.id === "producer_lumi") skill = CHAR_HOOKS.producer_lumi.dynamicSkillFor(p, ch, tier);
+  // ไดจิ: ช่องพื้นฐาน/รองเปลี่ยนชื่อ-ภาพตามการ์ดไซเบอร์ที่ถืออยู่
+  if (ch && ch.id === "daichi") skill = CHAR_HOOKS.daichi.dynamicSkillFor(p, ch, tier);
   if (ch && ch.id === "escanor") {
     skill = CHAR_HOOKS.escanor.prepareSkill(engine, p, tier, targets);
     if (!skill) return;
@@ -3606,6 +3628,8 @@ function useSkill(id, tier, targets, item) {
   const isLumiBasic = p.characterId === "producer_lumi" && tier === "basic";
   // คาเยนน์ "ปืนพกหน่วยรบ": ไม่นับเป็นการใช้สกิลของเทิร์น (กดแล้วยังใช้สกิลอื่นได้อีก 1 ครั้ง · ตัวเองจำกัด 1 ครั้ง/เทิร์น)
   const isCayBasic = p.characterId === "cayenne" && tier === "basic";
+  // ไดจิ "การ์ดไซเบอร์": ไม่นับเป็นการใช้สกิลของเทิร์น (กดได้ 2 ครั้ง/เทิร์น แล้วยังใช้สกิลอื่นได้อีก 1 ครั้ง)
+  const isDaichiBasic = p.characterId === "daichi" && tier === "basic";
   // ไบรอัน "N2O": ต้องยกเว้นจากโควตาสกิลของเทิร์นด้วย — การแข่งจบใน 1 เทิร์น และการกดท่าไม้ตาย 1
   //  กินโควตาไปแล้วในเทิร์นเดียวกัน ถ้าไม่ยกเว้น N2O จะกดไม่ได้เลยตลอดเกม (สเปคระบุว่า "กดได้ ไม่สนกฎของท่าไม้ตาย 1")
   const isBrianN2O = p.characterId === "brian" && tier === "ultimate" && CHAR_HOOKS.brian.n2oSlot(engine, p);
@@ -3621,7 +3645,7 @@ function useSkill(id, tier, targets, item) {
   const isHarukaBasic = p.characterId === "haruka" && tier === "basic";
   if (isHarukaBasic && (p.harukaBasicUses || 0) >= CHAR_HOOKS.haruka.BASIC_USES_PER_TURN) return;
   if (isSupPick && (p.supSkillUsesRound || 0) >= CHAR_HOOKS.the_supplicant.SKILL_USES_PER_TURN) return;
-  if (p.skillUsedRound && !isBrianKey && !isBrianN2O && !isLumiBasic && !isCayBasic && !isSupPick && !isHarukaBasic && !isApplePick && !isMuimiBasic && !isTohnoPick && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHisakawaFreeAction) return; // ใช้สกิลได้เพียง 1 อันต่อเทิร์น (ซ้ำ/ซ้อนไม่ได้)
+  if (p.skillUsedRound && !isBrianKey && !isBrianN2O && !isLumiBasic && !isCayBasic && !isDaichiBasic && !isSupPick && !isHarukaBasic && !isApplePick && !isMuimiBasic && !isTohnoPick && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHisakawaFreeAction) return; // ใช้สกิลได้เพียง 1 อันต่อเทิร์น (ซ้ำ/ซ้อนไม่ได้)
   // Beat Mode (ประกายเขี้ยว): ท่าไม้ตายใช้ไม่ได้เสมอ / สกิลพื้นฐานใช้ไม่ได้เฉพาะหลังกันตายทำงานแล้ว (patch 2.2 alpha)
   if (tier === "ultimate" && beatActive(p)) return;
   // ท่าไม้ตาย: กดซ้ำไม่ได้จนกว่าผลจะหมดเวลา (สวมเกราะราชันคงอยู่ถาวร = กดซ้ำไม่ได้อีกเลยตลอดเกม)
@@ -3767,6 +3791,10 @@ function useSkill(id, tier, targets, item) {
   const isCayPick = p.characterId === "cayenne";
   if (isCayPick && !CHAR_HOOKS.cayenne.canUseSkill(engine, p, tier)) return;
   let cayMissileCast = false; // มิสไซล์แห่งคำอำลา: ความเสียหายลงหลังวีดีโอจบ
+  // ---------- ไดจิ โอโซระ (characters/daichi.js) ----------
+  //  พื้นฐาน: 2 ครั้ง/เทิร์น · รอง: ต้องอยู่ใน unite และสวมเกราะใบเดิมซ้ำไม่ได้ · ท่าไม้ตาย: กดซ้ำระหว่าง unite ไม่ได้
+  const isDaichiPick = p.characterId === "daichi";
+  if (isDaichiPick && !CHAR_HOOKS.daichi.canUseSkill(engine, p, tier)) return;
   const isBrianPick = p.characterId === "brian";
   let brianTarget = null;
   if (isBrianPick) {
@@ -3866,7 +3894,7 @@ function useSkill(id, tier, targets, item) {
     if (p.statuses.freecast <= 0) delete p.statuses.freecast;
     lastLog.push(`👸 ${p.name} การ์ดราชินี — ใช้สกิลนี้โดยไม่เสียแต้มสกิล`);
   }
-  if (!isApplePick && !isMuimiBasic && !isTohnoPick && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHarukaBasic && !isHisakawaFreeAction && !isYuiBasic && !isSupPick && !isBrianKey && !isBrianN2O && !isLumiBasic && !isCayBasic) p.skillUsedRound = true; // สกิลเลือก/สลับและเสบียงฉุกเฉินไม่นับโควตาสกิลหลัก
+  if (!isApplePick && !isMuimiBasic && !isTohnoPick && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHarukaBasic && !isHisakawaFreeAction && !isYuiBasic && !isSupPick && !isBrianKey && !isBrianN2O && !isLumiBasic && !isCayBasic && !isDaichiBasic) p.skillUsedRound = true; // สกิลเลือก/สลับและเสบียงฉุกเฉินไม่นับโควตาสกิลหลัก
   if (isKaiPick) p.kaiSkillUsesRound = (p.kaiSkillUsesRound || 0) + 1;
   if (isTakumiPick) p.takumiSkillUsesRound = (p.takumiSkillUsesRound || 0) + 1;
 
@@ -4003,6 +4031,7 @@ function useSkill(id, tier, targets, item) {
     flashSuffix = CHAR_HOOKS.cayenne.applyInstantSkill(engine, p, tier) || flashSuffix;
     cayMissileCast = tier === "ultimate";
   }
+  if (isDaichiPick) flashSuffix = CHAR_HOOKS.daichi.applyInstantSkill(engine, p, tier) || flashSuffix;
   if (isBatPick) flashSuffix = CHAR_HOOKS.bat_ben.applyInstantSkill(engine, p, tier) || flashSuffix;
   if (st === "batKarma") CHAR_HOOKS.bat_ben.activateKarma(engine, p);
   if (st === "batTaunt") CHAR_HOOKS.bat_ben.activateTaunt(engine, p);
@@ -4102,6 +4131,7 @@ function useSkill(id, tier, targets, item) {
   if (skill.instant) {
     // Apple guy: ป้ายเด้งของสกิลพื้นฐานโชว์รูปของที่เลือก
     const flashImg = isApplePick ? CHAR_HOOKS.appleguy.ITEMS[item].img
+      : isDaichiPick && tier === "basic" ? CHAR_HOOKS.daichi.cardImg(p) // ไดจิ: โชว์การ์ดไซเบอร์ใบที่เพิ่งสุ่มได้
       : (skill.img || null);
     // เทเปา (ชิกิ): กดสกิลพื้นฐาน/สกิลรอง ให้เล่นเสียง tepeu_skill1_2 ก่อนเสมอ
     // คอนเนอร์: เพลงคิด conner_think.m4a "ไม่" เล่นที่นี่ — มันต้องเล่นระหว่างกำลังเรียงลำดับในโมดัล
@@ -4871,6 +4901,8 @@ function postAttackFollowup(attacker) {
   // อิปโป (characters/ippo.js): Dempsey roll — โจมตีต่อเนื่องตามจำนวน Dempsey Charge ที่สะสมไว้
   // โปรดิวเซอร์: จ่ายรางวัล luminous burst หลังคลิปเล่นจบ (คิวไว้ตั้งแต่ตอนโดนตีครบทุกคน)
   CHAR_HOOKS.producer_lumi.flushBurst(engine);
+  // ไดจิ เกราะโกโมร่า: สุ่มผ่านแล้ว -> โจมตีเพิ่มอีก 1 ครั้ง (ครั้งเพิ่มไม่สุ่มต่อ)
+  if (CHAR_HOOKS.daichi.startExtraAttack(engine, attacker)) return;
   if (CHAR_HOOKS.ippo.startExtraAttack(engine, attacker)) return;
   // โปรดิวเซอร์: All star 765 หมัดที่ 2 · kuroi 961 ตีต่อจากผู้ชนะ (ต้องอยู่หลังหมัดที่ 2 ของตัวเอง)
   if (CHAR_HOOKS.producer_lumi.startExtraAttack(engine, attacker)) return;
@@ -5287,6 +5319,8 @@ function doAttack(byId, targetId) {
   CHAR_HOOKS.escanor.onNormalAttackReceived(engine, attacker, target, escanorFormBeforeHit);
   // คาเยนน์ (characters/cayenne.js): เปราะบาง 30% (เกพาร์ด — มีผลตั้งแต่ครั้งถัดไป) · ปืนพกฟื้นเลือด
   const cayAttackFx = CHAR_HOOKS.cayenne.afterMainHit(engine, attacker, target, cayBarrage);
+  // ไดจิ (characters/daichi.js): เกราะโกโมร่า 50% ได้ตีเพิ่ม 1 ครั้ง · เกราะเอเลคิง 30% สตั้นเป้าหมายเทิร์นหน้า
+  const daichiAttackFx = CHAR_HOOKS.daichi.afterMainHit(engine, attacker, target);
   // ผู้สังหารเมจ (characters/mageslayer.js): Fury — สูบพลังชีวิตและมอบ [ดูดซับเวท] ตามขั้น แล้วเคลียร์สต็อก
   //  (การขโมยพลังงานจากตราล่าเวททำที่ท่อดาเมจกลาง mageslayerMarkSteal ไปแล้ว)
   CHAR_HOOKS.mageslayer.onAttackPostDamage(engine, attacker, target, dmg);
@@ -5508,6 +5542,7 @@ function doAttack(byId, targetId) {
   }, "atk");
   if (harukaCounterFx) addFx({ name: `อมาซอน — สวนกลับ -${harukaCounterFx.dmg}${harukaCounterFx.bled > 0 ? ` + เลือดไหล ${harukaCounterFx.bled}` : ""}${harukaCounterFx.stunned ? " + สตั้นเทิร์นหน้า" : ""}`, img: CHAR_HOOKS.haruka.IMG.base, by: target.name, color: POSITION_COLORS[target.position] || "#888" }, "def");
   for (const fx of CHAR_HOOKS.cayenne.attackFx(engine, attacker, cayAttackFx)) addFx(fx, fx.side);
+  for (const fx of CHAR_HOOKS.daichi.attackFx(engine, attacker, daichiAttackFx)) addFx(fx, fx.side);
   addFx(CHAR_HOOKS.cayenne.delayFx(engine, target, cayPendingBefore), "def");
   if (pshikiBladeHeal > 0) addFx({ name: `อืม ฉันเข้าใจแล้ว (ฟื้นเลือด +${pshikiBladeHeal})`, img: "/characters/princess_shiki/p_shiki_skill1.jpg", by: attacker.name, color: POSITION_COLORS[attacker.position] || "#888" }, "atk");
 
@@ -5692,6 +5727,8 @@ function endTurn() {
         if (k === "lumiUlt" || k === "lumiLuminous") CHAR_HOOKS.producer_lumi.onUltExpire(engine, p, k);
         // คาเยนน์: ร่าง "เกพาร์ด" หมดเวลา -> แรงใจเริ่มสะสมใหม่จาก 0
         if (k === "cayGepard") CHAR_HOOKS.cayenne.onGepardExpire(engine, p);
+        // ไดจิ: unite หมดเวลา -> เกราะหลุดไปด้วย
+        if (k === "daichiUnite") CHAR_HOOKS.daichi.onUniteExpire(engine, p);
         if (k === "kaiLink") CHAR_HOOKS.kai.onExpireKaiLink(p);
         if (k === "kaiRival1" || k === "kaiRival2") CHAR_HOOKS.kai.onExpireKaiRival(p);
         // ทาคุมิ ฟุจิวาระ: ถึงจะมองไม่เห็น แต่ฉันยังอยู่ หมดเวลาเองตามธรรมชาติ (ไม่มีใครไพ่แตกใน 5 เทิร์น) -> รีเซ็ต guard ให้ใช้ท่าไม้ตายรอบหน้าได้ปกติ
@@ -6073,6 +6110,7 @@ io.on('connection', (socket) => {
       muimiLoseStreak: 0, muimiHeartRound: 0, muimiForcedBustRound: 0, muimiUltCasts: 0, muimiUltCastRound: 0, muimiUltLock: 0,
       tepeuCookTurns: 0, tepeuPonderTurns: 0, tepeuEyeTurns: 0, tepeuLoseStreak: 0, tepeuKillTargetId: null,
       cayAmmo: 0, cayMorale: 0, cayBarrage: false, cayBarrageShot: 0, cayPistolRound: 0, cayPending: [],
+      daichiCard: "gomora", daichiArmor: null, daichiBasicUses: 0, daichiStored: [], daichiStunPending: 0,
       piggy: 0, senaNext: false, kotoneExtraAtk: false,
       bardNotes: [], bardNotesUsed: 0, bardPending: null,
       bloodSection: 0, soulSection: 0, bardLinks: {},

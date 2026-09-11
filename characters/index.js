@@ -41,6 +41,7 @@ const brian = require("./brian");
 const producer_lumi = require("./producer_lumi");
 const muimi = require("./muimi");
 const cayenne = require("./cayenne");
+const daichi = require("./daichi");
 
 const CHARACTER_MODULES = [
   tohno,
@@ -80,6 +81,7 @@ const CHARACTER_MODULES = [
   brian,
   producer_lumi,
   cayenne,
+  daichi,
 ];
 
 const CHAR_HOOKS = {};
