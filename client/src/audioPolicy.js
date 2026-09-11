@@ -3,7 +3,7 @@ export function musicForState(state, { lowQ = false, scene = null, cycleSeq = 0 
   const phase = state?.gameState;
   if (!phase || ["LOBBY", "TEAM_MODE", "TEAM_SETUP"].includes(phase)) return { name: "main_home" };
   const cs = phase === "CUTSCENE" ? state.cutscene : null;
-  const mandatory = cs?.kind === "overloadForce" || cs?.kind?.startsWith("yuuki");
+  const mandatory = cs?.kind === "overloadForce";
   if (cs && (!lowQ || mandatory || cs.announce)) return { name: null };
   const sc = state?.seraph;
   if (sc) {

@@ -150,7 +150,7 @@ module.exports = {
       engine.log(`🏃 ${p.name} Training — ${capMsg} — ฝึกฝนสำเร็จ! แต้มสกิล +1 และยุคทอง +1 (${p.statusAmt.goldenera}/${engine.OGURI_GOLD_MAX})${extraMsg}`);
     } else {
       engine.dealDirect(p, OGURI_TRAIN_FAIL_DMG);
-      engine.maybeBeatSave(p); engine.maybeBeatMode(p); engine.maybeEva3(p);
+      engine.maybeBeatSave(p); engine.maybeBeatMode(p);
       flashSuffix = " — ฝึกฝนล้มเหลว!";
       engine.log(`🏃💢 ${p.name} Training — ${capMsg} — ฝึกฝนล้มเหลว! รับดาเมจ -${OGURI_TRAIN_FAIL_DMG} (ไม่สนเกราะ)`);
       if (p.alive && p.hp <= 0) {
@@ -188,7 +188,6 @@ module.exports = {
       if (o.busted) {
         o.locked = true;
         engine.voidUltimateOnBust(o);
-        engine.maybeMoonBurst(o);
         bustedNames.push(o.name);
       }
     }
@@ -245,7 +244,7 @@ module.exports = {
       const hits = engine.alivePlayers().filter((o) => o.id !== p.id && engine.bustedOf(o));
       for (const o of hits) {
         engine.dealMixed(o, OGURI_ASHEN_DMG);
-        engine.maybeBeatSave(o); engine.maybeBeatMode(o); engine.maybeEva3(o); engine.maybeWakeKotone(o);
+        engine.maybeBeatSave(o); engine.maybeBeatMode(o); engine.maybeWakeKotone(o);
         o.wasAttacked = true;
         if (o.alive && o.hp <= 0) { engine.instantDeath(o); if (!o.alive) engine.log(`💀 ${o.name} เลือดจริงหมด ตกรอบ!`); }
       }

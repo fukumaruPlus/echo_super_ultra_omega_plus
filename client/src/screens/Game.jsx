@@ -497,7 +497,7 @@ function OverloadForceBadge() {
 //  กลางวัน = background_morning.jpg | กลางคืน = background_night.jpg
 //  เปลี่ยนช่วงเวลาแบบ crossfade ช้าๆ (ไม่ตัดปุ๊บปั๊บ) — ซ้อนทั้ง 2 ภาพแล้วเฟดสลับกัน
 //  ระหว่าง Lie Like Vortigern (โอเบรอน) ฉากหลังกลางคืนกลายเป็นวีดีโอ oberon_background.mp4 (เฟดเข้า)
-function GameBackground({ cycle, oberonBg, shradeBg, bardBg, shikiBg, hakunoBg, hisakawaBg, overloadForce, lowQ, seraph }) {
+function GameBackground({ cycle, oberonBg, bardBg, shikiBg, hisakawaBg, overloadForce, lowQ, seraph }) {
   // SE.RA.PH: โหมดนี้วาดฉากหลังของตัวเองไว้ข้างล่างแล้ว (สนามดวลวันที่ 5 กลางวัน/กลางคืน)
   //  ถ้าปล่อยให้กระดานเดิมวาดทับ จะกลายเป็นฉากหลังของเกมปกติแทน
   if (seraph) return null;
@@ -516,14 +516,6 @@ function GameBackground({ cycle, oberonBg, shradeBg, bardBg, shikiBg, hakunoBg, 
         className="absolute inset-0 w-full h-full object-cover transition-opacity duration-[3000ms] ease-in-out"
         style={{ opacity: night ? 1 : 0 }}
       />
-      {/* ราตรีของชเรด เอลัน (ร่างสปาด้า): ทุกค่ำคืน ฉากหลังกลายเป็น change_fill.jpg */}
-      {shradeBg && (
-        <img
-          src="/characters/shrade_elan/change_fill.jpg"
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover bg-fade-in"
-        />
-      )}
       {/* มิติมายาบรรเลง (Bard): โลหิต = ตอนเช้า / วิญญาณ = ตอนกลางคืน (ทับฉากหลังอื่นทั้งหมด) */}
       {bardBg && (
         <img
@@ -560,14 +552,6 @@ function GameBackground({ cycle, oberonBg, shradeBg, bardBg, shikiBg, hakunoBg, 
           src="/characters/shiki/shiki2.jpg"
           alt=""
           decoding="async"
-          className="absolute inset-0 w-full h-full object-cover bg-fade-in"
-        />
-      )}
-      {/* MOON*CELL (คิชินามิ ฮาคุโนะ patch 2.2.1): ซ้อน hakuno_fill.jpg ทับฉากหลังปัจจุบันระหว่างท่าไม้ตายทำงาน */}
-      {hakunoBg && (
-        <img
-          src="/characters/hakuno/hakuno_fill.jpg"
-          alt=""
           className="absolute inset-0 w-full h-full object-cover bg-fade-in"
         />
       )}
@@ -1001,12 +985,12 @@ function LifeBar({ p, sm, className = "" }) {
       <span className="inline-flex gap-0.5 shrink-0">
         {Array.from({ length: p.maxArmor }, (_, i) => <Shield key={i} on={i < p.armor} size={sm ? 12 : 16} />)}
       </span>
-      {/* ผู้วิงวอน "เกราะศรัทธา" (patch 3.4.5): เกราะชั้นที่ 2 — วาดต่อท้ายเกราะหลักตามที่สเปคกำหนด
+      {/* ผู้วิงวอน "เกราะศรัทธา" (patch 3.4.6): เกราะพิเศษที่กินดาเมจก่อนเกราะหลัก — วาดต่อท้ายเกราะหลัก
           ❤️❤️… 🛡️🛡️🛡️ 🔰🔰🔰 · โชว์เฉพาะจำนวนที่เหลือจริง (ไม่มีช่องว่างของหน่วยที่แตกไปแล้ว) */}
       {p.supFaith > 0 && (
         <span
           className={`${sm ? "text-sm" : "text-lg"} leading-none whitespace-nowrap`}
-          title={`เกราะศรัทธา ${p.supFaith}/${p.supFaithMax || 3} — เกราะชั้นหลังเกราะหลัก · ระหว่างที่ยังเหลือ เจ้าของได้ "คุ้มครอง 1" และ "เสริมพลัง 1"`}
+          title={`เกราะศรัทธา ${p.supFaith}/${p.supFaithMax || 3} — เกราะพิเศษที่กินความเสียหายก่อนเกราะหลักเสมอ (ยกเว้นการโจมตีทะลุเกราะ) · ระหว่างที่ยังเหลือ เจ้าของได้ "คุ้มครอง 1" และ "เสริมพลัง 1"`}
         >
           {"🔰".repeat(p.supFaith)}
         </span>
@@ -1204,7 +1188,6 @@ const STATUS_INFO = {
   yunaDelete: { icon: "💜", label: "Delete", cls: "bg-echo-magenta", desc: "Delete (ยูนะ): ดาเมจที่ได้รับเพิ่มขึ้น +1 ตามจำนวนเทิร์นที่เหลือ — ต้าน/ลบไม่ได้ ซ้อนกับเปราะบางได้" },
   yunaSmile: { icon: "💚", label: "Smile for You", cls: "bg-echo-cyan text-gray-900", desc: "Smile for You (ยูนะ): ดาเมจที่ได้รับลดลง -1 ตามจำนวนเทิร์นที่เหลือ — ต้าน/ลบไม่ได้" },
   yunaLonging: { icon: "✨", label: "Longing", cls: "bg-echo-gold text-gray-900", desc: "Longing (ยูนะ): พลังโจมตี +1 ตามจำนวนเทิร์นที่เหลือ (ได้รับตอนฟื้นคืนชีพ)" },
-  heroSword: { icon: "⚔️", label: "ดาบผู้กล้า", cls: "bg-echo-gold text-gray-900", desc: "ดาบผู้กล้า: พลังโจมตีปกติ +2 ตามจำนวนเทิร์นที่เหลือ" },
   // ---------- Bard : คีตกวี (patch 2.2) ----------
   resist:    { icon: "🛡️", label: "ต้านผิดปกติ", cls: "bg-echo-gold text-gray-900", desc: "ต้านสถานะผิดปกติ: ล้างและต้านทานดีบัฟพื้นฐาน (ขัดแย้ง/หลับไหล/สตั้น/ห้ามจั่ว/ห้ามใช้สกิล/พิษ/อ่อนแอ/เปราะบาง/ภาระเวท) ตามจำนวนเทิร์นที่เหลือ — ดีบัฟที่ยังไม่เกิดผลทันที (ยามฟ้าสาง/เส้นชีวิต) ถูกล้างจะลดลงทีละ 1 หน่วย" },
   guard:     { icon: "💗", label: "คุ้มครอง", cls: "bg-echo-armor", desc: "คุ้มครอง: ความเสียหายจากการถูกโจมตีลดลงตามจำนวนที่ระบุ (ไม่ระบุ = 1) ตามจำนวนเทิร์นที่เหลือ" },
@@ -1272,10 +1255,12 @@ const STATUS_INFO = {
   brianPush:   { icon: "🏎️", label: "หลีกทางไป", cls: "bg-echo-gold text-gray-900", desc: "หลีกทางไป: ทุกเทิร์นหลังเปิดไพ่ จะพุ่งชนผู้เล่นที่แต้มสูงสุดในบรรดาคนที่แต้มมากกว่าเรา สร้างความเสียหาย 1 หน่วย (2 หน่วยในร่างเพิ่มพลัง) — ระหว่างนี้ใช้ท่าไม้ตายไม่ได้" },
   brianNoFuel: { icon: "⛽", label: "ถังรั่ว", cls: "bg-echo-hp", desc: "ถังรั่ว: แพ้หรือเสมอในการแข่งที่มีเดิมพัน — ฟื้นน้ำมันจากการจบเทิร์นไม่ได้ (แต่ยังได้น้ำมันจากการชนะการจั่วตามปกติ)" },
   // ---------- สถานะ Universal ใหม่ (patch 3.4) ----------
+  cayPistol: { icon: "🔫", label: "ปืนพก", cls: "bg-echo-cyan text-gray-900", desc: "ปืนพกหน่วยรบ (คาเยนน์): การโจมตีปกติที่เข้าเป้าฟื้นพลังชีวิต 3 หน่วย — ทำงานครั้งเดียวแล้วหมด (คงอยู่ 1 เทิร์น)" },
+  cayGepard: { icon: "🛡️", label: "เกพาร์ด", cls: "bg-echo-gold text-gray-900", desc: "ร่วมร่างสหายแห่งเทพ (คาเยนน์): ร่างเกพาร์ด — ความเสียหายที่ได้รับไม่ถูกเลื่อนอีกต่อไป · การโจมตีปกติแต่ละนัดที่เข้าเป้ามีโอกาส 50% มอบ \"เปราะบาง\" · ปลดล็อก \"แน่จริงก็หลบสิ\" และ \"มิสไซล์แห่งคำอำลา\"" },
   mend:      { icon: "💚", label: "เยียวยา", cls: "bg-echo-armor", desc: "เยียวยา: ต้นเทิร์นฟื้นพลังชีวิตเท่ากับจำนวนหน่วยที่ระบุ (1 หน่วย = 1 พลังชีวิต) — ซ้อนทับจำนวนเทิร์นได้สูงสุด 5 เทิร์น" },
   blind:     { icon: "🕶️", label: "ตาบอด", cls: "bg-echo-hp", desc: "ตาบอด: มองไม่เห็นอะไรเลยทั้งเทิร์น — ไพ่ แต้ม พลังงาน พลังชีวิต และเกราะของทุกคนรวมทั้งของตัวเอง ถูกปิดหมด" },
   // ---------- ผู้วิงวอน The Supplicant (patch 3.4 new) ----------
-  supFaith:  { icon: "✝️", label: "เกราะศรัทธา", cls: "bg-echo-gold text-gray-900", desc: "เกราะศรัทธา: เกราะชั้นที่ 2 ที่อยู่หลังเกราะหลัก (สะสมได้สูงสุด 3 หน่วย) — ตราบที่ยังเหลืออยู่ เจ้าของได้รับ \"คุ้มครอง 1\" และ \"เสริมพลัง 1\" ตลอดเวลา · ล้าง/ต้านไม่ได้ หายเมื่อถูกดาเมจกินจนหมดเท่านั้น" },
+  supFaith:  { icon: "✝️", label: "เกราะศรัทธา", cls: "bg-echo-gold text-gray-900", desc: "เกราะศรัทธา: เกราะพิเศษที่เสริมขึ้นมา (สะสมได้สูงสุด 3 หน่วย · 1 หน่วย = เกราะ 1 หน่วย) — ความเสียหายทุกช่องทาง รวมดาเมจนอกสนามและดาเมจจากสถานะดีบัฟ จะกินเกราะนี้ก่อนเกราะหลักเสมอ ยกเว้นการโจมตีทะลุเกราะ · ปืนสลายเกราะทำลายได้ · การโจมตีที่คำนวณแล้วดาเมจเหลือ 0 ทำลายไม่ได้ · ตราบที่ยังเหลืออยู่ เจ้าของได้รับ \"คุ้มครอง 1\" และ \"เสริมพลัง 1\" ตลอดเวลา · ล้าง/ต้านไม่ได้" },
   supJudge:  { icon: "⚖️", label: "ตราพิพากษา", cls: "bg-echo-magenta", desc: "ตราพิพากษา: ทุกครั้งที่เจ้าของถูกโจมตี และทุกครั้งที่เจ้าของเป็นฝ่ายโจมตี (นับแยกกัน) จะเกิดผล 1 ครั้ง — สายศัตรูรับดาเมจเพิ่ม 1 ต่อครั้ง ครบ 3 ครั้งติด \"ลงทัณฑ์\" / สายพันธมิตรฟื้นเกราะ +1 ต่อครั้ง ครบ 3 ครั้งได้ \"ฟื้นฟู\" + ล้างดีบัฟ" },
   supPunish: { icon: "⛓️", label: "ลงทัณฑ์", cls: "bg-echo-hp", desc: "ลงทัณฑ์: ระหว่างที่ยังติดอยู่ เจ้าของได้รับดีบัฟ \"ชา\" (กดจั่ว 1 ครั้งได้ไพ่ 2 ใบ) และ \"ตาบอด\" (มองไม่เห็นอะไรเลย) — ล้าง/ต้านไม่ได้" },
   supLamb:   { icon: "🐑", label: "ลูกแกะน้อยรู้แจ้ง", cls: "bg-echo-hp", desc: "ลูกแกะน้อยรู้แจ้ง: ระหว่างที่ยังติดอยู่ เจ้าของได้รับดีบัฟ \"อ่อนแอ 1\" และ \"เปราะบาง 1\" และเล็งผู้วิงวอนไม่ได้เลย (สกิล/ไอเทม/โจมตีปกติ) — ล้าง/ต้านไม่ได้" },
@@ -1401,6 +1386,14 @@ function statusEntries(p, full) {
       cls: (p.lumiPoints || 0) >= (p.lumiPointsMax || 6) ? "bg-echo-gold text-gray-900" : "bg-white/20",
       desc: "แต้มสถานะ \"ไอดอล\" — ได้ +1 ทุกครั้งที่กดท่าไม้ตายหรือฝึกซ้อม · ครบแล้วช่องท่าไม้ตายจะกลายเป็น luminous (ใช้แล้วรีเซ็ตเป็น 0)",
     });
+  }
+  // คาเยนน์: กระสุน / แรงใจ / ชุดกระสุนที่บรรจุไว้ / ความเสียหายที่เลื่อนไว้ (ทุกคนเห็นได้ — เป็นข้อมูลสนาม)
+  if (p.cayenne) {
+    const c = p.cayenne;
+    out.push({ key: "cayAmmo", v: 1, icon: "🔫", label: `กระสุน ${c.ammo}/${c.ammoMax}`, cls: c.ammo > 0 ? "bg-echo-cyan text-gray-900" : "bg-echo-hp", desc: "ทหารผ่านศึก: กระสุน (แม็ก) เริ่ม 3 เก็บได้สูงสุด 3 — ปืนพกหน่วยรบ +1 · แน่จริงก็หลบสิ ใช้ 1 · มิสไซล์แห่งคำอำลา ใช้ 2" });
+    if (!c.gepard) out.push({ key: "cayMorale", v: 1, icon: "🔥", label: `แรงใจ ${c.morale}/${c.moraleNeed}`, cls: "bg-white/20", desc: "แรงใจ: ได้จากปืนพกหน่วยรบครั้งละ 1 — ครบ 5 แปลงร่างเป็น \"เกพาร์ด\" 10 เทิร์น (หมดร่างแล้วเริ่มสะสมใหม่จาก 0)" });
+    if (c.barrage) out.push({ key: "cayBarrage", v: 1, icon: "🎯", label: "แน่จริงก็หลบสิ (บรรจุแล้ว)", cls: "bg-echo-magenta", desc: "การโจมตีปกติครั้งถัดไปยิง 4 นัด นัดละ 1 หน่วย (นัดที่ 4 มีโอกาส 50%) — ค้างไว้จนกว่าจะได้โจมตี" });
+    if (c.pending > 0) out.push({ key: "cayPending", v: c.pending, icon: "⏳", label: `ความเสียหายค้าง ${c.pending}`, cls: "bg-echo-hp", desc: "ทหารผ่านศึก: ความเสียหายที่ได้รับตอนไม่ได้อยู่ในร่างเกพาร์ด ถูกเลื่อนไปลงผลตอนต้นเทิร์นถัดไป" });
   }
   // ไบรอัน: น้ำมันเป็นข้อมูลสาธารณะ — เป็นตัวจับเวลาของร่างรถที่ทุกคนต้องอ่านออกว่าเหลืออีกกี่เทิร์น
   if (p.character?.id === "brian") {
@@ -1944,29 +1937,6 @@ function OtherPlayer({ p, phase, slot, targetable, onAttack, picked, onInspect, 
 
 // ---------- การ์ดคู่ต่อสู้แบบมือถือ (เรียงกริดด้านบน แตะเพื่อโจมตี/เลือกเป้า ANATA) ----------
 //  แตะตอนไม่ได้เลือกเป้า = เปิดหน้าต่างดูสถานะของคนนั้น (onInspect)
-// บอสยูกิเป็นการ์ดกลางจอแทนกองกลางตลอดเวลาที่ยังอยู่ในสนาม
-function YuukiBossCard({ p, phase, targetable, onPick, onInspect, hostRef, compact = false }) {
-  if (!p?.alive) return null;
-  const summary = phase === "SUMMARY";
-  return (
-    <div
-      ref={hostRef}
-      onClick={targetable ? () => { clickSound(); onPick(p.id); } : () => { clickSound(); onInspect(p.id); }}
-      className={`pointer-events-auto p-target-wrap relative rounded-2xl border-2 border-violet-400 bg-black/75 shadow-2xl cursor-pointer ${compact ? "w-28 p-2" : "w-36 p-3"}`}
-      style={{ boxShadow: "0 0 28px rgba(124,58,237,.65)" }}
-    >
-      <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-violet-700 border border-violet-300 px-3 py-0.5 text-[10px] font-black whitespace-nowrap z-20">ยูกิ Overload</div>
-      <Portrait p={p} className={`${compact ? "h-20" : "h-24"} w-full rounded-xl`} rounded="rounded-xl" />
-      <div className="mt-1 text-center text-sm font-black text-violet-200 truncate">ยูกิ Overload</div>
-      <Stats p={p} center />
-      {summary && p.score !== null && <div className="text-center text-xl font-black text-echo-gold">{p.busted ? "แตก!" : `${p.score} แต้ม`}</div>}
-      <StatusChips p={p} compact max={4} />
-      {targetable && <><TargetLock /><span className="p-target-badge absolute -top-3 -right-5 text-[10px] px-2 py-0.5 rounded-full text-white">🎯 เป้า</span></>}
-      {phase === "PLAYING" && p.locked && <span className="absolute top-1 right-1 bg-emerald-600 rounded-full w-5 h-5 grid place-items-center text-xs">✓</span>}
-    </div>
-  );
-}
-
 function MobileOpponent({ p, phase, targetable, onAttack, picked, onInspect, hostRef }) {
   const summary = phase === "SUMMARY";
   return (
@@ -2828,7 +2798,7 @@ function ConnorPredictModal({ me, players, onSubmit, onClose }) {
     startLoopSfx("conner_think");
     return () => stopLoopSfx();
   }, []);
-  const targets = players.filter((p) => p.alive && p.id !== me.id && !p.isBoss);
+  const targets = players.filter((p) => p.alive && p.id !== me.id);
   const toggle = (key) => {
     clickSound();
     setNone(false);
@@ -3273,8 +3243,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
   const { flights: cardFlights, removeFlight: removeCardFlight, deckRef, selfHandRef, registerOther } = useCardFlights(state);
   const phase = state.gameState;
   const me = state.players.find((p) => p.id === state.youId);
-  const boss = state.players.find((p) => p.isBoss && p.alive) || null;
-  const others = state.players.filter((p) => p.id !== state.youId && !p.isBoss);
+  const others = state.players.filter((p) => p.id !== state.youId);
   const slots = SLOTS[Math.min(others.length, 6)] || [];
   const iAmAttacker = phase === "ATTACK" && state.attackerId === state.youId;
   const attacker = state.players.find((p) => p.id === state.attackerId);
@@ -3442,6 +3411,12 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
   const lumiBasicLocked = isLumi && !lumiIdolDown && lumiUltOn;
   const lumiSecLocked = isLumi && (lumiIdolDown || (me?.statuses?.lumiTrain || 0) > 0);
   const lumiUltLocked = isLumi && (lumiIdolDown || lumiUltOn);
+  // คาเยนน์: ปืนพก 1 ครั้ง/เทิร์น (ไม่กินโควตาสกิล) · รอง/ท่าไม้ตายต้องเป็นเกพาร์ด + กระสุนพอ — ต้องตรงกับ canUseSkill ฝั่ง server
+  const isCay = ch?.id === "cayenne";
+  const cayState = (isCay && me?.cayenne) || {};
+  const cayBasicLocked = isCay && cayState.pistolRound === state.roundNumber;
+  const caySecLocked = isCay && (!cayState.gepard || !!cayState.barrage || (cayState.ammo || 0) < 1);
+  const cayUltLocked = isCay && (!cayState.gepard || (cayState.ammo || 0) < 2);
   const isShido = ch?.id === "shido";
   const shidoUltCd = isShido ? ((me?.shidoGuard || 0) > 0 ? me.shidoGuard : (me?.shidoCd || 0)) : 0;
   const shidoUltLocked = isShido && shidoUltCd > 0;
@@ -4029,11 +4004,9 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
   //  โหมดประหยัด (patch 2.0.6): ข้ามวีดีโอ — แสดงกระดาน + แจ้งเตือนว่าใครเปิดท่าไม้ตาย รอเวลาเท่าวีดีโอจริง
   const csYuna = phase === "CUTSCENE" && state.cutscene && state.cutscene.kind === "yuna" ? state.cutscene : null;
   const csOverload = phase === "CUTSCENE" && state.cutscene && state.cutscene.kind === "overloadForce" ? state.cutscene : null;
-  const csYuuki = phase === "CUTSCENE" && state.cutscene?.kind?.startsWith("yuuki") ? state.cutscene : null;
   const csAnnounce = phase === "CUTSCENE" && state.cutscene && state.cutscene.announce ? state.cutscene : null;
-  const csSkipped = lowQ && phase === "CUTSCENE" && state.cutscene && !csAnnounce && !csYuna && !csOverload && !csYuuki ? state.cutscene : null;
+  const csSkipped = lowQ && phase === "CUTSCENE" && state.cutscene && !csAnnounce && !csYuna && !csOverload ? state.cutscene : null;
   if (csOverload) return <OverloadForceCutscene key={state.cutscene.id} cs={state.cutscene} />;
-  if (csYuuki) return <Cutscene key={state.cutscene.id} cs={state.cutscene} />;
   if (phase === "CUTSCENE" && state.cutscene && csYuna && !lowQ) return <YunaCutscene key={state.cutscene.id} cs={state.cutscene} />;
   if (phase === "CUTSCENE" && state.cutscene && !csAnnounce && !csYuna && !lowQ) return <Cutscene key={state.cutscene.id} cs={state.cutscene} />;
 
@@ -4062,7 +4035,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
     const revealed = phase === "SUMMARY" || phase === "ATTACK" || phase === "ATTACKING";
     return (
       <div className="fixed inset-0 overflow-hidden flex flex-col">
-        <GameBackground cycle={state.cycle} oberonBg={state.oberonBg} shradeBg={state.shradeBg} bardBg={state.bardBg} shikiBg={state.shikiBg} hakunoBg={state.hakunoBg} hisakawaBg={state.hisakawaBg} overloadForce={state.overloadForce} lowQ={lowQ} seraph={!!state.seraph} />
+        <GameBackground cycle={state.cycle} oberonBg={state.oberonBg} bardBg={state.bardBg} shikiBg={state.shikiBg} hisakawaBg={state.hisakawaBg} overloadForce={state.overloadForce} lowQ={lowQ} seraph={!!state.seraph} />
         {/* แถบบน: รอบ + เวลา (เว้นขวาให้ปุ่มเสียง) */}
         <div className="shrink-0 flex flex-col items-center gap-1 pt-2 px-14 min-h-[40px]">
           {(phase === "PLAYING" || phase === "ATTACK") && (
@@ -4252,13 +4225,11 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
           <div className="relative grid place-items-center">
             <img src="/image/logo_current.webp" alt="" className="h-14 w-auto opacity-25" />
             <div className="absolute inset-0 grid place-items-center">
-              {boss ? (
-                <YuukiBossCard p={boss} phase={phase} compact hostRef={(el) => registerOther(boss.id, el)} targetable={isTargetable(boss, iAmAttacker, targetChain)} onPick={(id) => resolveAttackPick(id, targetChain)} onInspect={setStatusViewId} />
-              ) : <DeckPile hostRef={deckRef} size="md" onClick={() => setDeckOpen(true)} />}
+              <DeckPile hostRef={deckRef} size="md" onClick={() => setDeckOpen(true)} />
             </div>
           </div>
         </div>
-        {deckOpen && !boss && <DeckLedgerModal ledger={state.deckLedger || []} onClose={() => setDeckOpen(false)} />}
+        {deckOpen && <DeckLedgerModal ledger={state.deckLedger || []} onClose={() => setDeckOpen(false)} />}
         {me?.qte && <QtePanel key={me.qte.idx} qte={me.qte} />}
 
         {/* ---------- แผงตัวเรา (ล่างสุด กดง่ายด้วยนิ้วโป้ง) ----------
@@ -4349,13 +4320,13 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
               {/* ช่องสกิล 3 อัน — ทรงพัด: ช่องกลาง (สกิลรอง) ยกสูงกว่าอีก 2 ช่อง */}
               <div className="grid grid-cols-3 gap-2 mt-3 items-end">
                 <div className="translate-y-1.5">
-                  <SkillSlot label="สกิลพื้นฐาน" tier="basic" skill={ch?.basic} points={me.skillPoints} disabled={!me.alive || phase !== "PLAYING" || (!isHisakawa && (done || noSkill || moonCellOn)) || hisakawaSwitchLocked || miyakoHealPending || hakunoSecondaryPending || beatBasicLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || witchMarkCooldown || (me.skillUsed && !gambleRepeat && !isByleth && !isHaruka && !isApple && !isMuimi && !isBard && !isTohno && !isHakuno && !isDoomguy && !isKai && !isTakumi && !isHisakawa && !isSup && !isBrian && !isLumi) || harukaBasicLocked || muimiBasicLocked || bylethBasicLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || cassiusLocked || veilLocked || ktBasicLocked || (isHakuno && me.hakunoGenderSwitched) || doomBasicLocked || takutoBasicPending || tepeuCookLocked || tepeuPonderLocked || psBladeLocked || ippoBasicCd > 0 || supBudgetLocked || arjunaBasicLocked || connorPredictLocked || lumiBasicLocked} onUse={requestSkillUse} cooldown={witchMarkCd || ippoBasicCd} ammo={isGambler ? me.gamblerUses : isMuimi ? me.muimiEmergencyUses : undefined} cost={isGambler && goldenOn ? halfCost(ch?.basic) : undefined} />
+                  <SkillSlot label="สกิลพื้นฐาน" tier="basic" skill={ch?.basic} points={me.skillPoints} disabled={!me.alive || phase !== "PLAYING" || (!isHisakawa && (done || noSkill || moonCellOn)) || hisakawaSwitchLocked || miyakoHealPending || hakunoSecondaryPending || beatBasicLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || witchMarkCooldown || (me.skillUsed && !gambleRepeat && !isByleth && !isHaruka && !isApple && !isMuimi && !isBard && !isTohno && !isHakuno && !isDoomguy && !isKai && !isTakumi && !isHisakawa && !isSup && !isBrian && !isLumi && !isCay) || harukaBasicLocked || muimiBasicLocked || bylethBasicLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || cassiusLocked || veilLocked || ktBasicLocked || (isHakuno && me.hakunoGenderSwitched) || doomBasicLocked || takutoBasicPending || tepeuCookLocked || tepeuPonderLocked || psBladeLocked || ippoBasicCd > 0 || supBudgetLocked || arjunaBasicLocked || connorPredictLocked || lumiBasicLocked || cayBasicLocked} onUse={requestSkillUse} cooldown={witchMarkCd || ippoBasicCd} ammo={isGambler ? me.gamblerUses : isMuimi ? me.muimiEmergencyUses : undefined} cost={isGambler && goldenOn ? halfCost(ch?.basic) : undefined} />
                 </div>
                 <div className="-translate-y-2">
-                  <SkillSlot label="สกิลรอง" tier="secondary" skill={ch?.secondary} points={me.skillPoints} disabled={done || phase !== "PLAYING" || noSkill || moonCellOn || miyakoComboPending || hakunoSecondaryPending || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || (me.skillUsed && !isByleth && !isBard && !isDoomguy && !isKai && !isTakumi && !isSup) || bylethSecLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || ohgerLocked || lanLocked || ktSecLocked || skSecLocked || banagherAssaultLocked || doomNoEffectLocked || takutoSecPending || takutoNotApprivoiseLocked || monsterMe || tepeuPonderLocked || tepeuCookLocked || batKarmaLocked || psSealLocked || harukaSecLocked || muimiSecLocked || burdenCooldown || ippoSecCd > 0 || supBudgetLocked || arjunaSecLocked || brianSecLocked || lumiSecLocked} onUse={requestSkillUse} cooldown={burdenCd || ippoSecCd} ammo={isApple ? me.appleGiveUses : me.beamAmmo} cost={isGambler && goldenOn ? halfCost(ch?.secondary) : undefined} />
+                  <SkillSlot label="สกิลรอง" tier="secondary" skill={ch?.secondary} points={me.skillPoints} disabled={done || phase !== "PLAYING" || noSkill || moonCellOn || miyakoComboPending || hakunoSecondaryPending || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || (me.skillUsed && !isByleth && !isBard && !isDoomguy && !isKai && !isTakumi && !isSup) || bylethSecLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || ohgerLocked || lanLocked || ktSecLocked || skSecLocked || banagherAssaultLocked || doomNoEffectLocked || takutoSecPending || takutoNotApprivoiseLocked || monsterMe || tepeuPonderLocked || tepeuCookLocked || batKarmaLocked || psSealLocked || harukaSecLocked || muimiSecLocked || burdenCooldown || ippoSecCd > 0 || supBudgetLocked || arjunaSecLocked || brianSecLocked || lumiSecLocked || caySecLocked} onUse={requestSkillUse} cooldown={burdenCd || ippoSecCd} ammo={isApple ? me.appleGiveUses : isCay ? cayState.ammo : me.beamAmmo} cost={isGambler && goldenOn ? halfCost(ch?.secondary) : undefined} />
                 </div>
                 <div className="translate-y-1.5">
-                  {isBard ? <BardComposeSlot me={me} /> : isKai ? <KaiOverhaulSlot me={me} /> : <SkillSlot label="ท่าไม้ตาย" tier="ultimate" skill={ch?.ultimate} points={me.skillPoints} disabled={(done || phase !== "PLAYING" || noSkill || moonCellOn || beatMe || (me.skillUsed && !isByleth && !isSup && !isBrianN2O) || bylethUltLocked || bylethBudgetLocked || ultimateActive || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || takumiBudgetLocked || fourthLocked || doomUltLocked || takutoUltLockedNow || tepeuCookLocked || tepeuPonderLocked || offerLocked || ktUltLocked || shUltLocked || shCharging || rgCharging || phenexTaunting || hikaruUltLocked || shidoUltLocked || eijiUltLocked || muimiUltLocked || ippoUltLocked || supBudgetLocked || supUltCd > 0 || arjunaUltCd > 0 || brianUltLocked || lumiUltLocked)} onUse={requestSkillUse} cooldown={shidoUltCd || eijiUltCd || muimiUltCd || ippoUltCd || supUltCd || arjunaUltCd} cost={undefined} />}
+                  {isBard ? <BardComposeSlot me={me} /> : isKai ? <KaiOverhaulSlot me={me} /> : <SkillSlot label="ท่าไม้ตาย" tier="ultimate" skill={ch?.ultimate} points={me.skillPoints} disabled={(done || phase !== "PLAYING" || noSkill || moonCellOn || beatMe || (me.skillUsed && !isByleth && !isSup && !isBrianN2O) || bylethUltLocked || bylethBudgetLocked || ultimateActive || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || takumiBudgetLocked || fourthLocked || doomUltLocked || takutoUltLockedNow || tepeuCookLocked || tepeuPonderLocked || offerLocked || ktUltLocked || shUltLocked || shCharging || rgCharging || phenexTaunting || hikaruUltLocked || shidoUltLocked || eijiUltLocked || muimiUltLocked || ippoUltLocked || supBudgetLocked || supUltCd > 0 || arjunaUltCd > 0 || brianUltLocked || lumiUltLocked || cayUltLocked)} onUse={requestSkillUse} ammo={isCay ? cayState.ammo : undefined} cooldown={shidoUltCd || eijiUltCd || muimiUltCd || ippoUltCd || supUltCd || arjunaUltCd} cost={undefined} />}
                 </div>
               </div>
               {noSkill && phase === "PLAYING" && !done && (
@@ -4516,8 +4487,6 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
             <div className="text-center">
               <div className="text-4xl font-black mb-4">
                 {(() => {
-                  if (state.yuukiVictory) return <>☠️ ผู้เล่นทั้งหมดพ่ายแพ้ต่อ ยูกิ Overload</>;
-                  if (state.overloadVictory) return <>🏆 ผู้เล่นทุกคนเอาชนะ ยูกิ Overload!</>;
                   if (state.gameMode !== "ffa" && state.winningTeamId) { const ws = state.players.filter((p) => p.alive && p.teamId === state.winningTeamId); const names = ws.map((w) => w.name).join(" & "); return <>🏆 Team {state.winningTeamId}{names ? ` (${names})` : ""} ชนะ!</>; }
                   if (state.allyWin) { const ws = state.players.filter((p) => p.alive); return <>🤝 {ws.map((w) => w.name).join(" & ")} ชนะทั้งคู่!</>; }
                   const c = state.players.find((p) => p.alive); return c ? <>🏆 {c.name} ชนะ!</> : "จบเกม";
@@ -4563,7 +4532,7 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
 
   return (
     <div className="fixed inset-0 overflow-hidden">
-      <GameBackground cycle={state.cycle} oberonBg={state.oberonBg} shradeBg={state.shradeBg} bardBg={state.bardBg} shikiBg={state.shikiBg} hakunoBg={state.hakunoBg} hisakawaBg={state.hisakawaBg} overloadForce={state.overloadForce} lowQ={lowQ} seraph={!!state.seraph} />
+      <GameBackground cycle={state.cycle} oberonBg={state.oberonBg} bardBg={state.bardBg} shikiBg={state.shikiBg} hisakawaBg={state.hisakawaBg} overloadForce={state.overloadForce} lowQ={lowQ} seraph={!!state.seraph} />
       <div
         className="relative overflow-hidden"
         style={{ width: DESIGN_W, height: designH, transform: `scale(${scale})`, transformOrigin: "top left" }}
@@ -4573,13 +4542,11 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
         <div className="relative grid place-items-center">
           <img src="/image/logo_current.webp" alt="" className="h-16 sm:h-20 w-auto opacity-25" />
           <div className="absolute inset-0 grid place-items-center">
-            {boss ? (
-              <YuukiBossCard p={boss} phase={phase} hostRef={(el) => registerOther(boss.id, el)} targetable={isTargetable(boss, iAmAttacker, targetChain)} onPick={(id) => resolveAttackPick(id, targetChain)} onInspect={setStatusViewId} />
-            ) : <DeckPile hostRef={deckRef} size="lg" onClick={() => setDeckOpen(true)} />}
+            <DeckPile hostRef={deckRef} size="lg" onClick={() => setDeckOpen(true)} />
           </div>
         </div>
       </div>
-      {deckOpen && !boss && <DeckLedgerModal ledger={state.deckLedger || []} onClose={() => setDeckOpen(false)} />}
+      {deckOpen && <DeckLedgerModal ledger={state.deckLedger || []} onClose={() => setDeckOpen(false)} />}
 
       {/* QTE (ยุย) — ลอยกลางจอ ไม่บังกองการ์ด */}
       {me?.qte && <QtePanel key={me.qte.idx} qte={me.qte} />}
@@ -4935,13 +4902,13 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
               <div className="flex flex-col items-center gap-1.5">
                 <div className="flex items-end gap-2 sm:gap-3">
                   <div className="w-40 sm:w-48">
-                    <SkillSlot size="lg" label="พื้นฐาน" tier="basic" skill={ch?.basic} points={me.skillPoints} disabled={!me.alive || phase !== "PLAYING" || (!isHisakawa && (done || noSkill || moonCellOn)) || hisakawaSwitchLocked || miyakoHealPending || hakunoSecondaryPending || beatBasicLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || witchMarkCooldown || (me.skillUsed && !gambleRepeat && !isByleth && !isHaruka && !isApple && !isMuimi && !isBard && !isTohno && !isHakuno && !isDoomguy && !isKai && !isTakumi && !isHisakawa && !isSup && !isBrian && !isLumi) || harukaBasicLocked || muimiBasicLocked || bylethBasicLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || cassiusLocked || veilLocked || ktBasicLocked || (isHakuno && me.hakunoGenderSwitched) || doomBasicLocked || takutoBasicPending || tepeuCookLocked || tepeuPonderLocked || psBladeLocked || ippoBasicCd > 0 || supBudgetLocked || arjunaBasicLocked || connorPredictLocked || lumiBasicLocked} onUse={requestSkillUse} cooldown={witchMarkCd || ippoBasicCd} ammo={isGambler ? me.gamblerUses : isMuimi ? me.muimiEmergencyUses : undefined} cost={isGambler && goldenOn ? halfCost(ch?.basic) : undefined} />
+                    <SkillSlot size="lg" label="พื้นฐาน" tier="basic" skill={ch?.basic} points={me.skillPoints} disabled={!me.alive || phase !== "PLAYING" || (!isHisakawa && (done || noSkill || moonCellOn)) || hisakawaSwitchLocked || miyakoHealPending || hakunoSecondaryPending || beatBasicLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || witchMarkCooldown || (me.skillUsed && !gambleRepeat && !isByleth && !isHaruka && !isApple && !isMuimi && !isBard && !isTohno && !isHakuno && !isDoomguy && !isKai && !isTakumi && !isHisakawa && !isSup && !isBrian && !isLumi && !isCay) || harukaBasicLocked || muimiBasicLocked || bylethBasicLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || cassiusLocked || veilLocked || ktBasicLocked || (isHakuno && me.hakunoGenderSwitched) || doomBasicLocked || takutoBasicPending || tepeuCookLocked || tepeuPonderLocked || psBladeLocked || ippoBasicCd > 0 || supBudgetLocked || arjunaBasicLocked || connorPredictLocked || lumiBasicLocked || cayBasicLocked} onUse={requestSkillUse} cooldown={witchMarkCd || ippoBasicCd} ammo={isGambler ? me.gamblerUses : isMuimi ? me.muimiEmergencyUses : undefined} cost={isGambler && goldenOn ? halfCost(ch?.basic) : undefined} />
                   </div>
                   <div className="w-40 sm:w-48">
-                    <SkillSlot size="lg" label="รอง" tier="secondary" skill={ch?.secondary} points={me.skillPoints} disabled={done || phase !== "PLAYING" || noSkill || moonCellOn || miyakoComboPending || hakunoSecondaryPending || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || (me.skillUsed && !isByleth && !isBard && !isDoomguy && !isKai && !isTakumi && !isSup) || bylethSecLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || ohgerLocked || lanLocked || ktSecLocked || skSecLocked || banagherAssaultLocked || doomNoEffectLocked || takutoSecPending || takutoNotApprivoiseLocked || monsterMe || tepeuPonderLocked || tepeuCookLocked || batKarmaLocked || psSealLocked || harukaSecLocked || muimiSecLocked || burdenCooldown || ippoSecCd > 0 || supBudgetLocked || arjunaSecLocked || brianSecLocked || lumiSecLocked} onUse={requestSkillUse} cooldown={burdenCd || ippoSecCd} ammo={isApple ? me.appleGiveUses : me.beamAmmo} cost={isGambler && goldenOn ? halfCost(ch?.secondary) : undefined} />
+                    <SkillSlot size="lg" label="รอง" tier="secondary" skill={ch?.secondary} points={me.skillPoints} disabled={done || phase !== "PLAYING" || noSkill || moonCellOn || miyakoComboPending || hakunoSecondaryPending || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || (me.skillUsed && !isByleth && !isBard && !isDoomguy && !isKai && !isTakumi && !isSup) || bylethSecLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || ohgerLocked || lanLocked || ktSecLocked || skSecLocked || banagherAssaultLocked || doomNoEffectLocked || takutoSecPending || takutoNotApprivoiseLocked || monsterMe || tepeuPonderLocked || tepeuCookLocked || batKarmaLocked || psSealLocked || harukaSecLocked || muimiSecLocked || burdenCooldown || ippoSecCd > 0 || supBudgetLocked || arjunaSecLocked || brianSecLocked || lumiSecLocked || caySecLocked} onUse={requestSkillUse} cooldown={burdenCd || ippoSecCd} ammo={isApple ? me.appleGiveUses : isCay ? cayState.ammo : me.beamAmmo} cost={isGambler && goldenOn ? halfCost(ch?.secondary) : undefined} />
                   </div>
                   <div className="w-40 sm:w-48">
-                    {isBard ? <BardComposeSlot me={me} /> : isKai ? <KaiOverhaulSlot me={me} /> : <SkillSlot size="lg" label="ท่าไม้ตาย" tier="ultimate" skill={ch?.ultimate} points={me.skillPoints} disabled={(done || phase !== "PLAYING" || noSkill || moonCellOn || beatMe || (me.skillUsed && !isByleth && !isSup && !isBrianN2O) || bylethUltLocked || bylethBudgetLocked || ultimateActive || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || takumiBudgetLocked || monsterMe || fourthLocked || doomUltLocked || takutoUltLockedNow || tepeuCookLocked || tepeuPonderLocked || offerLocked || ktUltLocked || shUltLocked || shCharging || rgCharging || phenexTaunting || shidoUltLocked || eijiUltLocked || muimiUltLocked || ippoUltLocked || supBudgetLocked || supUltCd > 0 || arjunaUltCd > 0 || brianUltLocked || lumiUltLocked)} onUse={requestSkillUse} cooldown={shidoUltCd || eijiUltCd || muimiUltCd || ippoUltCd || supUltCd || arjunaUltCd} cost={undefined} />}
+                    {isBard ? <BardComposeSlot me={me} /> : isKai ? <KaiOverhaulSlot me={me} /> : <SkillSlot size="lg" label="ท่าไม้ตาย" tier="ultimate" skill={ch?.ultimate} points={me.skillPoints} disabled={(done || phase !== "PLAYING" || noSkill || moonCellOn || beatMe || (me.skillUsed && !isByleth && !isSup && !isBrianN2O) || bylethUltLocked || bylethBudgetLocked || ultimateActive || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || takumiBudgetLocked || monsterMe || fourthLocked || doomUltLocked || takutoUltLockedNow || tepeuCookLocked || tepeuPonderLocked || offerLocked || ktUltLocked || shUltLocked || shCharging || rgCharging || phenexTaunting || shidoUltLocked || eijiUltLocked || muimiUltLocked || ippoUltLocked || supBudgetLocked || supUltCd > 0 || arjunaUltCd > 0 || brianUltLocked || lumiUltLocked || cayUltLocked)} onUse={requestSkillUse} ammo={isCay ? cayState.ammo : undefined} cooldown={shidoUltCd || eijiUltCd || muimiUltCd || ippoUltCd || supUltCd || arjunaUltCd} cost={undefined} />}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -5051,8 +5018,6 @@ export default function Game({ state, lowQ, skillConfirmOn = true }) {
           <div className="text-center">
             <div className="text-4xl sm:text-5xl font-black mb-4">
               {(() => {
-                if (state.yuukiVictory) return <>☠️ ผู้เล่นทั้งหมดพ่ายแพ้ต่อ ยูกิ Overload</>;
-                if (state.overloadVictory) return <>🏆 ผู้เล่นทุกคนเอาชนะ ยูกิ Overload!</>;
                 if (state.gameMode !== "ffa" && state.winningTeamId) { const ws = state.players.filter((p) => p.alive && p.teamId === state.winningTeamId); const names = ws.map((w) => w.name).join(" & "); return <>🏆 Team {state.winningTeamId}{names ? ` (${names})` : ""} ชนะ!</>; }
                   if (state.allyWin) { const ws = state.players.filter((p) => p.alive); return <>🤝 {ws.map((w) => w.name).join(" & ")} ชนะทั้งคู่!</>; }
                   const c = state.players.find((p) => p.alive); return c ? <>🏆 {c.name} ชนะ!</> : "จบเกม";

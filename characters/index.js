@@ -6,8 +6,6 @@
 
 const tohno = require("./tohno");
 const temari = require("./temari");
-const kuwagata = require("./kuwagata");
-const eva13 = require("./eva13");
 const oberon = require("./oberon");
 const takuto = require("./takuto");
 const appleguy = require("./appleguy");
@@ -16,17 +14,11 @@ const satoru = require("./satoru");
 const shiki = require("./shiki");
 const doomguy = require("./doomguy");
 const oguri = require("./oguri");
-const hakuno = require("./hakuno");
 const miyako = require("./miyako");
-const banagher = require("./banagher");
-const riddhe = require("./riddhe");
 const tepeu = require("./tepeu");
-const shrade_elan = require("./shrade_elan");
 const hikaru = require("./hikaru");
 const phenex = require("./phenex");
 const kotone = require("./kotone");
-const gambler = require("./gambler");
-const broadband_man = require("./broadband_man");
 const bard = require("./bard");
 const kai = require("./kai");
 const mageslayer = require("./mageslayer");
@@ -37,26 +29,22 @@ const ultraman_trigger = require("./ultraman_trigger");
 const escanor = require("./escanor");
 const hisakawa_sister = require("./hisakawa_sister");
 const ignis = require("./ignis");
-const yuuki = require("./yuuki");
 const eiji = require("./eiji");
 const haruka = require("./haruka");
-const byleth = require("./byleth");
 const conner = require("./conner");
 const dan = require("./dan");
 const shido = require("./shido");
 const yui = require("./yui");
 const ippo = require("./ippo");
-const arjuna = require("./arjuna");
 const the_supplicant = require("./the_supplicant");
 const brian = require("./brian");
 const producer_lumi = require("./producer_lumi");
 const muimi = require("./muimi");
+const cayenne = require("./cayenne");
 
 const CHARACTER_MODULES = [
   tohno,
   temari,
-  kuwagata,
-  eva13,
   oberon,
   takuto,
   appleguy,
@@ -65,17 +53,11 @@ const CHARACTER_MODULES = [
   shiki,
   doomguy,
   oguri,
-  hakuno,
   miyako,
-  banagher,
-  riddhe,
   tepeu,
-  shrade_elan,
   hikaru,
   phenex,
   kotone,
-  gambler,
-  broadband_man,
   bard,
   kai,
   mageslayer,
@@ -86,20 +68,18 @@ const CHARACTER_MODULES = [
   escanor,
   hisakawa_sister,
   ignis,
-  yuuki,
   eiji,
   haruka,
-  byleth,
   conner,
   dan,
   shido,
   yui,
   muimi,
   ippo,
-  arjuna,
   the_supplicant,
   brian,
   producer_lumi,
+  cayenne,
 ];
 
 const CHAR_HOOKS = {};

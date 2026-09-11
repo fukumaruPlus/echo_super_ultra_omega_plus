@@ -79,7 +79,7 @@ module.exports = {
       engine.queueCutscene(takumi, "takumiBlackoutBust");
       if (target.alive) {
         engine.dealMixed(target, TAKUMI_BLACKOUT_DMG, true);
-        engine.maybeBeatSave(target); engine.maybeBeatMode(target); engine.maybeEva3(target); engine.maybeWakeKotone(target);
+        engine.maybeBeatSave(target); engine.maybeBeatMode(target); engine.maybeWakeKotone(target);
         target.wasAttacked = true;
         if (target.alive && target.hp <= 0) {
           engine.instantDeath(target);

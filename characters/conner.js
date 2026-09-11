@@ -99,12 +99,6 @@ const LEVELS = {
 };
 
 function isConner(p) { return !!p && p.characterId === ID; }
-// บอสยูกิอยู่นอกระบบสืบสวนทั้งหมด — ไม่มีความเครียด เล็งด้วยสกิลรอง/ท่าไม้ตายไม่ได้
-//  (สตั้นจากการจับกุมจะทำให้ลูป autoPlayYuuki ของบอสค้าง และบอสไม่ได้ "กดสกิล" ให้เก็บสถิติอยู่แล้ว)
-function isBoss(engine, p) {
-  const boss = typeof engine.yuukiBoss === "function" ? engine.yuukiBoss() : null;
-  return !!p && !!boss && p.id === boss.id;
-}
 function stressOf(p) { return Math.max(0, Math.min(STRESS_MAX, (p && p.connorStress) || 0)); }
 function levelKeyOf(p) {
   const n = stressOf(p);
@@ -162,7 +156,7 @@ module.exports = {
   //  จุดเดียวที่แก้ค่านี้ได้ ทุกแหล่งต้องเรียกผ่านที่นี่ (เคารพเพดาน 0-10 และกติกา "ไม่ลงตัวคอนเนอร์เอง")
   //  ไม่เช็ค resist/ต้านสถานะโดยตั้งใจ — สเปคระบุว่าเป็น UI ไม่ใช่สถานะที่ล้างหรือต้านได้
   addStress(engine, p, n, why) {
-    if (!p || !p.alive || isConner(p) || isBoss(engine, p)) return 0;
+    if (!p || !p.alive || isConner(p)) return 0;
     if (!connerOf(engine)) return 0;             // ไม่มีคอนเนอร์ที่ยังทำงานอยู่ = ไม่มีระบบสืบสวน
     const before = stressOf(p);
     p.connorStress = Math.max(0, Math.min(STRESS_MAX, before + n));
@@ -237,7 +231,7 @@ module.exports = {
 
   // เป้าหมายที่ถูกกฎ: ผู้เล่นอื่นที่ยังอยู่ ไม่ใช่เพื่อนร่วมทีม และไม่ถูกอาคมบัญชาคุ้มครอง
   legalTargets(engine, p) {
-    return engine.alivePlayers().filter((o) => o.id !== p.id && !isBoss(engine, o) && !friendlyTo(engine, p, o) && !engine.sealActive(o));
+    return engine.alivePlayers().filter((o) => o.id !== p.id && !friendlyTo(engine, p, o) && !engine.sealActive(o));
   },
   criminalTargets(engine, p) {
     return this.legalTargets(engine, p).filter((o) => levelKeyOf(o) === "criminal");
@@ -246,7 +240,7 @@ module.exports = {
   prepareTarget(engine, p, tier, targets) {
     const tgs = Array.isArray(targets) ? [...new Set(targets)] : [];
     const t = tgs.length === 1 ? engine.players[tgs[0]] : null;
-    if (!t || !t.alive || t.id === p.id || isBoss(engine, t)) return null;
+    if (!t || !t.alive || t.id === p.id) return null;
     if (friendlyTo(engine, p, t) || engine.sealActive(t)) return null;
     // จัดการปิดคดี: เลือกได้เฉพาะระดับอาชญากรเท่านั้น
     if (tier === "ultimate" && levelKeyOf(t) !== "criminal") return null;
@@ -380,7 +374,7 @@ module.exports = {
       }
       engine.dealMixed(target, CLOSE_CASE_DMG);
       target.wasAttacked = true;
-      engine.maybeBeatSave(target); engine.maybeBeatMode(target); engine.maybeEva3(target); engine.maybeWakeKotone(target);
+      engine.maybeBeatSave(target); engine.maybeBeatMode(target); engine.maybeWakeKotone(target);
       engine.log(`⚖️ ${p.name} จัดการปิดคดี — ${target.name} รับความเสียหาย -${CLOSE_CASE_DMG}`);
       if (target.alive && target.hp <= 0) {
         engine.instantDeath(target);
@@ -515,7 +509,7 @@ module.exports = {
         target.connorStress = 0;
         engine.dealMixed(target, CAUGHT_DMG);
         target.wasAttacked = true;
-        engine.maybeBeatSave(target); engine.maybeBeatMode(target); engine.maybeEva3(target); engine.maybeWakeKotone(target);
+        engine.maybeBeatSave(target); engine.maybeBeatMode(target); engine.maybeWakeKotone(target);
         if (engine.applyDebuff(target, "stun", null, CAUGHT_STUN)) engine.log(`😵 ${target.name} ถูกจับกุม — ติดสถานะสตั้น ${CAUGHT_STUN} เทิร์น`);
         if (engine.applyDebuff(target, "accused", null, CAUGHT_ACCUSED)) engine.log(`⛓️ ${target.name} ติดสถานะ "ผู้ต้องหา" ${CAUGHT_ACCUSED} เทิร์น`);
       });
@@ -626,7 +620,7 @@ module.exports = {
           if (!o || !o.alive || engine.friendlyEffectBlocked(o)) continue;
           engine.dealMixed(o, COUNTER_DMG);
           o.wasAttacked = true;
-          engine.maybeBeatSave(o); engine.maybeBeatMode(o); engine.maybeEva3(o); engine.maybeWakeKotone(o);
+          engine.maybeBeatSave(o); engine.maybeBeatMode(o); engine.maybeWakeKotone(o);
           engine.log(`🛡️ ${p.name} การป้องกันตัว — สวนกลับใส่ ${o.name} -${COUNTER_DMG}`);
           if (o.alive && o.hp <= 0) {
             engine.instantDeath(o);

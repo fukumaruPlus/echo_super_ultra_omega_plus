@@ -223,7 +223,7 @@ export default function SeraphGame({ state, lowQ, skillConfirmOn }) {
       overlay = (
         <CycleEndScene
           cycleRound={sc.cycleRound - 1}
-          players={state.players.filter((p) => !p.isBoss)}
+          players={state.players}
           matrixHeld={sc.matrixHeld}
           matrixMax={sc.matrixMax}
           // จบฉากแล้วเชนเข้าแบนเนอร์วันที่ 1 ของรอบใหม่ต่อทันที

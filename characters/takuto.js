@@ -116,7 +116,7 @@ module.exports = {
     engine.triggerCutscene(p, "takutoUlt3");
     for (const o of engine.alivePlayers()) {
       engine.dealMixed(o, TAKUTO_ULT2_DMG);
-      engine.maybeBeatSave(o); engine.maybeBeatMode(o); engine.maybeEva3(o); engine.maybeWakeKotone(o);
+      engine.maybeBeatSave(o); engine.maybeBeatMode(o); engine.maybeWakeKotone(o);
       o.wasAttacked = true;
       if (o.alive && o.hp <= 0) {
         engine.instantDeath(o);

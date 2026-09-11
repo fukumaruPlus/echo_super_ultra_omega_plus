@@ -111,7 +111,7 @@ module.exports = {
   // เรียกจาก useSkill() ในส่วน effect (สถานะ pshikiBlade ถูก applyEffect ตั้งให้แล้ว)
   activateBlade(engine, p) {
     engine.dealDirect(p, PSHIKI_BLEED_COST); // ไม่สนเกราะ
-    engine.maybeBeatSave(p); engine.maybeBeatMode(p); engine.maybeEva3(p); engine.maybeWakeKotone(p);
+    engine.maybeBeatSave(p); engine.maybeBeatMode(p); engine.maybeWakeKotone(p);
     engine.log(`🗡️ ${p.name} อืม ฉันเข้าใจแล้ว — เสียพลังชีวิต ${PSHIKI_BLEED_COST} หน่วย (ไม่สนเกราะ) แลกกับการชักดาบออกมา ${PSHIKI_BLADE_TURNS} เทิร์น: เทิร์นนี้โจมตีปกติได้ และหากได้โจมตีจริงจะฟื้นพลังชีวิต +${PSHIKI_BLADE_HEAL}`);
     if (p.alive && p.hp <= 0) {
       engine.instantDeath(p);

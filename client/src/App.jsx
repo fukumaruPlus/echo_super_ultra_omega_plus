@@ -186,7 +186,7 @@ export default function App() {
   const cycle = stage === "connected" && state ? state.cycle : null;
   const skillMusic = stage === "connected" && state ? state.skillMusic : null;
   const skillMusicSeq = stage === "connected" && state ? state.skillMusicSeq : 0;
-  const mandatoryCutscene = phase === "CUTSCENE" && (state?.cutscene?.kind === "overloadForce" || state?.cutscene?.kind?.startsWith("yuuki"));
+  const mandatoryCutscene = phase === "CUTSCENE" && state?.cutscene?.kind === "overloadForce";
   useEffect(() => {
     // CUTSCENE: หยุดเพลงพื้นหลัง ปล่อยให้เสียงในวีดีโอเล่น (เพลงสกิลมาหลังวีดีโอ)
     // ร่างแปลง (Ginga/Unicorn): เพลงสกิลทับ | ช่วงต่อสู้: เพลงกลางวัน/กลางคืน | อื่นๆ: main_home

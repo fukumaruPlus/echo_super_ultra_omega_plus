@@ -260,7 +260,7 @@ module.exports = {
   resolveManaRupture(engine, caster, target, pending) {
     const { energy: e, dmg, seal } = pending;
     engine.dealMixed(target, dmg, true);
-    engine.maybeBeatSave(target); engine.maybeBeatMode(target); engine.maybeEva3(target); engine.maybeWakeKotone(target);
+    engine.maybeBeatSave(target); engine.maybeBeatMode(target); engine.maybeWakeKotone(target);
     target.wasAttacked = true;
     engine.log(`💥 ${caster ? caster.name : "Mana Rupture"} — ระเบิดมานาของ ${target.name} ทำงาน (พลังงานตอนติดดีบัฟ ${e}) รับดาเมจ -${dmg}`);
     // เสียง SFX_Skill_2.mp3 ดังตอน "สถานะหมดเวลาแล้วระเบิด" ไม่ใช่ตอนกดใช้สกิล

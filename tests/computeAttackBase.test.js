@@ -42,26 +42,8 @@ test('oberonZero: oberon attacker gets -1 base (0 total, floored elsewhere not h
 test('empowerAtk (bard Rejuvenation): +1', () => {
   assert.equal(base({ statuses: { empower: 1 } }), 2);
 });
-test('beam (riddhe Beam Magnum, self-only status): +2', () => {
-  assert.equal(base({ characterId: 'riddhe', statuses: { beam: 1 } }), 3);
-});
-test('ohgerBonus (kuwagata "ohger", self-only status): +1', () => {
-  assert.equal(base({ characterId: 'kuwagata', statuses: { ohger: 1 } }), 2);
-});
-test('rachanAtk (kuwagata "rachan" form, self-only status): +1', () => {
-  assert.equal(base({ characterId: 'kuwagata', statuses: { rachan: 1 } }), 2);
-});
-test('spearAtk (eva13 spear lock, self-only status): +1', () => {
-  assert.equal(base({ characterId: 'eva13', statuses: { spear: 1 } }), 2);
-});
-test('fourthAtk (eva13 Fourth Impact, self-only status): +2', () => {
-  assert.equal(base({ characterId: 'eva13', statuses: { fourth: 1 } }), 3);
-});
 test('appleAtk (appleguy give-buff stacks): +N (array length)', () => {
   assert.equal(base({ characterId: 'appleguy', appleAtkBuffs: ['a', 'b', 'c'] }), 4);
-});
-test('tigerAtk (broadband_man tiger, no-partner branch): +1, gated to broadband_man (self-only status)', () => {
-  assert.equal(base({ characterId: 'broadband_man', statuses: { tiger: 2 } }), 2);
 });
 test('kotoneLove (รัก รักที่สุดเลย): +floor(piggy/5) capped at 3, only for kotone characterId', () => {
   assert.equal(base({ characterId: 'kotone', piggy: 7, statuses: { kotoneLove: 1 } }), 2, 'floor(7/5)=1');
@@ -69,15 +51,6 @@ test('kotoneLove (รัก รักที่สุดเลย): +floor(piggy/
   assert.equal(base({ characterId: 'kotone', piggy: 40, statuses: { kotoneLove: 1 } }), 4, 'capped at +3');
   assert.equal(base({ characterId: 'kotone', piggy: 15 }), 1, 'no bonus without the buff');
   assert.equal(base({ characterId: 'tohno', piggy: 15, statuses: { kotoneLove: 1 } }), 1, 'kotoneLove must not apply to non-kotone');
-});
-test('shradeAtk (shrade_elan spada form, night only): +2 at night, +0 by day', () => {
-  const attackerNight = mkPlayer({ characterId: 'shrade_elan', shradeForm: true });
-  const target = mkPlayer({ characterId: 'nanaya' });
-  const nightEngine = Object.assign(Object.create(engine), { isNightRound: () => true });
-  assert.equal(computeAttackBase(nightEngine, attackerNight, target).base, 3);
-  const attackerDay = mkPlayer({ characterId: 'shrade_elan', shradeForm: true });
-  const dayEngine = Object.assign(Object.create(engine), { isNightRound: () => false });
-  assert.equal(computeAttackBase(dayEngine, attackerDay, target).base, 1, 'shradeAtk must not apply by day');
 });
 test('phenexRebornAtk: +1', () => {
   assert.equal(base({ characterId: 'phenex', phenexReborn: true }), 2);
@@ -88,17 +61,6 @@ test('phenexNtdAtk (phenexNtd status OR permanent flag): +1', () => {
 });
 test('takutoAtk (apprivoise form): +1', () => {
   assert.equal(base({ characterId: 'takuto', statuses: { apprivoise: 1 } }), 2);
-});
-test('hakunoMaleAtk: +1, suppressed during moonCell', () => {
-  assert.equal(base({ characterId: 'hakuno', hakunoGender: 'male' }), 2);
-  assert.equal(base({ characterId: 'hakuno', hakunoGender: 'male', statuses: { moonCell: 1 } }), 2, 'moonCell swaps to hakunoMoonAtk, still +1 net');
-});
-test('partnerAtk (broadband_man contract buff): +1 when a live boss claims this player as partner', () => {
-  const boss = mkPlayer({ characterId: 'broadband_man', alive: true });
-  const attacker = mkPlayer({ characterId: 'nanaya', contractWith: boss.id });
-  boss.contractPartner = attacker.id;
-  const target = mkPlayer({ characterId: 'tohno' });
-  assert.equal(computeAttackBase(engine, attacker, target).base, 2);
 });
 
 // ---------- terms with cross-cutting values reused later in doAttack (Batch B candidates) ----------
@@ -113,10 +75,6 @@ test('doomCrucible overrides weapon atk entirely (7)', () => {
   const attacker = mkPlayer({ characterId: 'doomguy', doomWeapon: 'bfg', statuses: { doomCrucible: 1 } });
   const target = mkPlayer({ characterId: 'tohno' });
   assert.equal(computeAttackBase(engine, attacker, target).base, 7);
-});
-test('profitAtk (gambler accumulated profit): +N, only for gambler', () => {
-  assert.equal(base({ characterId: 'gambler', profit: 3 }), 4);
-  assert.equal(base({ characterId: 'tohno', profit: 3 }), 1, 'profit field ignored for non-gambler');
 });
 test('kotoneLove reports ctx for the attack-fx card and coin-consumption step', () => {
   const attacker = mkPlayer({ characterId: 'kotone', piggy: 12, statuses: { kotoneLove: 1 } });
@@ -133,31 +91,10 @@ test('oguriGoldAtk: capped at OGURI_GOLD_ATK_CAP even with excess stacks; victor
   const target = mkPlayer({ characterId: 'tohno' });
   assert.equal(computeAttackBase(oguriEngine, attacker, target).base, 1 + 2 + 2, 'base 1 + gold cap 2 + victory bonus 2');
 });
-test('riddheUltBonus: beamplus OR riddhentd, capped at +1 combined (not +2)', () => {
-  assert.equal(base({ characterId: 'riddhe', statuses: { beamplus: 1 } }), 2);
-  assert.equal(base({ characterId: 'riddhe', statuses: { riddhentd: 1 } }), 2);
-  assert.equal(base({ characterId: 'riddhe', statuses: { beamplus: 1, riddhentd: 1 } }), 2, 'both flags active still only +1, not +2');
-});
-test('riddheP1Atk: riddhe attacking an unallied banagher gets +1 (unless riddhentd already covered it)', () => {
-  const attacker = mkPlayer({ characterId: 'riddhe' });
-  const target = mkPlayer({ characterId: 'banagher' });
-  assert.equal(computeAttackBase(engine, attacker, target).base, 2);
-});
-test('riddheAvAtk: permanent avenger bonus +1, additive with riddheP1Atk', () => {
-  const attacker = mkPlayer({ characterId: 'riddhe', riddheAvenger: true });
-  const target = mkPlayer({ characterId: 'banagher' });
-  assert.equal(computeAttackBase(engine, attacker, target).base, 3, 'base1 + riddheP1Atk(1, via avenger clause) + riddheAvAtk(1)');
-});
-test('unibeam2Atk (banagher, self-only status): +BANAGHER_ULT2_TARGET_DMG(6)', () => {
-  assert.equal(base({ characterId: 'banagher', statuses: { unibeam2: 1 } }), 7);
-});
 test('miyakoAtkBonusOn: via "yaak" stack or via miyakoUlt, only for miyako, +1', () => {
   assert.equal(base({ characterId: 'miyako', statuses: { yaak: 1 } }), 2);
   assert.equal(base({ characterId: 'miyako', statuses: { miyakoUlt: 1 } }), 2);
   assert.equal(base({ characterId: 'tohno', statuses: { yaak: 1 } }), 1, 'yaak ignored for non-miyako');
-});
-test('hakunoMoonAtk: MOON*CELL bonus applies regardless of gender, mutually exclusive with hakunoMaleAtk', () => {
-  assert.equal(base({ characterId: 'hakuno', hakunoGender: 'female', statuses: { moonCell: 1 } }), 2);
 });
 test('ginga (hikaru Ultlive form): +1', () => {
   mkPlayer({ characterId: 'tohno' }); // a 3rd live player so lastStanding doesn't also fire here
@@ -176,9 +113,10 @@ test('lastStanding (hikaru, only one opponent left on the whole field): +1 on to
 
 // ---------- ctx passthrough sanity (values needed by post-damage hooks downstream) ----------
 test('ctx carries raw flags needed by downstream post-damage hooks, not just the summed base', () => {
-  const attacker = mkPlayer({ characterId: 'kuwagata', statuses: { ohger: 1 } });
+  mkPlayer({ characterId: 'tohno' }); // ผู้เล่นคนที่ 3 กัน lastStanding ไม่ให้ทำงานร่วมด้วย
+  const attacker = mkPlayer({ characterId: 'hikaru', statuses: { storium: 1 } });
   const target = mkPlayer({ characterId: 'tohno' });
   const result = computeAttackBase(engine, attacker, target);
-  assert.equal(result.ohger, true, 'raw boolean must survive for onAttackConsumeOhger-style hooks');
-  assert.equal(result.base, 2);
+  assert.equal(result.storiumAtk, true, 'raw boolean must survive for the storium damage-override step');
+  assert.equal(result.base, 1);
 });

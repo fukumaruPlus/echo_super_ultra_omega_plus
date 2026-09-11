@@ -42,7 +42,7 @@ module.exports = {
     engine.log(`🌀 ${p.name} [โดนดูด] — เสียหาย -${engine.DOOM_DRAIN_DMG} (เจาะเกราะก่อน) (เหลืออีก ${p.statuses.doomDrain - 1} เทิร์น)`);
     engine.maybeBeatSave(p);
     engine.maybeBeatMode(p);
-    engine.maybeEva3(p);
+   
     engine.maybeWakeKotone(p);
     if (p.alive && p.hp <= 0) {
       engine.instantDeath(p);
@@ -98,7 +98,7 @@ module.exports = {
       }
     } else if (doomW.effect === "bonusdmg" && doomTarget) {
       engine.dealMixed(doomTarget, engine.DOOM_ROCKET_BONUS_DMG);
-      engine.maybeBeatSave(doomTarget); engine.maybeBeatMode(doomTarget); engine.maybeEva3(doomTarget); engine.maybeWakeKotone(doomTarget);
+      engine.maybeBeatSave(doomTarget); engine.maybeBeatMode(doomTarget); engine.maybeWakeKotone(doomTarget);
       doomTarget.wasAttacked = true;
       engine.log(`🚀 ${p.name} ${wname} — ยิงใส่ ${doomTarget.name} เพิ่มเติม -${engine.DOOM_ROCKET_BONUS_DMG}`);
       if (doomTarget.alive && doomTarget.hp <= 0) {
@@ -115,7 +115,7 @@ module.exports = {
     } else if (doomW.effect === "bonusdmg2" && doomTarget) {
       // Ballista (patch): เลือกเป้าหมาย 1 คน โดนดาเมจเพิ่มเติมทันที (โครงเดียวกับ Rocket's bonusdmg)
       engine.dealMixed(doomTarget, engine.DOOM_BALLISTA_TARGET_DMG);
-      engine.maybeBeatSave(doomTarget); engine.maybeBeatMode(doomTarget); engine.maybeEva3(doomTarget); engine.maybeWakeKotone(doomTarget);
+      engine.maybeBeatSave(doomTarget); engine.maybeBeatMode(doomTarget); engine.maybeWakeKotone(doomTarget);
       doomTarget.wasAttacked = true;
       engine.log(`🎯 ${p.name} ${wname} — ยิงใส่ ${doomTarget.name} เพิ่มเติม -${engine.DOOM_BALLISTA_TARGET_DMG}`);
       if (doomTarget.alive && doomTarget.hp <= 0) {
@@ -142,9 +142,8 @@ module.exports = {
       o.busted = engine.bustedOf(o);
       o.locked = true;
       engine.voidUltimateOnBust(o);
-      engine.maybeMoonBurst(o);
       engine.dealDirect(o, engine.DOOM_CRUCIBLE_BUST_DMG);
-      engine.maybeBeatSave(o); engine.maybeBeatMode(o); engine.maybeEva3(o); engine.maybeWakeKotone(o);
+      engine.maybeBeatSave(o); engine.maybeBeatMode(o); engine.maybeWakeKotone(o);
       o.wasAttacked = true;
       if (o.alive && o.hp <= 0) { engine.instantDeath(o); if (!o.alive) engine.log(`💀 ${o.name} เลือดจริงหมด ตกรอบ!`); }
     }
@@ -184,7 +183,7 @@ module.exports = {
       while (hits.length < engine.DOOM_EXPLODE_TARGETS && pool.length) hits.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
       for (const o of hits) {
         engine.dealMixed(o, engine.DOOM_EXPLODE_DMG);
-        engine.maybeBeatSave(o); engine.maybeBeatMode(o); engine.maybeEva3(o); engine.maybeWakeKotone(o);
+        engine.maybeBeatSave(o); engine.maybeBeatMode(o); engine.maybeWakeKotone(o);
         o.wasAttacked = true;
         if (o.alive && o.hp <= 0) { engine.instantDeath(o); if (!o.alive) engine.log(`💀 ${o.name} เลือดจริงหมด ตกรอบ!`); }
       }
@@ -196,7 +195,7 @@ module.exports = {
       if (pool.length) {
         const o = pool[Math.floor(Math.random() * pool.length)];
         engine.dealMixed(o, dmg);
-        engine.maybeBeatSave(o); engine.maybeBeatMode(o); engine.maybeEva3(o); engine.maybeWakeKotone(o);
+        engine.maybeBeatSave(o); engine.maybeBeatMode(o); engine.maybeWakeKotone(o);
         o.wasAttacked = true;
         engine.log(`🚀 Rocket Launcher — ดาเมจกระจายใส่ ${o.name} ด้วย -${dmg}`);
         if (o.alive && o.hp <= 0) { engine.instantDeath(o); if (!o.alive) engine.log(`💀 ${o.name} เลือดจริงหมด ตกรอบ!`); }

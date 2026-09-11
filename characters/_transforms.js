@@ -11,10 +11,10 @@ const danImg = require("./dan").IMG;       // โมโรโบชิ ดัน
 const shidoImg = require("./shido").IMG;   // อิสึกะ ชิโด: เหตุผลเดียวกัน
 const yuiImg = require("./yui").IMG;       // ยุย โยชิโอกะ: เหตุผลเดียวกัน
 const ippoImg = require("./ippo").IMG;     // มาคุโนะอุจิ อิปโป: เหตุผลเดียวกัน
-const arjunaImg = require("./arjuna").IMG; // มหาเทพ อรชุน: เหตุผลเดียวกัน
 const brianImg = require("./brian").IMG;   // ไบรอัน (GT-R34): เหตุผลเดียวกัน
 const lumiChar = require("./producer_lumi"); // โปรดิวเซอร์ (luminous): เหตุผลเดียวกัน
 const muimiImg = require("./muimi").IMG;   // มุยมิ: ใช้ path รูปจาก hook กลาง
+const cayChar = require("./cayenne");      // คาเยนน์ ซูซูชิโระ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
 const BAT_CAR_IMG = "/characters/bat_ben/bat_update/bat_ben_car.webp";
 const BAT_SHOT_IMG = "/characters/bat_ben/bat_update/skill1.2/bat_ben_skill1.2.jpg";
 const BAT_GUN_IMG = "/characters/bat_ben/bat_update/skill2.2/bat_ben_skill2.2.png";
@@ -35,6 +35,13 @@ module.exports = function buildTransforms(img) {
     lumiUlt_kaho: { img: lumiChar.IDOLS.kaho.ultImg, video: "/characters/producer_lumi/kaho/kaho_idol_intro.mp4", title: "Tsubasa 283", label: "ได้เวลาสนุกแล้ว", seconds: 17, music: null, afterReveal: false },
     lumiUlt_kohaku: { img: lumiChar.IDOLS.kohaku.ultImg, video: "/characters/producer_lumi/kohaku/kohaku_idol_intro.mp4", title: "kuroi 961", label: "จะพยายามค่ะ", seconds: 16, music: null, afterReveal: false },
     lumiLuminous: { img: lumiChar.IMG.luminous, video: "/characters/producer_lumi/luminus/luminus_intro.mp4", title: "luminous", label: "รวมพลังไอดอลทั้ง 5", seconds: 14, music: null, afterReveal: false },
+    // ---------- คาเยนน์ ซูซูชิโระ ----------
+    //  ทุกคลิปคิวเองจากโค้ดผ่าน triggerCutscene (เล่นอย่างละ 1 ครั้งต่อเกม) จึงต้อง afterReveal: false
+    //  seconds วัดจากความยาวจริง (23.15 / 3.97 / 12.93 วิ) แล้วปัดขึ้นเผื่อเวลาตัดฉาก
+    //  เพลง cayenne_theme มาจาก activeMusic ของตัวละคร (ค้างตลอดร่างเกพาร์ด) ไม่ใช่ฟิลด์ music ตรงนี้
+    cayGepard:  { img: cayChar.IMG.gepard, video: cayChar.VIDEO.gepard, title: "ร่วมร่างสหายแห่งเทพ", label: "เกพาร์ด", seconds: 24, music: null, afterReveal: false },
+    cayBarrage: { img: cayChar.IMG.skill2, video: cayChar.VIDEO.skill2, title: "แน่จริงก็หลบสิ", label: "ยิงรัว 4 นัด", seconds: 5, music: null, afterReveal: false },
+    cayMissile: { img: cayChar.IMG.skill3, video: cayChar.VIDEO.skill3, title: "มิสไซล์แห่งคำอำลา", label: "ปล่อยท่าไม้ตาย", seconds: 14, music: null, afterReveal: false },
     lumiBurst:    { img: lumiChar.IMG.luminous, video: "/characters/producer_lumi/luminus/luminus_burst.mp4", title: "LUMINOUS BURST", label: "ทุกคนตีครบแล้ว", seconds: 16, music: null, afterReveal: false },
     // ---------- ไบรอัน (GT-R34) (patch 3.5 new) ----------
     //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก — ทุกคลิปเรียกผ่าน queueCutscene = เล่นทุกครั้ง
@@ -51,9 +58,6 @@ module.exports = function buildTransforms(img) {
     brianDuelLost: { img: brianImg.skill3, video: "/characters/brian_r34/skill3/duel/brian_duel_lost.mp4",title: "LOSER",               label: "พ่ายแพ้",      seconds: 13, music: null, afterReveal: false },
     brianN2O:      { img: brianImg.skill32, video: "/characters/brian_r34/skill3/brian_skill3.2.mp4",     title: "N2O",                 label: "เทน้ำมันทั้งถัง", seconds: 12, music: null, afterReveal: false },
     brianN2OHit:   { img: brianImg.skill32, video: "/characters/brian_r34/skill3/brian_skill3.2_hit.mp4", title: "N2O · FINISH",        label: "เข้าเส้นชัย",  seconds: 7, music: null, afterReveal: false },
-    // ---------- มหาเทพ อรชุน (patch 3.4 new) ----------
-    //  seconds วัดจาก mvhd จริง (16.38) แล้วปัดขึ้นเผื่อเวลาตัดฉาก — queueCutscene = เล่นทุกครั้งที่กดท่าไม้ตาย
-    arjunaPralaya: { img: arjunaImg.skill3, video: "/characters/arjuna/arjuna_skill3.mp4", title: "MAHAPRALAYA", label: "มหาประลัย", seconds: 17, music: null, afterReveal: false },
     // ---------- มาคุโนะอุจิ อิปโป (patch 3.3 new) ----------
     //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก (หลบหลีก 4.69 -> 6 · Dempsey 10.96 -> 12 · อัลติ 2.88 -> 4)
     //  ทุกคลิปเรียกผ่าน queueCutscene = เล่นทุกครั้งที่ทำงาน (การหลบเกิดบ่อย จึงตั้งเวลาให้กระชับ)
@@ -125,35 +129,15 @@ module.exports = function buildTransforms(img) {
     gingastrium: { img: img.HIKARU_STRIUM_IMG, video: "/characters/hikaru/hikaru_update/ginga_skill3.mp4", title: "GINGA STRIUM", label: "ปล่อยท่าไม้ตาย", seconds: 20, music: "gingastrium", afterReveal: false },
     // hikaruStorium (patch 2.1.3): สกิลรอง 2 ลำแสงสโตเรียม — เล่นก่อนสรุปผลตอนชนะแล้วได้โจมตี
     hikaruStorium: { img: "/characters/hikaru/hikaru_update/ginga_skill2.2.png", video: "/characters/hikaru/hikaru_update/ginga_skill2.2.mp4", title: "STORIUM RAY", label: "ใช้สกิล", seconds: 16, music: null, afterReveal: false },
-    // patch 2.1.2 ลิงก์ Rework: NewType Paradise ทำงานก่อนเปิดการ์ดแล้ว (ไม่ใช่ afterReveal อีกต่อไป — เล่นวีดีโอทันทีตอนกด)
-    paradise: { img: "/characters/banagher/unicorn_ntdfinal.jpg", video: "/characters/banagher/Unicorn_final.mp4", title: "NEWTYPE PARADISE",    label: "ปล่อยท่าไม้ตาย",   seconds: 10, music: "unicorn", afterReveal: false },
-    ntd:      { img: "/characters/banagher/banagher_update/unicorn_new_ndt.png", video: "/characters/banagher/NTD_passive.mp4",   title: "NT-D SYSTEM",           label: "สกิลติดตัวทำงาน", seconds: 9,  music: null,     afterReveal: false },
-    // banagherAssault: สกิลรอง 1 Full Assault — เล่นทันทีตอนกด (ก่อนเปิดการ์ด) วีดีโอ 5 วิ
-    banagherAssault: { img: "/characters/banagher/banagher_update/skill2_new/unicorn_skill2_new.webp", video: "/characters/banagher/banagher_update/skill2_new/unicorn_skill2_new.mp4", title: "FULL ASSAULT", label: "ใช้สกิล", seconds: 6, music: null, afterReveal: false },
-    // banagherBeamAtk: สกิลรอง 2 Beam Magnum (ระหว่างร่าง Paradise) — เล่นก่อนสรุปผลตอนได้โจมตี วีดีโอ 4 วิ
-    banagherBeamAtk: { img: "/characters/banagher/unicorn_skill2.jpg", video: "/characters/banagher/banagher_update/skill2.2/unicorn_skill2.2.mp4", title: "BEAM MAGNUM", label: "ใช้สกิล", seconds: 5, music: null, afterReveal: false },
-    // banagherAlly: ต่อจากวีดีโอ Paradise เมื่อมีริดดี้เป็นพันธมิตร — วีดีโอ 19 วิ
-    banagherAlly: { img: "/characters/banagher/unicorn_ntdfinal.jpg", video: "/characters/banagher/banagher_update/bansheeandunicorn.mp4", title: "ไม่ได้อยู่ตัวคนเดียว", label: "ปล่อยท่าไม้ตาย", seconds: 20, music: null, afterReveal: false },
-    // banagherPassive2: สกิลติดตัว 2 ฉันไม่อยากให้เราต้องมาสู้กัน — เล่นก่อนล็อกเป้าแก้แค้นใส่ริดดี้ วีดีโอ 14 วิ
-    banagherPassive2: { img: "/characters/banagher/banagher_update/unicorn_new_ndt.png", video: "/characters/banagher/banagher_update/unicorn_passvie2.mp4", title: "ฉันไม่อยากให้เราต้องมาสู้กัน", label: "สกิลติดตัวทำงาน", seconds: 15, music: null, afterReveal: false },
-    // unibeam2: ท่าไม้ตาย 2 แสงที่ไม่อยู่เพียงลำพัง — เล่นก่อนสรุปผลตอนได้โจมตี วีดีโอ 5 วิ
-    unibeam2: { img: "/characters/banagher/banagher_update/unicorn_skill3.2.jpg", video: "/characters/banagher/banagher_update/unicorn_and_banshee_beam.mp4", title: "แสงที่ไม่อยู่เพียงลำพัง", label: "ปล่อยท่าไม้ตาย", seconds: 6, music: null, afterReveal: false },
     // tepeuUlt: นายเป็นคนทำตัวเองนะ (เทเปา ชิกิ) — ผลสังหาร/พลาดคำนวณและเล่นวีดีโอนี้หลังทุกคนเปิดไพ่แล้ว (afterResolve) วีดีโอ 13 วิ
     //  จบแล้วเพลง tepeu + ฉากหลังซ้อนแบบโทโนะ ชิกิ (shiki_fill.png) จนกว่าเทิร์นนั้นจะจบ — เรียก triggerCutscene เอง ไม่ผ่านลูป afterReveal อัตโนมัติ (afterReveal:true ไว้เพื่อบันทึกความหมายเท่านั้น)
     tepeuUlt: { img: "/characters/tepeu/skill3/tepeu_skill3.jpg", video: "/characters/tepeu/skill3/tepeu_skill3.mp4", title: "นายเป็นคนทำตัวเองนะ", label: "ปล่อยท่าไม้ตาย", seconds: 13, music: "tepeu", afterReveal: true },
     // seconds ≈ ความยาววิดีโอ (วีดีโอจบ = ตัดกลับจอปกติทันที ไม่ค้างเฟรม)
     //  เสียงพากย์ + เอฟเฟกต์ระเบิด + แจ้งเปลี่ยนร่าง จะเล่นบนจอปกติหลังวีดีโอจบ (ฝั่ง client)
-    //  rachan: วีดีโอ 11.62 | beat: วีดีโอ 4.70
-    rachan:   { img: img.OHGER_FORM, video: "/characters/kuwagata/kuwagata_final.mp4",   title: "สวมเกราะราชัน",       label: "ปล่อยท่าไม้ตาย",   seconds: 12, music: "final_normal", voice: "normal_k", afterReveal: false }, // patch 2.2.1 alpha: ทำงานทันทีก่อนเปิดไพ่ (ตั้ง p.seen ในจุดใช้สกิลแล้ว ไม่ต้องรอ afterResolve() sweep)
-    beat:     { img: img.OHGER_FORM, video: "/characters/kuwagata/kuwagata_passive.mp4", title: "ประกายเขี้ยวปฏิปักษ์", label: "สกิลติดตัวทำงาน", seconds: 5,  music: "ex_guts",      voice: "ex_k",     afterReveal: false },
     // monster: เล่นทันทีตอนใช้สกิล (พักช่วงจั่วการ์ดไว้ก่อน) | anataFinal: สกิลติดตัวเทมาริ เล่นก่อนท่าไม้ตายอื่นเสมอ
     // monster (patch 2.1.3): ไม่ใช่การแปลงร่างถาวรอีกต่อไป (เป็นบัฟเกราะ/ฟื้นเลือด) แต่ยังเล่นวีดีโอตอนกดสกิลเหมือนเดิม
     monster:  { img: "/characters/hikaru/black_king.webp", video: "/characters/hikaru/ginga_skill3.mp4", title: "MONSTERLIVE", label: "แปลงร่างไคจู", seconds: 10, music: null, afterReveal: false },
     anataFinal: { img: "/characters/temari/temari.webp", video: "/characters/temari/temari_final.mp4", title: "หิวอะโปรดิวเซอร์", label: "สกิลติดตัวทำงาน", seconds: 10, music: null, afterReveal: false },
-    // golden: ท่าไม้ตายแกมเบลอร์ ทอยสำเร็จ -> เล่นทันทีก่อนเปิดไพ่ (แบบ monster) + เพลงค้างระหว่างมีผล — วีดีโอ 10 วิ
-    golden:   { img: "/characters/gambler/gamnler_final.jpg", video: "/characters/gambler/gambler_final.mp4", title: "เวลาทองของพี่มาแล้ว 777", label: "ปล่อยท่าไม้ตาย", seconds: 11, music: "gambler", afterReveal: false },
-    // fourth: ท่าไม้ตายเอวา 13 (หลังเปิดไพ่) — วีดีโอ 10 วิ + เพลงค้างระหว่างมีผล
-    fourth:   { img: "/characters/eva13/eva13_final.jpg", video: "/characters/eva13/eva13_final.mp4", title: "FOURTH IMPACT", label: "ปล่อยท่าไม้ตาย", seconds: 11, music: "eva13", afterReveal: false }, // patch 2.2.1 alpha: ทำงานทันทีก่อนเปิดไพ่ (ตั้ง p.seen ในจุดใช้สกิลแล้ว ไม่ต้องรอ afterResolve() sweep)
     doomCrucible: { img: "/characters/doomguy/สกิลอัลติเมติ/crucible.jpg", video: "/characters/doomguy/สกิลอัลติเมติ/doom.mp4", title: "Crucible", label: "ปล่อยท่าไม้ตาย", seconds: 10, music: "doomguy", afterReveal: false }, // patch 2.2 new: ทำงานทันทีก่อนเปิดไพ่
     // ---------- สึงาชิ ทาคุโตะ (patch 2.2 new / 2.2.3 / 2.2.4) ----------
     // seconds ปรับให้ตรงความยาวจริง (วัดจาก mvhd atom): takuto_passive 24.96 / takuto_2sword 5.20 / takuto_passive2 14.65 / takuto_skill3_new 17.32
@@ -173,11 +157,6 @@ module.exports = function buildTransforms(img) {
     // patch 2.2.5: หอกผู้พิชิต — ดาบทั้ง 2 อันรวมเป็นหนึ่งหลังกันตายทำงานแล้ว
     takutoLance: { img: "/characters/takuto/upadate/tauburn_un.jpg", video: "/characters/takuto/upadate2/takuto_lance.mp4", title: "หอกผู้พิชิต", label: "เอฟเฟกต์พิเศษ", seconds: 2, music: null, afterReveal: false },
     takutoLanceHit: { img: "/characters/takuto/upadate/tauburn_un.jpg", video: "/characters/takuto/upadate2/takuto_lance_hit.mp4", title: "หอกผู้พิชิต", label: "ใช้สกิล", seconds: 13, music: null, afterReveal: false },
-    // eva3: สกิลติดตัว 3 เอวา 13 (เลือด <= 3) — วีดีโอ 9 วิ | evaboom: สกิลติดตัว 1 ตายขณะ fourth impact — วีดีโอ 17 วิ
-    eva3:     { img: "/characters/eva13/eva13_passive3.jpg", video: "/characters/eva13/eva13_passive3.mp4", title: "อย่าให้ฉันทำแแบบนี้เลย", label: "สกิลติดตัวทำงาน", seconds: 10, music: null, afterReveal: false },
-    evaboom:  { img: "/characters/eva13/eva13.webp", video: "/characters/eva13/eva13_passive1.mp4", title: "ไม่สามารถแก้ไขอะไรได้อีกแล้ว", label: "สกิลติดตัวทำงาน", seconds: 18, music: null, afterReveal: false },
-    eva13RsHopper:   { img: "/characters/eva13/eva13.webp", video: "/characters/eva13/eva13_rshopper.mp4", title: "RS-HOPPER", label: "สกิลติดตัวทำงาน", seconds: 6, music: null, afterReveal: false },
-    eva13ExRsHopper: { img: "/characters/eva13/eva13.webp", video: "/characters/eva13/eva13_ex_rshopper.mp4", title: "RS-HOPPER", label: "สกิลติดตัวทำงาน", seconds: 6, music: null, afterReveal: false },
     // ---------- โอเบรอน (patch 1.7) ----------
     // lai: ท่าไม้ตายกลางวัน — วีดีโอ 13 วิ | vortigern (Rework 2): ทำงานทันทีก่อนเปิดการ์ดแล้ว (ดู CHAR_HOOKS.oberon.applyVortigernEffect) ไม่ใช่ afterReveal อีกต่อไป
     // (ฉากหลัง "ราตรีกลืนกิน" ไม่ผูกกับท่าไม้ตาย — ทำงานเองทุกครั้งที่เข้ากลางคืนขณะมีโอเบรอนอยู่ในเกม)
@@ -191,8 +170,6 @@ module.exports = function buildTransforms(img) {
     // appleguyDodge: สกิลติดตัว Apple guy — หลบการถูกเลือกโจมตีสำเร็จระหว่างชิวๆครับน้องๆ
     //  (วีดีโอ 13 วิ เล่นซ้ำได้เรื่อยๆ แต่ขึ้นเฉพาะตอนอัตราหลบ 50%/25% — จบวีดีโอค่อยขึ้นสรุปผลการตี)
     appleguyDodge: { img: "/characters/appleguy/appleguy.jpg", video: "/characters/appleguy/appleguy_final.mp4", title: "ชิวๆครับน้องๆ", label: "หลบหลีกสบายใจ", seconds: 14, music: null, afterReveal: false },
-    // broadbandBill: สกิลติดตัวเจ้าแห่งเน็ตบ้าน — ขึ้นต้นเทิร์นที่คู่สัญญาต้องจ่ายค่าต่อสัญญา (วีดีโอ 6 วิ — ครั้งแรกต่อเกม ครั้งถัดไปแจ้งเตือนเล็กๆ)
-    broadbandBill: { img: "/characters/broadband_man/broadband_man.jpg", video: "/characters/broadband_man/broadband_man_final.mp4", title: "ชำระค่าบริการ", label: "สกิลติดตัวทำงาน", seconds: 7, music: null, afterReveal: false },
     // ---------- ฟุจิตะ โคโตเนะ (rework 2.3) ----------
     // kotoneSena: ข้อเสียสกิลติดตัว — โดนท่านประธานเซนะจังเจอตัว (วีดีโอเดิม 5 วิ ครั้งแรกต่อเกม ครั้งถัดไปแจ้งเตือนเล็กๆ)
     kotoneSena: { img: "/characters/kotone/kotone.jpg", video: "/characters/kotone/kotone_passive.mp4", title: "ท่านประธานเซนะจัง!?", label: "สกิลติดตัวทำงาน", seconds: 6, music: null, afterReveal: false },
@@ -205,17 +182,6 @@ module.exports = function buildTransforms(img) {
     kawaii:  { img: "/characters/kotone/rework/สกิลอัลติเมต3/Kotone Sekaii.png", video: "/characters/kotone/rework/สกิลอัลติเมต3/ULT3.mp4", title: "SEKAI ICHI KAWAII WATASHI", label: "ปล่อยท่าไม้ตาย", seconds: 15, music: "kotone_ult3", afterReveal: false },
     kcampus: { img: "/characters/kotone/rework/สกิลอัลติเมต4/Kotone Campus.png", video: "/characters/kotone/rework/สกิลอัลติเมต4/ULT4.mp4", title: "CAMPUS MODE!", label: "ปล่อยท่าไม้ตาย", seconds: 12, music: "kotone_ult4", afterReveal: false },
     kshuki:  { img: "/characters/kotone/rework/สกิลอัลติเมต5/Kotone Shuki.png", video: "/characters/kotone/rework/สกิลอัลติเมต5/ULT5.mp4", title: "SELF-AFFIRMATION EXPLOSION! LOVE LOVE", label: "ปล่อยท่าไม้ตาย", seconds: 17, music: "kotone_ult5", afterReveal: false },
-    // ---------- ชเรด เอลัน (patch พิเศษ) ----------
-    // shradeMoon: สกิลรอง แสงจันทร์ส่องวิญญาณ (ก่อนเปิดไพ่ — เล่นทันทีตอนกดสกิล) วีดีโอ 4.1 วิ
-    shradeMoon: { img: "/characters/shrade_elan/skill2/shrade_skill2.jpg", video: "/characters/shrade_elan/skill2/shrade_skill2.mp4", title: "แสงจันทร์ส่องวิญญาณ", label: "ใช้สกิล", seconds: 5, music: null, afterReveal: false },
-    // shradeForm: ท่าไม้ตาย 1 รวมร่างทำนองเพลง (ก่อนเปิดไพ่ — แปลงร่างสปาด้าถาวร) วีดีโอ 20 วิ
-    shradeForm: { img: img.SHRADE_SPADA_IMG, video: "/characters/shrade_elan/skill3/shrade_final.mp4", title: "รวมร่างทำนองเพลง", label: "ปล่อยท่าไม้ตาย", seconds: 20, music: null, afterReveal: false },
-    // shradeCharge: ท่าไม้ตาย 2 แด่เพื่อนรักของฉัน — วีดีโอเริ่มชาร์จ 10 วิ (เพลง shrade_theme ค้างระหว่างชาร์จ)
-    shradeCharge: { img: "/characters/shrade_elan/skill3/shrade_skill3.2.jpg", video: "/characters/shrade_elan/skill3/shrade_final2.1.mp4", title: "แด่เพื่อนรักของฉัน", label: "ปล่อยท่าไม้ตาย", seconds: 10, music: "shrade", afterReveal: false },
-    // shradeBlast: แด่เพื่อนรักของฉัน ครบ 3 เทิร์น — วีดีโอสุดท้าย 15 วิ แล้วระเบิดใส่ทุกคน 8 หน่วย
-    shradeBlast: { img: img.SHRADE_SPADA_IMG, video: "/characters/shrade_elan/skill3/shrade_final2.2.mp4", title: "แด่เพื่อนรักของฉัน", label: "บทเพลงบรรเลงจบ", seconds: 15, music: null, afterReveal: false },
-    // shradePassive: สกิลติดตัว เสียงไพเราะที่กึกก้อง — เข้ากลางคืนพร้อมท่วงทำนองครบ 5 วีดีโอ 11 วิ
-    shradePassive: { img: "/characters/shrade_elan/profile/shrade_elan.jpg", video: "/characters/shrade_elan/shrade_passive.mp4", title: "เสียงไพเราะที่กึกก้อง", label: "สกิลติดตัวทำงาน", seconds: 11, music: null, afterReveal: false },
     // ---------- Bard : คีตกวี (patch 2.2) ----------
     // bardDim: เปิดมิติมายาบรรเลง (ท่อนทำนองครบ 5) — วีดีโอ 7 วิ แล้วฉากหลัง/เพลงเปลี่ยนตามสายมิติ
     //  (เล่นวีดีโอเต็มทุกครั้งที่เปิดมิติ — ไม่ใช้ triggerCutscene แบบครั้งเดียวต่อเกม)
@@ -239,9 +205,6 @@ module.exports = function buildTransforms(img) {
     miyakoUlt: { img: "/characters/miyako/miyako.webp", video: "/characters/miyako/miyako_skill3.mp4", title: "หนูจะทำให้พี่ตาสว่างเอง", label: "ปล่อยท่าไม้ตาย", seconds: 18, music: null, afterReveal: false },
     // arimaShiki: เจอ โทโนะ ชิกิ / นานายะ ชิกิ ในเกมเดียวกัน -> เล่นก่อนเริ่มเทิร์นแรก (วีดีโอจริง ~8.34 วิ)
     arimaShiki: { img: "/characters/miyako/miyako.webp", video: "/characters/miyako/arima_shiki.mp4", title: "นั่นพี่จ๋าเองหรอกหรอ?!", label: "เปิดเกม", seconds: 9, music: null, afterReveal: false },
-    // ---------- คิชินามิ ฮาคุโนะ (patch 2.2.1) ----------
-    hakunoUltMale:   { img: "/characters/hakuno/profile/hakuno_male.png", video: "/characters/hakuno/skill3/hakuno_male_skill3.mp4", title: "คำสาปแห่งดวงจันทร์ MOON*CELL", label: "ปล่อยท่าไม้ตาย", seconds: 16, music: "hakuno", afterReveal: false },
-    hakunoUltFemale: { img: "/characters/hakuno/profile/hakuno_female.webp", video: "/characters/hakuno/skill3/hakuno_female_skill3.mp4", title: "คำสาปแห่งดวงจันทร์ MOON*CELL", label: "ปล่อยท่าไม้ตาย", seconds: 15, music: "hakuno", afterReveal: false },
     // ---------- โอกูริ แคป (patch 2.0.8.1) ----------
     // graybeast: เข้าสู่ร่าง Zone (ยุคทองครบ 2 ตอนเริ่มเทิร์น) — วีดีโอ 24 วิ + เพลง oguri_theme ค้างระหว่างอยู่ร่าง Zone
     graybeast: { img: img.OGURI_ZONE_IMG, video: "/characters/oguri/zone_form.mp4", title: "เข้าสู่ร่าง Zone", label: "สกิลติดตัวทำงาน", seconds: 25, music: "oguri", afterReveal: false },
@@ -254,21 +217,6 @@ module.exports = function buildTransforms(img) {
     // ---------- ซาโตรุ อาเคฟุ (patch 2.0.8.2) ----------
     // wonderofu: ท่าไม้ตายอัตโนมัติ Wonder of U — วีดีโอ Ultimate.mp4 11.5 วิ (patch 2.1.1) + เพลงเล่นค้างตราบใดที่มีคนติด [Calamity]
     wonderofu: { img: "/characters/satoru/wonderofu.png", video: "/characters/satoru/Ultimate.mp4", title: "WONDER OF U", label: "ปล่อยท่าไม้ตาย", seconds: 12, music: "wonderofu", afterReveal: false },
-    // ---------- ริดดี้ มาร์เซนาส (patch 2.0.9) ----------
-    // riddheAlert: Event เริ่มเกม — ตรวจพบบานาจ (ยูนิคอร์น) บนสนาม (วีดีโอ 5 วิ) แล้วถามจับมือเป็นพันธมิตร
-    riddheAlert: { img: img.RIDDHE_BANSHEE_IMG, video: "/characters/riddhe/banshee_alert.mp4", title: "ตรวจพบยูนิคอร์น", label: "บันชีตื่นขึ้น", seconds: 6, music: null, afterReveal: false },
-    // riddheBeam: สกิลรอง Beam Magnum Plus — เล่นเมื่อชนะแล้วโจมตีสำเร็จ (วีดีโอ 4 วิ — ครั้งแรกเต็ม ครั้งถัดไปแจ้งเตือน)
-    riddheBeam: { img: "/characters/riddhe/skill2/banshee_skill2.jpg", video: "/characters/riddhe/skill2/banshee_skill2.mp4", title: "BEAM MAGNUM PLUS", label: "ใช้สกิล", seconds: 5, music: null, afterReveal: false },
-    // riddheNtd: ท่าไม้ตาย 1 แกไม่มีสิทธิ์มาสั่งสอนฉัน — กดก่อนเปิดไพ่ (วีดีโอ 9 วิ)
-    riddheNtd: { img: img.RIDDHE_NTD_IMG, video: "/characters/riddhe/skill3/banshee_skill3.mp4", title: "แกไม่มีสิทธิ์มาสั่งสอนฉัน", label: "ปล่อยท่าไม้ตาย", seconds: 10, music: null, afterReveal: false },
-    // riddhePassive: สกิลติดตัว 1 — บานาจตีเรา/ไม่ตีเราครบ 3 เทิร์น (วีดีโอ 15 วิ) แล้วท่าไม้ตาย 1 ทำงานฟรี
-    riddhePassive: { img: img.RIDDHE_NTD_IMG, video: "/characters/riddhe/banshee_passive.mp4", title: "จะทำให้ฉันหน้าสมเพชอีกนานแค่ไหน", label: "สกิลติดตัวทำงาน", seconds: 16, music: null, afterReveal: false },
-    // riddheGuard: ท่าไม้ตาย 2 ฉันจะไม่ยอมสูญเสียใครไปอีก — กดก่อนเปิดไพ่ (วีดีโอ 11 วิ)
-    riddheGuard: { img: "/characters/riddhe/skill3/banshee_skill3.2.png", video: "/characters/riddhe/skill3/banshee_skill3.2.mp4", title: "ฉันจะไม่ยอมสูญเสียใครไปอีก", label: "ปล่อยท่าไม้ตาย", seconds: 12, music: null, afterReveal: false },
-    // riddheLastShield: ระหว่างท่าไม้ตาย 2 เกราะเสียถึง 3 หน่วย (วีดีโอ 10 วิ — เล่นเต็มทุกครั้งที่ทริกเกอร์)
-    riddheLastShield: { img: img.RIDDHE_NTD2_IMG, video: "/characters/riddhe/skill3/banshee_skill3.2_last.mp4", title: "ฉันจะไม่ยอมสูญเสียใครไปอีก", label: "เกราะปกป้องทั้งคู่", seconds: 11, music: null, afterReveal: false },
-    // riddhePassive3: สกิลติดตัว 3 อย่าทิ้งฉันไป — บานาจพันธมิตรตาย (วีดีโอ 9 วิ) ร่างบันชีดำมืดถาวร
-    riddhePassive3: { img: img.RIDDHE_NTD2_IMG, video: "/characters/riddhe/banshee_passive3.mp4", title: "อย่าทิ้งฉันไป", label: "สกิลติดตัวทำงาน", seconds: 10, music: null, afterReveal: false },
     // ---------- ริต้า เบอร์นัล / ฟีนิกซ์ (patch 2.1.6) ----------
     // seconds วัดจากความยาววีดีโอจริง (+buffer ~0.5-1 วิ กันตัดก่อนจบ)
     // phenexReflect: สกิลรอง 1 ฝันไปเถอะ — เล่นตอนสะท้อนความเสียหายกลับผู้โจมตี ก่อนสรุปผล (วีดีโอจริง 3.24 วิ)

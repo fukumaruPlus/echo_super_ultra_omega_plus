@@ -188,7 +188,7 @@ module.exports = {
       engine.withEffectSource(p, () => {
         engine.dealMixed(victim, BAT_DOOM_DMG);
         victim.wasAttacked = true;
-        engine.maybeBeatSave(victim); engine.maybeBeatMode(victim); engine.maybeEva3(victim); engine.maybeWakeKotone(victim);
+        engine.maybeBeatSave(victim); engine.maybeBeatMode(victim); engine.maybeWakeKotone(victim);
       });
       engine.log(`🚗💥 ${p.name} ฉันไม่เคยปล่อยใครรอดพ้น — แบทโมบิลพุ่งชน ${victim.name} ที่ไพ่แตก -${BAT_DOOM_DMG}`);
       if (victim.alive && victim.hp <= 0) {
@@ -318,7 +318,7 @@ module.exports = {
     engine.triggerCutscene(p, "batKarmaSend"); // bat_ben_skill2.mp4 — เล่นก่อนความเสียหายเกิดขึ้น
     engine.dealMixed(target, dmg); // ไม่ผ่านระบบหลบหลีกปกติ — ของที่ลืมไว้ต้องถึงมือเจ้าตัวเสมอ (ยังลดเกราะก่อน)
     target.wasAttacked = true;
-    engine.maybeBeatSave(target); engine.maybeBeatMode(target); engine.maybeEva3(target); engine.maybeWakeKotone(target);
+    engine.maybeBeatSave(target); engine.maybeBeatMode(target); engine.maybeWakeKotone(target);
     engine.log(`🎁💥 ${p.name} นายลืมของน่ะ — ส่งความเสียหาย ${dmg} หน่วยคืนให้ ${target.name} (ไม่สนการหลบหลีก)!`);
     if (target.alive && target.hp <= 0) {
       engine.instantDeath(target);
@@ -351,7 +351,7 @@ module.exports = {
     if (dmg <= 0 || !attacker.alive) return 0;
     engine.dealMixed(attacker, dmg);
     attacker.wasAttacked = true;
-    engine.maybeBeatSave(attacker); engine.maybeBeatMode(attacker); engine.maybeEva3(attacker); engine.maybeWakeKotone(attacker);
+    engine.maybeBeatSave(attacker); engine.maybeBeatMode(attacker); engine.maybeWakeKotone(attacker);
     engine.log(`🦇⚡ ${target.name} เข้ามาเลย — ความเสียหาย ${dmg} หน่วยที่ ${attacker.name} ลงมือ เกิดขึ้นกับ ${attacker.name} เองด้วย!`);
     if (attacker.alive && attacker.hp <= 0) {
       engine.instantDeath(attacker);

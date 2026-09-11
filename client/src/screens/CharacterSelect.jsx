@@ -9,13 +9,13 @@ const P_DISPLAY = "var(--font-p-display)";
 // ---------- กลุ่มความยากในการเล่น (แบ่งหน้าเลือกตัวละคร) ----------
 //  order = ลำดับการแสดงในกลุ่ม — ตัวที่ไม่อยู่ในลิสต์จะต่อท้ายตามลำดับ roster
 const DIFFICULTY_GROUPS = [
-  { key: "easy", label: "ง่าย", color: "#2E9E4B", order: ["banagher", "hikaru", "kuwagata", "mageslayer", "ignis"] },
-  { key: "medium", label: "กลาง", color: "#E5B33B", order: ["eva13", "temari", "shrade_elan", "riddhe", "miyako", "bat_ben", "escanor", "hisakawa_sister", "ippo", "arjuna"] },
-  { key: "hard", label: "ยาก", color: "#C0392B", order: ["oberon", "kotone", "bard", "shiki", "hakuno", "kai", "takumi", "the_supplicant"] },
-  { key: "fun", label: "เอาฮา", color: "#9B4F96", order: ["gambler", "appleguy", "broadband_man", "dan"] },
+  { key: "easy", label: "ง่าย", color: "#2E9E4B", order: ["hikaru", "mageslayer", "ignis"] },
+  { key: "medium", label: "กลาง", color: "#E5B33B", order: ["temari", "miyako", "bat_ben", "escanor", "hisakawa_sister", "ippo", "cayenne"] },
+  { key: "hard", label: "ยาก", color: "#C0392B", order: ["oberon", "kotone", "bard", "shiki", "kai", "takumi", "the_supplicant"] },
+  { key: "fun", label: "เอาฮา", color: "#9B4F96", order: ["appleguy", "dan"] },
   { key: "extreme", label: "ยากสุดขีด", color: "#111827", order: ["satoru"] },
   { key: "impossible", label: "ทักษิณ จะโปรหาบิดาท่านหรือ?", color: "#450a0a", order: ["tohno", "nanaya", "princess_shiki"] },
-  { key: "special", label: "พิเศษ", color: "#0e7490", order: ["ultraman_trigger", "yuuki", "yui", "shido", "brian", "producer_lumi"] },
+  { key: "special", label: "พิเศษ", color: "#0e7490", order: ["ultraman_trigger", "yui", "shido", "brian", "producer_lumi"] },
 ];
 // ตัวละครในกลุ่มความยากนั้น เรียงตาม order ที่กำหนด
 function charsInGroup(roster, g) {
@@ -243,36 +243,33 @@ export default function CharacterSelect({ roster, position, name, takenChars = [
                   <div className="grid grid-cols-1 sm:grid-cols-2 auto-rows-fr gap-3">
                     <SkillTile label="สกิลติดตัว" skill={sel.passive} />
                     {/* บานาจ ลิงก์ (patch 2.1.2): สกิลติดตัว 2 ฉันไม่อยากให้เราต้องมาสู้กัน */}
-                    {sel.id === "banagher" && sel.passive2 && <SkillTile label="สกิลติดตัว 2" skill={sel.passive2} />}
                     {sel.id === "hisakawa_sister" && sel.passive2 && <SkillTile label="สกิลติดตัว 2" skill={sel.passive2} />}
                     {/* นานายะ ชิกิ (patch 2.1.9): สกิลติดตัว 2 หัวใจฆาตกร / สกิลติดตัว 3 พักผ่อนสักครู่ */}
                     {sel.id === "nanaya" && sel.passive2 && <SkillTile label="สกิลติดตัว 2" skill={sel.passive2} />}
                     {sel.id === "nanaya" && sel.passive3 && <SkillTile label="สกิลติดตัว 3" skill={sel.passive3} />}
                     {/* คอนเนอร์ RK800 (patch 2.7): สกิลติดตัว 2-4 จับกุมขั้นเด็ดขาด / ปัญญาประดิษฐ์ / การป้องกันตัว */}
                     {sel.id === "conner" && sel.passive2 && <SkillTile label="สกิลติดตัว 2" skill={sel.passive2} />}
+                    {/* คาเยนน์ ซูซูชิโระ: สกิลติดตัว 2 ร่วมร่างสหายแห่งเทพ */}
+                    {sel.id === "cayenne" && sel.passive2 && <SkillTile label="สกิลติดตัว 2" skill={sel.passive2} />}
                     {sel.id === "conner" && sel.passive3 && <SkillTile label="สกิลติดตัว 3" skill={sel.passive3} />}
                     {sel.id === "conner" && sel.passive4 && <SkillTile label="สกิลติดตัว 4" skill={sel.passive4} />}
                     <SkillTile label={sel.basicNight ? "สกิลพื้นฐาน (กลางวัน)" : "สกิลพื้นฐาน"} skill={sel.basic} />
                     {sel.basicNight && <SkillTile label="สกิลพื้นฐาน (กลางคืน)" skill={sel.basicNight} />}
                     {sel.id === "hisakawa_sister" && sel.basic2 && <SkillTile label="สกิลพื้นฐาน 2 (เมื่อแฝดล้ม)" skill={sel.basic2} />}
                     {/* โอเบรอน/โคโตเนะ: สกิลสลับตามช่วงเวลากลางวัน/กลางคืน — โชว์ครบทุกท่า */}
-                    <SkillTile label={sel.secondaryNight ? "สกิลรอง (กลางวัน)" : sel.id === "hakuno" ? "สกิลรอง (ร่างชาย)" : "สกิลรอง"} skill={sel.secondary} />
+                    <SkillTile label={sel.secondaryNight ? "สกิลรอง (กลางวัน)" : "สกิลรอง"} skill={sel.secondary} />
                     {sel.secondaryNight && <SkillTile label="สกิลรอง (กลางคืน)" skill={sel.secondaryNight} />}
                     {/* บานาจ ลิงก์ (patch 2.1.2): สกิลรอง 2 Beam Magnum — แทนที่สกิลรอง 1 ระหว่างร่าง NewType Paradise */}
-                    {sel.id === "banagher" && sel.secondary2 && <SkillTile label="สกิลรอง 2 (ระหว่างร่าง Paradise)" skill={sel.secondary2} />}
-                    {sel.id === "hakuno" && sel.secondary2 && <SkillTile label="สกิลรอง (ร่างหญิง)" skill={sel.secondary2} />}
                     {sel.id === "hisakawa_sister" && sel.secondary2 && <SkillTile label="สกิลรอง (ฮายาเตะ)" skill={sel.secondary2} />}
                     {/* อควาเรียน: ไม่มีท่าไม้ตายกลาง — ใช้ 4 ท่าตามร่างด้านล่างแทน */}
                     {!sel.ultimateSolar && (
                       <SkillTile
-                        label={sel.ultimateNight ? "ท่าไม้ตาย (กลางวัน)" : sel.id === "shiki" ? "ท่าไม้ตาย 1" : sel.id === "riddhe" ? "ท่าไม้ตาย 1 (เส้นทางเดี่ยว)" : "ท่าไม้ตาย"}
+                        label={sel.ultimateNight ? "ท่าไม้ตาย (กลางวัน)" : sel.id === "shiki" ? "ท่าไม้ตาย 1" : "ท่าไม้ตาย"}
                         skill={sel.ultimate}
                       />
                     )}
                     {/* ริดดี้ (patch 2.0.9): ท่าไม้ตาย 2 — ใช้แทนท่า 1 ระหว่างเป็นพันธมิตรกับบานาจ */}
-                    {sel.id === "riddhe" && sel.ultimate2 && <SkillTile label="ท่าไม้ตาย 2 (เส้นทางพันธมิตร)" skill={sel.ultimate2} />}
                     {/* บานาจ ลิงก์ (patch 2.1.2): ท่าไม้ตาย 2 — ใช้แทนท่า 1 ระหว่างร่าง Paradise ที่มีริดดี้เป็นพันธมิตร */}
-                    {sel.id === "banagher" && sel.ultimate2 && <SkillTile label="ท่าไม้ตาย 2 (ระหว่างร่าง Paradise + พันธมิตรริดดี้)" skill={sel.ultimate2} />}
                     {sel.id === "hisakawa_sister" && sel.ultimate2 && <SkillTile label="ท่าไม้ตาย 2 (ฮายาเตะ)" skill={sel.ultimate2} />}
                     {sel.id === "hisakawa_sister" && sel.ultimate3 && <SkillTile label="ท่าไม้ตาย 3 (รวมพลัง)" skill={sel.ultimate3} />}
                     {/* ชิกิ (patch 2.0.6): ท่าไม้ตาย 2 ความตายที่โรยรา — เลือกใช้ได้ 1 ท่าต่อเกม */}

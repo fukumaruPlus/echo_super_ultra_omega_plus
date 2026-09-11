@@ -15,12 +15,10 @@ const FILES = {
   muimi: "/overload_force/overload_force_theme.mp3",
   muimi_normal_hit: "/characters/muimi/mumi_normal_hit.mp3",
   muimi_ub_hit: "/characters/muimi/mumi_ub_hit.mp3",
-  shrade: "/characters/shrade_elan/shrade_theme.mp3", // เพลงระหว่างชาร์จ แด่เพื่อนรักของฉัน (ชเรด เอลัน)
   shiki: "/characters/shiki/shiki_theme.mp3",         // เพลงระหว่างท่าไม้ตาย ฉันมองเห็นมันแล้ว (ชิกิ)
   shiki2: "/characters/shiki/shiki_theme2.mp3",       // เพลงระหว่างท่าไม้ตาย 2 ความตายที่โรยรา (ชิกิ patch 2.0.6)
   tohno: "/characters/tohno/tohno_theme.mp3",         // เพลงระหว่างสกิลติดตัวโทโนะเปิดใช้งาน (ระดับ 2 ขึ้นไป — patch 2.1.7)
   nanaya: "/characters/nanaya/nanaya_theme.mp3",      // เพลงระหว่างสกิลติดตัว 1 นานายะ ชิกิ เปิดใช้งาน (patch 2.1.9)
-  hakuno: "/characters/hakuno/hakuno_theme.mp3",      // เพลงระหว่าง MOON*CELL คิชินามิ ฮาคุโนะ ทำงาน (patch 2.2.1)
   nanayaVoice1: "/characters/nanaya/voice/nanaya_voice1.m4a", // เสียงพากย์สุ่มตอนนานายะชนะการจั่ว
   nanayaVoice2: "/characters/nanaya/voice/nanaya_voice2.m4a",
   nanayaVoice3: "/characters/nanaya/voice/nanaya_voice3.m4a",
@@ -36,14 +34,7 @@ const FILES = {
   bard_melody3: "/characters/bard/bard_melody3.mp3",  // เสียงบรรเลงทำนอง Encore ทำงานซ้ำ
   ginga: "/characters/hikaru/ginga_song.mp3",
   gingastrium: "/characters/hikaru/hikaru_update/ginga_theme2.mp3", // เพลงระหว่างร่าง Ginga Strium (ท่าไม้ตาย patch 2.1.3) — แทนที่เพลง ginga ที่เล่นค้างจากสกิลรอง
-  unicorn: "/characters/banagher/unicorn_song.mp3",
-  final_normal: "/characters/kuwagata/final_normal.mp3", // เพลงระหว่างสวมเกราะราชัน
-  ex_guts: "/characters/kuwagata/ex_guts.mp3",           // เพลง Beat Mode (ทับทุกเพลงจนตาย)
-  normal_k: "/characters/kuwagata/normal_k.mp3",         // เสียงพากย์หลังวีดีโอสวมเกราะราชัน
-  ex_k: "/characters/kuwagata/ex_k.mp3",                 // เสียงพากย์หลังวีดีโอ Beat Mode
   temari_final_theme: "/characters/temari/temari_final_theme.mp3", // เพลง ANATA WAAAAAAAA (เล่นถึงตอนเปิดไพ่)
-  gambler: "/characters/gambler/gambler_theme.mp3",  // เพลงระหว่างบัฟเวลาทอง 777 (แกมเบลอร์)
-  eva13: "/characters/eva13/eva13_theme.mp3",        // เพลงระหว่าง Fourth Impact (เอวา 13)
   oberon: "/characters/oberon/orberon theme.mp3",    // เพลงประจำตัวโอเบรอน (ระหว่าง Lie Like Vortigern)
   // ยูนะ ไอดอลประจำสนาม (patch 2.2.6): เพลงล็อกทั้งสนามตลอด 5 เทิร์นที่เอฟเฟกต์ทำงาน
   yuna_longing: "/characters/yuna/Longing.mp3",
@@ -109,12 +100,6 @@ const FILES = {
   eiji_ult: "/characters/eiji/skill3/eiji_skill3_connect.m4a",
   // อาจารย์ ไบเลธ (patch 2.6 new): เพลงประจำ 3 หลักสูตร แยกไฟล์กลางวัน/กลางคืน
   //  สลับช่วงเวลาแล้วเพลงอีกไฟล์ต้องเล่น "ต่อจากตำแหน่งเดิม" ไม่เริ่มใหม่ (ดู MUSIC_POSITION_GROUPS)
-  byleth_normal_day: "/characters/byleth/normal/day_normal.mp3",
-  byleth_normal_night: "/characters/byleth/normal/night_normal.mp3",
-  byleth_ex_day: "/characters/byleth/ex/day_ex.mp3",
-  byleth_ex_night: "/characters/byleth/ex/night_ex.mp3",
-  byleth_end_day: "/characters/byleth/end/day_end.mp3",
-  byleth_end_night: "/characters/byleth/end/night_end.mp3",
   // คอนเนอร์ RK800: เพลงไล่ล่า (สกิลติดตัว 2 จับกุมขั้นเด็ดขาด) — เล่นค้างตลอด 3 เทิร์นของการไล่ล่า
   conner_theme: "/characters/connor/conner_theme.m4a",
   // อิสึกะ ชิโด: เพลง Sandalphon — เล่นค้างตลอด 3 เทิร์นที่ดาบยังอยู่
@@ -146,7 +131,9 @@ const FILES = {
   lumi_voice_kaho: "/characters/producer_lumi/kaho/kaho_idol_voice.m4a",
   lumi_voice_kohaku: "/characters/producer_lumi/kohaku/kohaku_idol_voice.m4a",
   lumi_luminous: "/characters/producer_lumi/luminus/luminus_song.m4a",
-  byleth_hit: "/characters/byleth/hit_sound.mp3", // เสียงโจมตีของ "ดาบต้องสาป"
+  // ---------- คาเยนน์ ซูซูชิโระ ----------
+  cayenne_theme: "/characters/cayenne/cayenne_theme.m4a", // เพลงประจำร่างเกพาร์ด (ขึ้นหลังวีดีโอแปลงร่าง)
+  cayenne_gun: "/characters/cayenne/gun_sound.mp3",       // เสียงโจมตีปกติในร่างเกพาร์ด
   // ---------- SE.RA.PH Moon Cell (โหมดผจญภัย) — ดู SERAPH_SCENES.md §6 ----------
   //  แต่ละเพลงจำตำแหน่งของตัวเอง · วันดวลวันที่ 7 ใช้ seq ของรอบเพื่อเริ่มจากต้น
   sc_day: "/mooncell/theme/day1-4.mp3",
@@ -181,9 +168,6 @@ const MUSIC_SEQUENCES = {
 //  แต่ละหลักสูตรเป็นกลุ่มของตัวเอง — "สลับหลักสูตร" จึงไม่ใช่การต่อเพลง แต่เป็นการเปิดเพลงใหม่
 //  ซึ่ง server จะขยับ seq (transformAt) ให้ทุกครั้งที่กด -> เพลงของหลักสูตรใหม่เริ่มจากต้นเสมอ
 const MUSIC_POSITION_GROUPS = {
-  byleth_normal_day: "byleth_normal", byleth_normal_night: "byleth_normal",
-  byleth_ex_day: "byleth_ex", byleth_ex_night: "byleth_ex",
-  byleth_end_day: "byleth_end", byleth_end_night: "byleth_end",
   // SE.RA.PH: **ห้ามจับ sc_day กับ sc_rest เป็นกลุ่มเดียวกัน** — กลุ่มตำแหน่งมีไว้สำหรับ
   //  "เพลงเดียวกันคนละเวอร์ชัน" (กลางวัน/กลางคืนของหลักสูตรไบเลธ) เท่านั้น
   //  สองเพลงนี้เป็นคนละเพลงกันและยาวไม่เท่ากัน: ถ้าอยู่กลุ่มเดียวกัน ตอนสลับจะ carry ตำแหน่งข้ามมา
@@ -200,8 +184,6 @@ const musicSuspensions = new Set();
 
 // เพลงบางเพลงต้นฉบับดังกว่าเพลงอื่นมาก (เพลงคุวากาตะทั้ง 2 แบบ) — ลดเฉพาะตัวให้สมดุลกับเพลงอื่น
 const MUSIC_TRACK_SCALE = {
-  final_normal: 0.6, // สวมเกราะราชัน
-  ex_guts: 0.6,       // Beat Mode
 };
 // "หรี่เพลงหลัก" (patch 3.4.2 — เพลงคิดของคอนเนอร์): ระหว่างมีลูปเสียงเฉพาะกิจเล่นอยู่
 //  เพลง BGM ปกติจะถูกหรี่ลงแทนที่จะหยุด เพราะเอฟเฟกต์เพลงใน App.jsx สั่งเล่นซ้ำทุกครั้งที่ state เปลี่ยน

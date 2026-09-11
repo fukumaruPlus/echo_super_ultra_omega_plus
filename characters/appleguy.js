@@ -73,7 +73,7 @@ module.exports = {
       engine.dealDirect(t, 1);
       engine.maybeBeatSave(t);
       engine.maybeBeatMode(t);
-      engine.maybeEva3(t);
+     
       engine.log(`📱 ${p.name} เอาไปสิ — มอบไอโฟนเครื่องใหม่ให้ ${t.name} (เกราะ +2 / เสียเลือด 1 ไม่สนเกราะ)`);
       if (t.alive && t.hp <= 0) {
         engine.instantDeath(t);

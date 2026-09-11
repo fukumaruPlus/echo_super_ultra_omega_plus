@@ -62,7 +62,7 @@ test('ข้อมูลตัวละครลงทะเบียนคร�
   assert.equal(ch.difficulty, 'special');
   assert.equal(ch.unique, true);
   assert.equal(ch.basic.cost, 0, 'สลับไอดอลไม่เสียแต้มสกิล');
-  assert.equal(ch.basic2.cost, 6);
+  assert.equal(ch.basic2.cost, 8);
   assert.equal(ch.secondary.cost, 4);
   assert.equal(ch.ultimate2.cost, 6);
   for (const key of lumi.IDOL_KEYS) {
@@ -551,7 +551,20 @@ test('[integration] ไอดอลล้มแล้วกดชุบผ่า
   engine.useSkill('L', 'basic');
   assert.equal(lumi.idolDown(L), false);
   assert.equal(L.hp, lumi.REVIVE_HP);
-  assert.equal(L.skillPoints, 2, 'หักคอส 6 ของช่องชุบ');
+  assert.equal(L.skillPoints, 0, 'หักคอส 8 ของช่องชุบ');
+  assert.equal(L.lumiRevives, 1, 'นับจำนวนครั้งที่ชุบไปแล้ว');
+});
+
+test('ชุบไอดอลได้ 3 ครั้งต่อเกม — ครบแล้วช่องชุบกดไม่ได้อีก', () => {
+  const { L } = setup();
+  L.lumiIdolDown = true;
+  for (let i = 0; i < lumi.REVIVE_MAX; i++) {
+    assert.equal(lumi.canUseSkill(engine, L, 'basic'), true, `ครั้งที่ ${i + 1} ต้องกดได้`);
+    lumi.applyRevive(engine, L);
+    L.lumiIdolDown = true; // ล้มอีกรอบ
+  }
+  assert.equal(L.lumiRevives, lumi.REVIVE_MAX);
+  assert.equal(lumi.canUseSkill(engine, L, 'basic'), false, 'ครบ 3 ครั้งแล้วกดไม่ได้');
 });
 
 test('[regression] broadcastState ตัวจริงไม่พังในทุกสถานะ (กันบั๊ก TDZ ของ activeSkillMusic)', () => {

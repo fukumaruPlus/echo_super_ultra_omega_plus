@@ -280,7 +280,7 @@ module.exports = {
     engine.triggerCutscene(e, "eijiInterrupt"); // eiji_passive1.mp4 เล่นก่อน แล้วค่อยเกิดความเสียหาย
     engine.withEffectSource(e, () => {
       engine.dealMixed(attacker, INTERRUPT_DMG);
-      engine.maybeBeatSave(attacker); engine.maybeBeatMode(attacker); engine.maybeEva3(attacker);
+      engine.maybeBeatSave(attacker); engine.maybeBeatMode(attacker);
       attacker.wasAttacked = true;
     });
     engine.log(`⚔️ ${e.name} สวนคืน ${attacker.name} -${INTERRUPT_DMG}`);
@@ -369,7 +369,7 @@ module.exports = {
     engine.queueCutscene(e, "eijiLonging");
     engine.withEffectSource(e, () => {
       engine.dealDirect(revived, LONGING_PUNISH_DMG);
-      engine.maybeBeatSave(revived); engine.maybeBeatMode(revived); engine.maybeEva3(revived);
+      engine.maybeBeatSave(revived); engine.maybeBeatMode(revived);
       revived.wasAttacked = true;
     });
     engine.log(`🥀 ${e.name} — ตามไปจบเรื่องกับ ${revived.name} ทันทีที่ฟื้นคืนชีพ (-${LONGING_PUNISH_DMG} ทะลุเกราะ) และบัฟ Longing ถูกปิดการใช้งาน`);

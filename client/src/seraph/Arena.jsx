@@ -207,7 +207,7 @@ export default function Arena({ state, onHit, onLock }) {
   }, []);
 
   const players = useMemo(
-    () => [...state.players].filter((p) => !p.isBoss).sort((a, b) => a.position - b.position),
+    () => [...state.players].sort((a, b) => a.position - b.position),
     [state.players]
   );
   const selfIndex = players.findIndex((p) => p.id === state.youId);

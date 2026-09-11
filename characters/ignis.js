@@ -144,7 +144,6 @@ module.exports = {
     if (engine.log) engine.log(`💥 ${p.name} ใช้ Impact ใส่ ${target.name} — อวดครวญ ${damage} หน่วย สร้างความเสียหาย ${damage} หน่วย และล้าง อวดครวญ ทั้งหมดบนสนาม`);
     if (engine.maybeBeatSave) engine.maybeBeatSave(target);
     if (engine.maybeBeatMode) engine.maybeBeatMode(target);
-    if (engine.maybeEva3) engine.maybeEva3(target);
     if (engine.maybeWakeKotone) engine.maybeWakeKotone(target);
     if (target.alive && target.hp <= 0 && engine.instantDeath) {
       engine.instantDeath(target);

@@ -7,8 +7,9 @@
 //
 //  จุดที่ต่างจากตัวละครอื่นอย่างมีนัยสำคัญ 3 อย่าง:
 //   1) กดสกิลได้ 2 ครั้งต่อเทิร์น (โควตาแยกของตัวเอง supSkillUsesRound — แพทเทิร์นเดียวกับไค ชิซากิ)
-//   2) "เกราะศรัทธา" เป็นชั้นเกราะที่ 2 ซ้อนอยู่หลังเกราะหลัก — ดูดดาเมจที่หัว loseHp()
-//      (จุดคอขวดเดียวกับร่างรถของแบทแมน จึงครอบคลุมดาเมจทะลุเกราะทุกช่องทาง)
+//   2) "เกราะศรัทธา" นับเป็น "เกราะ" พิเศษที่เสริมขึ้นมา (1 หน่วย = เกราะ 1 หน่วย) และอยู่ "หน้า"
+//      เกราะหลัก — ดาเมจทุกช่องทางกินเกราะศรัทธาก่อนเสมอ ยกเว้นดาเมจทะลุเกราะ (dealDirect)
+//      ที่ข้ามเกราะทุกชนิดตามนิยามของมัน · ปืนสลายเกราะ (Shockwave Bullet) ทำลายได้เหมือนเกราะปกติ
 //   3) ผู้ที่ติด "ลูกแกะน้อยรู้แจ้ง" เล็งผู้วิงวอนไม่ได้เลย (สกิล/ไอเทม/โจมตีปกติ)
 //
 //  สถานะเฉพาะตัว (ล้างไม่ได้ทั้งหมด — ไม่อยู่ใน BASIC_DEBUFF_CLEAR):
@@ -85,6 +86,8 @@ function judgeOn(p) { return !!p && ((p.statuses && p.statuses.supJudge) || 0) >
 function punishOn(p) { return !!p && ((p.statuses && p.statuses.supPunish) || 0) > 0; }
 function lambOn(p) { return !!p && ((p.statuses && p.statuses.supLamb) || 0) > 0; }
 function prayersOf(p) { return isSup(p) ? Math.max(0, Math.min(PRAYER_MAX, p.supPrayers || 0)) : 0; }
+// "ผุพัง" (สถานะ Universal): เกราะฟื้นไม่ได้ — รวมถึงเกราะศรัทธาที่นับเป็นเกราะเหมือนกัน
+function decayOn(p) { return !!p && ((p.statuses && p.statuses.decay) || 0) > 0; }
 
 module.exports = {
   id: ID,
@@ -158,8 +161,9 @@ module.exports = {
   chaaActive(p) { return punishOn(p); },
   blindActive(p) { return punishOn(p); },
 
-  // ---------- เกราะศรัทธา: ชั้นเกราะที่ 2 หลังเกราะหลัก ----------
-  //  เรียกจากหัว loseHp() — คืน true = ดาเมจก้อนนี้ถูกเกราะศรัทธากินไปแล้ว ผู้เรียกต้อง return ทันที
+  // ---------- เกราะศรัทธา: ชั้นเกราะที่อยู่ "หน้า" เกราะหลัก ----------
+  //  เรียกจากท่อดาเมจกลาง (damageSoft/dealMixed/dealArmorOnly) ก่อนหักเกราะหลัก
+  //  คืน true = ดาเมจ 1 หน่วยนี้ถูกเกราะศรัทธากินไปแล้ว ผู้เรียกต้องข้ามการหักเกราะหลัก/เลือดของหน่วยนั้น
   faithAbsorb(engine, p) {
     const left = faithOf(p);
     if (left <= 0) return false;
@@ -175,22 +179,10 @@ module.exports = {
     return true;
   },
 
-  // ---------- หมัดที่ถูก "คุ้มครอง" ของเกราะศรัทธากันจนเหลือ 0 ก็ยังกร่อนเกราะศรัทธา 1 หน่วย ----------
-  //  ⚠️ บั๊กที่แก้ (patch 3.4.3): พลังโจมตีปกติของเกมนี้คือ 1 หน่วย และเกราะศรัทธาให้ "คุ้มครอง 1"
-  //  หมัดปกติจึงเหลือ 0 พอดี -> ไม่มีดาเมจไหลไปถึง loseHp() -> faithAbsorb() ไม่เคยถูกเรียก
-  //  = เกราะศรัทธาไม่มีวันแตก และเจ้าของกลายเป็นอมตะต่อการโจมตีปกติถาวร (ไม่ใช่โล่ 3 ครั้งตามสเปค)
-  //  แก้โดยให้ "หมัดที่ถูกกันจนเป็น 0" นับเป็นการทดสอบศรัทธา 1 ครั้ง กร่อนเกราะไป 1 หน่วยเหมือนกัน
-  //  -> คุ้มครอง 1 ยังทำงานครบตามสเปค แต่โล่กลายเป็นของจำกัด (สูงสุด 3 หมัด) ตามที่ตั้งใจไว้แต่แรก
-  //  rawDmg = ดาเมจก่อนหักตัวลดของฝั่งรับ · finalDmg = ที่ลงจริง
-  absorbBlockedHit(engine, target, rawDmg, finalDmg) {
-    if (!(rawDmg > 0) || finalDmg > 0) return false; // หมัดที่ลงดาเมจได้จริงถูกกินที่ loseHp ตามปกติอยู่แล้ว
-    if (faithOf(target) <= 0) return false;
-    engine.log(`✝️🛡️ ${target.name} เกราะศรัทธากันหมัดนี้ไว้ได้ทั้งหมด — แต่ศรัทธาสึกกร่อนไป 1 หน่วย`);
-    return this.faithAbsorb(engine, target);
-  },
-
   // มอบเกราะศรัทธา n หน่วย (เพดาน FAITH_MAX) — คืนจำนวนที่เพิ่มได้จริง
+  //  "ผุพัง" (decay): เกราะฟื้นไม่ได้ทุกช่องทาง — เกราะศรัทธาเป็นเกราะจึงเสกใส่คนที่ติดผุพังไม่ได้เช่นกัน
   grantFaith(engine, target, n) {
+    if (decayOn(target)) return 0;
     const before = faithOf(target);
     const after = Math.min(FAITH_MAX, before + Math.max(1, n || 1));
     target.statuses.supFaith = 1; // ธง "มีเกราะศรัทธาอยู่" — ไม่นับเทิร์น (อยู่ใน NO_TICK_STATUS)
@@ -280,7 +272,9 @@ module.exports = {
     const add = this.grantFaith(engine, target, 1);
     engine.log(add > 0
       ? `✝️ ${sup.name} Armor of Faith — ${target.name} ได้รับเกราะศรัทธา +${add} (รวม ${faithOf(target)}/${FAITH_MAX}) พร้อม "คุ้มครอง ${FAITH_GUARD}" และ "เสริมพลัง ${FAITH_MIGHT}"`
-      : `✝️ ${sup.name} Armor of Faith — เกราะศรัทธาของ ${target.name} เต็มเพดาน ${FAITH_MAX} หน่วยแล้ว`);
+      : decayOn(target)
+        ? `🥀 ${sup.name} Armor of Faith — ${target.name} ติด "ผุพัง" อยู่ เกราะศรัทธาจึงไม่เพิ่มขึ้น`
+        : `✝️ ${sup.name} Armor of Faith — เกราะศรัทธาของ ${target.name} เต็มเพดาน ${FAITH_MAX} หน่วยแล้ว`);
     engine.iconFx(target, "shield");
     return ` — เกราะศรัทธา ${target.name}`;
   },

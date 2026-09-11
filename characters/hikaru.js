@@ -116,7 +116,7 @@ module.exports = {
       if (o.id === attacker.id || o.id === target.id) continue;
       const preBurn = o.statuses.hburn || 0;
       if (preBurn > 0) engine.dealMixed(o, preBurn);
-      engine.maybeBeatSave(o); engine.maybeBeatMode(o); engine.maybeEva3(o); engine.maybeWakeKotone(o);
+      engine.maybeBeatSave(o); engine.maybeBeatMode(o); engine.maybeWakeKotone(o);
       o.wasAttacked = true;
       splashHit.push({ p: o, dmg: preBurn });
     }

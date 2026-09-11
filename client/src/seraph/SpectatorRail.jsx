@@ -12,7 +12,7 @@
 
 export default function SpectatorRail({ players, duelPair, youId }) {
   const specs = players.filter(
-    (p) => !p.isBoss && p.id !== duelPair?.a && p.id !== duelPair?.b
+    (p) => p.id !== duelPair?.a && p.id !== duelPair?.b
   );
   if (!specs.length) return null;
 

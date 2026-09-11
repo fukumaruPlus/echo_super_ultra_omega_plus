@@ -18,7 +18,7 @@ test('Moon Cell music follows cutscene -> skill -> duel priority, with silent pa
 });
 
 test('voice announcements and mandatory clips stay silent in low quality; private clips do not silence outsiders', () => {
-  for (const cs of [{ announce: true, voice: 'ex_k' }, { kind: 'overloadForce' }, { kind: 'yuukiIntro' }]) {
+  for (const cs of [{ announce: true, voice: 'ex_k' }, { kind: 'overloadForce' }]) {
     assert.equal(policy.musicForState({ ...moon, gameState: 'CUTSCENE', cutscene: cs }, { lowQ: true }).name, null);
   }
   assert.equal(policy.musicForState({ ...moon, gameState: 'CUTSCENE', cutscene: null }).name, 'sc_duel_night');

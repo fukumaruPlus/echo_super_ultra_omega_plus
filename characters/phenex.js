@@ -107,7 +107,7 @@ module.exports = {
   // เรียกจาก useSkill() ในส่วน effect — ฝันไปเถอะ: เสียพลังชีวิตไม่สนเกราะทันที แล้วตั้งรับสะท้อนดาเมจ
   activateReflect(engine, p) {
     engine.dealDirect(p, PHENEX_REFLECT_COST_HP);
-    engine.maybeBeatSave(p); engine.maybeBeatMode(p); engine.maybeEva3(p); engine.maybeWakeKotone(p);
+    engine.maybeBeatSave(p); engine.maybeBeatMode(p); engine.maybeWakeKotone(p);
     engine.log(`🪞 ${p.name} ฝันไปเถอะ — เสียพลังชีวิต ${PHENEX_REFLECT_COST_HP} หน่วย (ไม่สนเกราะ) แล้วตั้งรับ ${p.statuses.phenexReflect || 0} เทิร์น สะท้อนความเสียหายที่ได้รับกลับผู้โจมตีทั้งหมด`);
     if (p.alive && p.hp <= 0) {
       engine.instantDeath(p);
@@ -119,7 +119,7 @@ module.exports = {
   activateNtd(engine, p) {
     engine.triggerCutscene(p, "phenexNtd");
     engine.dealDirect(p, PHENEX_NTD_COST_HP);
-    engine.maybeBeatSave(p); engine.maybeBeatMode(p); engine.maybeEva3(p); engine.maybeWakeKotone(p);
+    engine.maybeBeatSave(p); engine.maybeBeatMode(p); engine.maybeWakeKotone(p);
     engine.log(`⚙️ ${p.name} ฝืนใช้งาน NTD-Sytem — เสียพลังชีวิต ${PHENEX_NTD_COST_HP} หน่วย (ไม่สนเกราะ) เปิดใช้งาน NTD-System ${p.statuses.phenexNtd || 0} เทิร์น (สกิลรองเปลี่ยนเป็นอย่าอยู่เลย แกน่ะ!)`);
     if (p.alive && p.hp <= 0) {
       engine.instantDeath(p);
@@ -161,7 +161,7 @@ module.exports = {
     const reflectDmg = dmg;
     delete target.statuses.phenexReflect; // สะท้อนได้แค่ครั้งเดียวใน 3 เทิร์น — สะท้อนสำเร็จแล้วผลจบทันที
     engine.dealMixed(attacker, reflectDmg);
-    engine.maybeBeatSave(attacker); engine.maybeBeatMode(attacker); engine.maybeEva3(attacker); engine.maybeWakeKotone(attacker);
+    engine.maybeBeatSave(attacker); engine.maybeBeatMode(attacker); engine.maybeWakeKotone(attacker);
     attacker.wasAttacked = true;
     attacker.phenexLastHitBy = target.id;
     target.wasAttacked = true;

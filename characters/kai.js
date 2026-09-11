@@ -99,7 +99,7 @@ module.exports = {
       const creationSide = aStatus === "kaiCreation" ? a : b;
       const dmg = punishSide.id === kai.id ? KAI_SCALE_SELF_DMG : KAI_SCALE_DMG;
       engine.dealMixed(punishSide, dmg, true);
-      engine.maybeBeatSave(punishSide); engine.maybeBeatMode(punishSide); engine.maybeEva3(punishSide); engine.maybeWakeKotone(punishSide);
+      engine.maybeBeatSave(punishSide); engine.maybeBeatMode(punishSide); engine.maybeWakeKotone(punishSide);
       punishSide.wasAttacked = true;
       if (punishSide.alive && punishSide.hp <= 0) {
         engine.instantDeath(punishSide);

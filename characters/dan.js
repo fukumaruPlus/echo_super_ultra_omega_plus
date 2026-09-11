@@ -283,7 +283,7 @@ module.exports = {
     engine.withEffectSource(p, () => {
       engine.dealMixed(t, WHIP_DMG);
       t.wasAttacked = true;
-      engine.maybeBeatSave(t); engine.maybeBeatMode(t); engine.maybeEva3(t); engine.maybeWakeKotone(t);
+      engine.maybeBeatSave(t); engine.maybeBeatMode(t); engine.maybeWakeKotone(t);
     });
     engine.log(`🥊 ${p.name} อย่าให้ฉันต้องเฆี่ยนตี — ${t.name} รับความเสียหาย -${WHIP_DMG}`);
     if (t.alive && t.hp <= 0) {
@@ -306,7 +306,7 @@ module.exports = {
     engine.withEffectSource(target, () => {
       engine.dealMixed(attacker, DISCIPLE_COUNTER_DMG);
       attacker.wasAttacked = true;
-      engine.maybeBeatSave(attacker); engine.maybeBeatMode(attacker); engine.maybeEva3(attacker); engine.maybeWakeKotone(attacker);
+      engine.maybeBeatSave(attacker); engine.maybeBeatMode(attacker); engine.maybeWakeKotone(attacker);
     });
     engine.log(`🎓 ${target.name} นายทำให้ฉันผิดหวัง — สวนคืน ${attacker.name} ทันที -${DISCIPLE_COUNTER_DMG}`);
     // สวนได้ครั้งเดียวต่อการมอบ 1 ครั้ง แล้วสถานะ "ศิษย์" หลุดทันที
@@ -365,7 +365,7 @@ module.exports = {
         engine.withEffectSource(dan, () => {
           engine.dealMixed(chased, dmg);
           chased.wasAttacked = true;
-          engine.maybeBeatSave(chased); engine.maybeBeatMode(chased); engine.maybeEva3(chased); engine.maybeWakeKotone(chased);
+          engine.maybeBeatSave(chased); engine.maybeBeatMode(chased); engine.maybeWakeKotone(chased);
         });
         engine.log(`🚗 ${chased.name} ${busted ? "ไพ่แตก" : "แต้มแพ้"}ระหว่างถูกไล่ตาม — โดนชน -${dmg}${lost && chased.danLoseStreak >= WHIP_STREAK ? " (แพ้ติดกันครบ — เทิร์นหน้าดันเปลี่ยนเป็น \"อย่าให้ฉันต้องเฆี่ยนตี\")" : ""}`);
         if (chased.alive && chased.hp <= 0) {
@@ -393,7 +393,7 @@ module.exports = {
       engine.withEffectSource(dan, () => {
         engine.dealMixed(o, BUST_EXTRA_DMG);
         o.wasAttacked = true;
-        engine.maybeBeatSave(o); engine.maybeBeatMode(o); engine.maybeEva3(o); engine.maybeWakeKotone(o);
+        engine.maybeBeatSave(o); engine.maybeBeatMode(o); engine.maybeWakeKotone(o);
       });
       engine.log(`👊 ครูฝึกสุดเหี้ยม — ${o.name} ไพ่แตก รับความเสียหายเพิ่ม -${BUST_EXTRA_DMG}`);
       if (o.alive && o.hp <= 0) {

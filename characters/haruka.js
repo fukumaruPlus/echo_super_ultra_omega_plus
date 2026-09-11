@@ -176,7 +176,7 @@ module.exports = {
     engine.withEffectSource(target, () => {
       engine.dealMixed(attacker, COUNTER_DMG);
       attacker.wasAttacked = true;
-      engine.maybeBeatSave(attacker); engine.maybeBeatMode(attacker); engine.maybeEva3(attacker); engine.maybeWakeKotone(attacker);
+      engine.maybeBeatSave(attacker); engine.maybeBeatMode(attacker); engine.maybeWakeKotone(attacker);
     });
     engine.log(`🦿 ${target.name} อมาซอน — สวนกลับ ${attacker.name} ทันที -${COUNTER_DMG}`);
     if (attacker.alive && attacker.hp <= 0) {

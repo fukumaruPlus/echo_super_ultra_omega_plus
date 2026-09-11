@@ -81,12 +81,24 @@ function coolReduction(p, isNormalAttack) {
 }
 
 // ดีบัฟพื้นฐานที่ "ต้านสถานะผิดปกติ" ล้างออกได้ทั้งหมด
+//  — และเป็นรายการเดียวกับที่ Prayer (ผู้วิงวอน) ไล่ล้างทีละขั้นผ่าน cleanseOneStep()
+//  ดีบัฟที่จงใจ "ล้างไม่ได้" จึงต้องไม่อยู่ในนี้: Calamity (ซาโตรุ) · Delete (ยูนะ) ·
+//  ลงทัณฑ์/ลูกแกะน้อยรู้แจ้ง (ผู้วิงวอนเอง) · มาร์กถาวรของไค ชิซากิ
 const BASIC_DEBUFF_CLEAR = ["discord", "sleep", "stun", "nodraw", "noskill", "weak", "fragile", "spellburden", "oblada", "hburn", "hbleed", "phenexBanUlt", "nanayaSeal", "miyakoSeal", "invert", "nohealing", "manaSeal", "chaa", "blind",
   // ผู้สังหารเมจ: ตราล่าเวท/ดูดซับเวท ถูกลบล้างได้ด้วย "ต้านทานสถานะผิดปกติ"
   //  (mageslayerMarkedId ฝั่งผู้ร่ายถูก reconcile ให้เองที่ tickWitchMark ท้ายเทิร์น — ดู characters/mageslayer.js)
   "mageslayerMark", "manaLeech",
   // คอนเนอร์ RK800: "ผู้ต้องหา" เป็นเครื่องหมายล้วนๆ (ทำให้คอนเนอร์ตีแรงขึ้น +2) ต้านสถานะผิดปกติล้างได้
-  "accused"];
+  "accused",
+  // patch 3.4.6: ดีบัฟที่ตกหล่นจากรายการเดิม — เดิมล้าง/ต้านไม่ได้ทั้งที่เป็นดีบัฟเต็มตัว
+  "decay",        // ผุพัง: เกราะฟื้นไม่ได้
+  "stagger",      // ชะงัก: ฟื้นแต้มสกิลไม่ได้ทุกช่องทาง
+  "doomDrain",    // [โดนดูด] (Plasma Rifle): ดาเมจ 1/เทิร์น เจาะเกราะ
+  "manaRupture",  // ระเบิดมานา: หมดเวลาแล้วระเบิดตามพลังงานที่บันทึกไว้
+  "drunk",        // มึนเมา: สุ่มติดห้ามจั่ว/ห้ามสกิล/สตั้นเมื่อกดสกิลหรือจั่วไพ่
+  "promo",        // เปิดแต้ม: แต้มการ์ดถูกเปิดให้ทุกคนเห็น
+  "energy",       // เครื่องดื่มชูกำลัง: เสียพลัง 1 หน่วยต่อเทิร์น
+  "harukaPunish"]; // จงไปสู่สุขติ (ฮารุกะ): เป้าหมายที่เลือดไหล >= 3 โดนระเบิดเลือดไหลใส่
 // ดีบัฟที่ยังไม่เกิดผลทันที (ยามฟ้าสาง / เส้นชีวิต): โดนล้าง = ลดลงทีละ 1 หน่วย ไม่หายทั้งหมด
 const SOFT_DEBUFF_STEP = ["dawn", "deathline"];
 
@@ -197,7 +209,7 @@ function tickBurn(engine, p) {
     engine.log(`🔥 ${p.name} ลุกไหม้ — เสียหาย -1 (ลดเกราะก่อน) (เหลืออีก ${p.statuses.hburn - 1} หน่วย)`);
     engine.maybeBeatSave(p);
     engine.maybeBeatMode(p);
-    engine.maybeEva3(p);
+   
     engine.maybeWakeKotone(p);
     if (p.alive && p.hp <= 0) {
       engine.instantDeath(p);
@@ -259,7 +271,7 @@ function tickBleed(engine, p) {
     engine.log(`🩸 ${p.name} เลือดไหล — เสียหาย -1 (ลดเกราะก่อน) (เหลืออีก ${p.statuses.hbleed - 1} หน่วย)`);
     engine.maybeBeatSave(p);
     engine.maybeBeatMode(p);
-    engine.maybeEva3(p);
+   
     engine.maybeWakeKotone(p);
     if (p.alive && p.hp <= 0) {
       engine.instantDeath(p);
@@ -327,12 +339,12 @@ const NO_TICK_STATUS = new Set([
   "dawn", "chill", "hburn", "hbleed", "melody", "star", "emeraude", "saphir", "lance", "takutoThirdAtk",
   "doomCrucible", "doomDrain", "doomExplode", "doomLockon", "fortune", "linked", "rsHopper",
   "cassius", "yaak", "spear", "ohger", "evade", "empower", "miyakoHeal", "miyakoCombo", "miyakoUlt",
-  "hakunoInvertReady", "hakunoNoRegenReady", "kotoneLove", "kotoneReady", "kready", "deathline", "tepeuCook", "tepeuPonder",
+  "kotoneLove", "kotoneReady", "kready", "deathline", "tepeuCook", "tepeuPonder",
   "kaiCreation", "kaiPunishment", "mageslayerMark", "mageslayerFury", "triggerForm", "triggerMulti",
   "triggerZeperion", "triggerLight", "hisakawaTempo", "triggerDarkWail", "escanorMorning",
   "escanorNight", "escanorNoon", "escanorLastStand", "escanorSolar", "escanorFlare",
   "escanorFlareNoon", "escanorPunch", "escanorRhitta", "escanorRhittaNoon", "escanorSun",
-  "graybeast", "grit", "healthfull", "overweight", "ntd", "beat", "eva3", "banagherPassive2",
+  "graybeast", "grit", "healthfull", "overweight",
   // ผู้วิงวอน (patch 3.4): "เกราะศรัทธา" เป็นจำนวนหน่วย ไม่ใช่ตัวนับเทิร์น — หายเมื่อถูกทำลายจนหมดเท่านั้น
   "supFaith",
   // ไบรอัน (patch 3.5): ร่างรถเป็นธง ไม่ใช่ตัวนับเทิร์น — หายเมื่อน้ำมันหมดถังหรือกดดับเครื่องเอง

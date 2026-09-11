@@ -25,6 +25,7 @@ const IDOL_HP = 5;
 const IDOL_ARMOR = 3;
 const REVIVE_HP = 3;     // ชุบไอดอลกลับมาด้วยเลือด 3 เกราะ 2
 const REVIVE_ARMOR = 2;
+const REVIVE_MAX = 3;    // ชุบไอดอลได้ 3 ครั้งต่อเกม (nerf) — ครบแล้วช่องนี้กดไม่ได้อีก
 const SWITCH_HEAL = 1;   // สลับไอดอล 1 ครั้ง = โปรดิวเซอร์ฟื้นเลือด 1
 
 // ---------- สกิลรอง ฝึกซ้อม ----------
@@ -121,6 +122,7 @@ module.exports = {
   IDOL_ARMOR,
   REVIVE_HP,
   REVIVE_ARMOR,
+  REVIVE_MAX,
   SWITCH_HEAL,
   TRAIN_TURNS,
   ULT_TURNS,
@@ -149,6 +151,7 @@ module.exports = {
     if (!isLumi(p)) return;
     p.lumiIdol = DEFAULT_IDOL;   // ไอดอลที่ยืนแนวหน้า (ค่าเริ่มต้น: โคฮารุ)
     p.lumiIdolDown = false;      // ไอดอลล้มแล้วหรือยัง (ล้ม = หลอดเลือดเป็นของโปรดิวเซอร์)
+    p.lumiRevives = 0;           // ชุบไอดอลไปแล้วกี่ครั้งในเกมนี้ (เพดาน REVIVE_MAX)
     p.lumiProducerHp = PRODUCER_HP; // เลือดโปรดิวเซอร์ที่พักไว้ระหว่างไอดอลยังยืนอยู่
     p.lumiPoints = 0;            // แต้ม "ไอดอล" 0-6 (ครบ 6 = ปลดล็อก luminous)
     p.lumiUltIdol = null;        // ท่าไม้ตาย 1 ที่เปิดอยู่เป็นของไอดอลคนไหน
@@ -378,7 +381,7 @@ module.exports = {
   canUseSkill(engine, p, tier, item) {
     if (!isLumi(p)) return true;
     if (tier === "basic") {
-      if (idolDown(p)) return true;              // ชุบไอดอล — กดได้เสมอถ้าแต้มพอ
+      if (idolDown(p)) return (p.lumiRevives || 0) < REVIVE_MAX; // ชุบไอดอล — จำกัด 3 ครั้งต่อเกม
       if (anyUltOn(p)) return false;             // ระหว่างท่าไม้ตายทำงาน สลับไอดอลไม่ได้
       return IDOL_KEYS.includes(item) && item !== idolKeyOf(p); // ต้องเลือกไอดอล "คนอื่น"
     }
@@ -414,13 +417,15 @@ module.exports = {
 
   // ---------- สกิลพื้นฐาน 2 ลุกขึ้นมา ไอดอลที่ฉันภาคภูมิใจ ----------
   applyRevive(engine, p) {
+    p.lumiRevives = (p.lumiRevives || 0) + 1;
     p.lumiProducerHp = Math.max(1, p.hp); // เก็บเลือดโปรดิวเซอร์ที่เหลือไว้ก่อนคืนหลอดให้ไอดอล
     p.lumiIdolDown = false;
     p.hp = REVIVE_HP;
     p.armor = REVIVE_ARMOR;
     p.lumiMiraiTurns = 0;
     engine.skillFlash({ name: "ลุกขึ้นมา ไอดอลที่ฉันภาคภูมิใจ", img: IMG.revive, by: p.name, color: engine.colorOf(p) });
-    engine.log(`✨ ${p.name} ลุกขึ้นมา ไอดอลที่ฉันภาคภูมิใจ — ${idolOf(p).name} กลับมายืนแนวหน้าด้วยพลังชีวิต ${REVIVE_HP} เกราะ ${REVIVE_ARMOR} (เลือดโปรดิวเซอร์ที่เหลือ ${p.lumiProducerHp} ถูกเก็บไว้)`);
+    const left = Math.max(0, REVIVE_MAX - p.lumiRevives);
+    engine.log(`✨ ${p.name} ลุกขึ้นมา ไอดอลที่ฉันภาคภูมิใจ — ${idolOf(p).name} กลับมายืนแนวหน้าด้วยพลังชีวิต ${REVIVE_HP} เกราะ ${REVIVE_ARMOR} (เลือดโปรดิวเซอร์ที่เหลือ ${p.lumiProducerHp} ถูกเก็บไว้) · ชุบได้อีก ${left}/${REVIVE_MAX} ครั้ง`);
     return " — ชุบไอดอล";
   },
 

@@ -101,6 +101,28 @@ test('Prayer: ดีบัฟที่เหลือ 1 อยู่แล้ว
   assert.ok(!a.statuses.stun);
 });
 
+test('Prayer: ดีบัฟที่เพิ่มเข้าหมวดใหม่ (patch 3.4.6) ล้างได้ทีละขั้น', () => {
+  const added = ['decay', 'stagger', 'doomDrain', 'manaRupture', 'drunk', 'promo', 'energy', 'harukaPunish'];
+  for (const key of added) {
+    const { s, a } = setup();
+    a.statuses[key] = 3;
+    sup.applyPrayer(engine, s, a);
+    assert.equal(a.statuses[key], 2, `${key} ต้องลดลง 1 ขั้น`);
+    assert.equal(s.supPrayers, 1, `${key} ต้องนับเป็นการล้าง 1 ขั้น`);
+  }
+});
+
+test('Prayer: ดีบัฟที่สเปคระบุว่าล้างไม่ได้ ต้องไม่ถูกแตะ', () => {
+  const locked = ['calamity', 'yunaDelete', 'supPunish', 'supLamb', 'kaiPunishment'];
+  for (const key of locked) {
+    const { s, a } = setup();
+    a.statuses[key] = 3;
+    sup.applyPrayer(engine, s, a);
+    assert.equal(a.statuses[key], 3, `${key} ต้องล้างไม่ได้`);
+    assert.equal(s.supPrayers, 0, `${key} ต้องไม่นับเป็นการล้าง`);
+  }
+});
+
 test('ปืนสลายเกราะ (Shockwave Bullet) สลายเกราะศรัทธาด้วย', () => {
   const { s, a } = setup();
   sup.grantFaith(engine, a, 3);
@@ -169,24 +191,53 @@ test('เกราะศรัทธา: สะสมได้สูงสุด
   assert.ok(fx.includes('A:shield'));
 });
 
-test('เกราะศรัทธา: เป็นชั้นเกราะหลังเกราะหลัก — ดูดดาเมจแทนพลังชีวิต', () => {
-  const { s, a } = setup();
+test('เกราะศรัทธา: กินดาเมจ "ก่อน" เกราะหลักเสมอ (patch 3.4.6)', () => {
+  const { a } = setup();
   sup.grantFaith(engine, a, 2);
   a.armor = 1;
   const hpBefore = a.hp;
-  engine.dealMixed(a, 3); // เกราะหลัก 1 -> เกราะศรัทธา 2
-  assert.equal(a.armor, 0);
-  assert.equal(sup.faithOf(a), 0, 'เกราะศรัทธาถูกกินหมดพอดี');
+  engine.dealMixed(a, 3); // เกราะศรัทธา 2 -> เกราะหลัก 1
+  assert.equal(sup.faithOf(a), 0, 'เกราะศรัทธาโดนกินก่อนจนหมด');
+  assert.equal(a.armor, 0, 'แล้วจึงถึงเกราะหลัก');
   assert.equal(a.hp, hpBefore, 'พลังชีวิตยังไม่ถูกแตะเลย');
 });
 
-test('เกราะศรัทธา: กันดาเมจเจาะเกราะ (dealDirect) ด้วย เพราะดักที่ loseHp', () => {
-  const { s, a } = setup();
+test('เกราะศรัทธา: ดาเมจสถานะ/นอกสนาม (damageSoft) ก็กินเกราะศรัทธาก่อนเกราะหลัก', () => {
+  const { a } = setup();
+  sup.grantFaith(engine, a, 1);
+  a.armor = 2;
+  engine.damageSoft(a);
+  assert.equal(sup.faithOf(a), 0);
+  assert.equal(a.armor, 2, 'เกราะหลักยังไม่ถูกแตะ');
+});
+
+test('เกราะศรัทธา: ดาเมจเกราะล้วน (dealArmorOnly) กินเกราะศรัทธาก่อนเช่นกัน', () => {
+  const { a } = setup();
+  sup.grantFaith(engine, a, 1);
+  a.armor = 2;
+  engine.dealArmorOnly(a, 2);
+  assert.equal(sup.faithOf(a), 0);
+  assert.equal(a.armor, 1, 'หน่วยที่เหลือจึงไปลงเกราะหลัก');
+});
+
+test('เกราะศรัทธา: การโจมตีทะลุเกราะ (dealDirect) ข้ามเกราะศรัทธา — ข้อยกเว้นเดียวตามสเปค', () => {
+  const { a } = setup();
   sup.grantFaith(engine, a, 1);
   const hpBefore = a.hp;
   engine.dealDirect(a, 1);
-  assert.equal(a.hp, hpBefore);
+  assert.equal(sup.faithOf(a), 1, 'เกราะศรัทธาไม่ถูกแตะ');
+  assert.equal(a.hp, hpBefore - 1, 'ดาเมจทะลุเข้าพลังชีวิตตรงๆ');
+});
+
+test('เกราะศรัทธา: เสกใส่คนที่ติด "ผุพัง" ไม่ได้', () => {
+  const { s, a } = setup();
+  a.statuses.decay = 3;
+  assert.equal(sup.grantFaith(engine, a, 1), 0);
   assert.equal(sup.faithOf(a), 0);
+  sup.applyFaithArmor(engine, s, a);
+  assert.equal(sup.faithOf(a), 0, 'กดสกิลรองใส่คนที่ผุพังก็ไม่ขึ้นเกราะ');
+  delete a.statuses.decay;
+  assert.equal(sup.grantFaith(engine, a, 1), 1, 'ผุพังหมดแล้วเสกได้ตามปกติ');
 });
 
 test('เกราะศรัทธา: ไม่นับถอยหลังเทิร์น (อยู่ใน NO_TICK_STATUS)', () => {
@@ -205,28 +256,22 @@ test('เกราะศรัทธา/ลูกแกะน้อยรู้�
   assert.equal(a.statuses.supPunish, 3);
 });
 
-test('เกราะศรัทธา: หมัดที่ถูก "คุ้มครอง" กันจนเหลือ 0 ก็ยังกร่อนเกราะศรัทธา (บั๊ก 3.4.3)', () => {
-  const { s, a } = setup();
+test('เกราะศรัทธา: การโจมตีที่คำนวณแล้วเหลือดาเมจ 0 ทำลายเกราะศรัทธาไม่ได้ (patch 3.4.6)', () => {
+  const { s } = setup();
   sup.grantFaith(engine, s, 3);
-  // พลังโจมตีปกติ = 1 · คุ้มครองของเกราะศรัทธา = 1 -> ดาเมจสุทธิ 0 (ไม่มีอะไรไหลถึง loseHp)
-  //  ถ้าไม่มีตาข่ายนี้ เกราะศรัทธาจะไม่มีวันแตก = อมตะต่อการโจมตีปกติถาวร
-  assert.equal(sup.absorbBlockedHit(engine, s, 1, 0), true);
-  assert.equal(sup.faithOf(s), 2);
-  sup.absorbBlockedHit(engine, s, 1, 0);
-  sup.absorbBlockedHit(engine, s, 1, 0);
-  assert.equal(sup.faithOf(s), 0, 'สามหมัดแล้วโล่ต้องแตก');
-  assert.equal(sup.statusAmtBonus(s, 'guard'), 0, 'คุ้มครองหายไปพร้อมโล่');
+  assert.equal(typeof sup.absorbBlockedHit, 'undefined', 'ตาข่าย 3.4.3 ถูกถอดออกแล้ว');
+  // ท่อดาเมจกลางไม่ทำอะไรเลยเมื่อดาเมจสุทธิเป็น 0 — เกราะศรัทธาจึงไม่สึก
+  engine.dealMixed(s, 0);
+  assert.equal(sup.faithOf(s), 3);
+  assert.equal(sup.statusAmtBonus(s, 'guard'), 1, 'คุ้มครองยังอยู่ครบ');
 });
 
-test('เกราะศรัทธา: หมัดที่ลงดาเมจได้จริงไม่ถูกหักซ้ำสองทาง', () => {
+test('เกราะศรัทธา: ปืนสลายเกราะทำลายได้ (faithAbsorb เรียกซ้ำจนหมด)', () => {
   const { s } = setup();
-  sup.grantFaith(engine, s, 2);
-  // finalDmg > 0 = ดาเมจไหลไปถึง loseHp แล้ว (faithAbsorb กินเอง) ตาข่ายนี้ต้องไม่ทำงานซ้ำ
-  assert.equal(sup.absorbBlockedHit(engine, s, 3, 2), false);
-  assert.equal(sup.faithOf(s), 2);
-  // ไม่มีเกราะศรัทธาอยู่แล้ว ก็ไม่ต้องทำอะไร
-  const { a } = setup();
-  assert.equal(sup.absorbBlockedHit(engine, a, 1, 0), false);
+  sup.grantFaith(engine, s, 3);
+  for (let i = 0; i < 3; i++) sup.faithAbsorb(engine, s);
+  assert.equal(sup.faithOf(s), 0);
+  assert.equal(sup.statusAmtBonus(s, 'guard'), 0, 'คุ้มครองหายไปพร้อมโล่');
 });
 
 // ---------------------------------------------------------------- ตราพิพากษา

@@ -155,7 +155,7 @@ module.exports = {
     if (night) {
       for (let i = 0; i < KOTONE_PART_NIGHT_HP; i++) engine.loseHp(p);
       hpMsg = ` · เสียพลังชีวิต -${KOTONE_PART_NIGHT_HP}`;
-      engine.maybeBeatSave(p); engine.maybeBeatMode(p); engine.maybeEva3(p);
+      engine.maybeBeatSave(p); engine.maybeBeatMode(p);
     }
     engine.log(`🐷 ${p.name} Part-time${night ? " (กะดึก)" : ""} — สุ่มได้ ${roll} เหรียญ (เข้ากระเป๋าสุทธิ +${kept} · มี ${p.gold})${hpMsg}`);
     return ` — เหรียญ +${kept}`;
@@ -176,7 +176,7 @@ module.exports = {
       }
       for (let i = 0; i < KOTONE_DANCE_NIGHT_HP; i++) engine.loseHp(p);
       extra += ` · เสียพลังชีวิต -${KOTONE_DANCE_NIGHT_HP}`;
-      engine.maybeBeatSave(p); engine.maybeBeatMode(p); engine.maybeEva3(p);
+      engine.maybeBeatSave(p); engine.maybeBeatMode(p);
     }
     engine.log(`💃 ${p.name} ${night ? "แอบซ้อม" : "Dance Lession"} — [ความพร้อม] +${add} (มี ${this.readyStacks(p)}/${KOTONE_READY_MAX})${extra}`);
     return ` — ความพร้อม ${this.readyStacks(p)}/${KOTONE_READY_MAX}`;
@@ -232,7 +232,7 @@ module.exports = {
       engine.log(`💖 Sekai ichi kawaii watashi! ${p.name} ขึ้นไลฟ์สุดน่ารักใส่ทุกคน — ฟื้นพลังชีวิต +${heal}`);
       for (const t of others) {
         engine.dealDirect(t, KOTONE_KAWAII_DMG); // เจาะเกราะ
-        engine.maybeBeatSave(t); engine.maybeBeatMode(t); engine.maybeEva3(t);
+        engine.maybeBeatSave(t); engine.maybeBeatMode(t);
         t.wasAttacked = true;
         let stunMsg = "";
         if (t.alive) {
@@ -288,7 +288,6 @@ module.exports = {
       o.busted = engine.bustedOf(o);
       o.locked = true;
       engine.voidUltimateOnBust(o);
-      engine.maybeMoonBurst(o);
       hit++;
     }
     if (hit > 0) engine.log(`🎤 ${p.name} บังคับให้ทุกคน (ยกเว้นตัวเอง) ไพ่แตกทันที — ${hit} คน`);

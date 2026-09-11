@@ -226,7 +226,7 @@ module.exports = {
     engine.withEffectSource(target, () => {
       engine.dealMixed(attacker, WRESTLE_COUNTER);
       attacker.wasAttacked = true;
-      engine.maybeBeatSave(attacker); engine.maybeBeatMode(attacker); engine.maybeEva3(attacker); engine.maybeWakeKotone(attacker);
+      engine.maybeBeatSave(attacker); engine.maybeBeatMode(attacker); engine.maybeWakeKotone(attacker);
     });
     engine.log(`🤼 ${target.name} เยอรมันซูเพล็ก — จับ ${attacker.name} ทุ่มสวนกลับ -${WRESTLE_COUNTER}`);
     if (attacker.alive && attacker.hp <= 0) {
@@ -421,7 +421,7 @@ module.exports = {
       engine.withEffectSource(yui, () => {
         engine.dealMixed(o, BEATS_BUST_DMG);
         o.wasAttacked = true;
-        engine.maybeBeatSave(o); engine.maybeBeatMode(o); engine.maybeEva3(o); engine.maybeWakeKotone(o);
+        engine.maybeBeatSave(o); engine.maybeBeatMode(o); engine.maybeWakeKotone(o);
       });
       engine.log(`🎶💥 my soul your beats — ${o.name} ไพ่แตกกลางจังหวะเพลง รับความเสียหาย -${BEATS_BUST_DMG}`);
       if (o.alive && o.hp <= 0) {

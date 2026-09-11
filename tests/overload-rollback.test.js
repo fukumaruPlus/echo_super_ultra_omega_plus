@@ -77,7 +77,7 @@ test('restoreTurnSnapshot is a no-op without a snapshot and cannot be replayed t
   assert.equal(p.skillPoints, 1);
 });
 
-test('Overload Force never spawns Yuuki outside Over Load mode', () => {
+test('Overload Force ครั้งที่ 3 ยังเป็นสนามปกติ (ไม่มีบอสให้เรียกอีกแล้ว)', () => {
   engine.setGameMode('ffa');
   engine.players.a = makePlayer('a');
   engine.players.b = makePlayer('b');
@@ -86,6 +86,5 @@ test('Overload Force never spawns Yuuki outside Over Load mode', () => {
   engine.triggerOverloadForce();
 
   assert.equal(engine.overloadForceCount, 3);
-  assert.equal(engine.yuukiBoss(), null, 'โหมด ffa ห้ามมีบอสยูกิ');
   assert.equal(engine.cutsceneInfo.kind, 'overloadForce');
 });
