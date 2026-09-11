@@ -224,6 +224,7 @@ test('เกราะเบมสตาร์: ความเสียหาย
   engine.withEffectSource('A', () => engine.dealMixed(D, 5)); // เกราะ 1 + เลือด 4
   assert.equal(D.hp, 2);
   assert.equal(daichi.publicState(D).bemstarOwed, 3);
+  D.dmgHp = 0; D.dmgArmor = 0; // เกมจริงรีเซ็ตตัวนับของหน้าสรุปผลตอนต้นเทิร์น — การฟื้นคืนต้องไม่พึ่งตัวนับนั้น
   daichi.onRoundStartTick(engine, D);
   assert.equal(D.hp, 5, 'ฟื้นสูงสุด 3');
   engine.withEffectSource('A', () => engine.dealMixed(D, 1));

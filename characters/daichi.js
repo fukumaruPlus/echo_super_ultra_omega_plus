@@ -62,7 +62,6 @@ function isDaichi(p) { return !!p && p.characterId === ID; }
 function uniteOn(p) { return isDaichi(p) && ((p.statuses && p.statuses.daichiUnite) || 0) > 0; }
 function cardOf(p) { return CARDS[(p && p.daichiCard) || DEFAULT_CARD] || CARDS[DEFAULT_CARD]; }
 function armorOf(p) { return uniteOn(p) && p.daichiArmor ? CARDS[p.daichiArmor] || null : null; }
-function damageTotal(p) { return (p.dmgHp || 0) + (p.dmgArmor || 0); }
 
 module.exports = {
   id: ID,
@@ -93,8 +92,7 @@ module.exports = {
     p.daichiStored = [];         // การ์ดที่ถูกตัดไว้ รอบวกเพิ่มในเทิร์นหน้า
     p.daichiExtraPending = false; // เกราะโกโมร่า: สุ่มผ่านแล้ว รอเปิดเฟสโจมตีเพิ่ม
     p.daichiInExtra = false;     // กำลังโจมตีครั้งเพิ่มอยู่ (ครั้งเพิ่มไม่สุ่มต่อ)
-    p.daichiBemstarBase = null;  // เกราะเบมสตาร์: ยอดความเสียหายสะสมตอนเริ่มนับ (null = ไม่ได้นับอยู่)
-    p.daichiBemstarOwed = 0;     // เกราะเบมสตาร์: ความเสียหายที่ต้องฟื้นคืนตอนต้นเทิร์นหน้า
+    p.daichiBemstarTaken = 0;    // เกราะเบมสตาร์: ความเสียหายที่ได้รับระหว่างสวมเกราะ รอฟื้นคืนตอนต้นเทิร์นหน้า
     p.daichiStunPending = 0;     // เกราะเอเลคิง (ติดที่เป้าหมาย): สตั้นที่จะลงตอนต้นเทิร์นถัดไป
   },
 
@@ -138,7 +136,7 @@ module.exports = {
       basicMax: BASIC_USES,
       stored: (p.daichiStored || []).reduce((s, c) => s + (c.value || 0), 0),
       storedCount: (p.daichiStored || []).length,
-      bemstarOwed: Math.min(BEMSTAR_HEAL_CAP, this.bemstarPreview(p)),
+      bemstarOwed: Math.min(BEMSTAR_HEAL_CAP, p.daichiBemstarTaken || 0),
     };
   },
 
@@ -173,9 +171,7 @@ module.exports = {
   // ---------- สกิลรอง ไพ่ตายของฉัน ----------
   applyArmor(engine, p) {
     const card = cardOf(p);
-    this.settleBemstar(p); // ถอดเกราะเบมสตาร์ -> ความเสียหายที่นับไว้แล้วยังฟื้นคืนเทิร์นหน้าตามเดิม
-    p.daichiArmor = card.key;
-    if (card.key === "bemstar") p.daichiBemstarBase = damageTotal(p);
+    p.daichiArmor = card.key; // ถอดเกราะเบมสตาร์กลางเทิร์น: ความเสียหายที่นับไว้แล้วยังฟื้นคืนเทิร์นหน้าตามเดิม
     engine.triggerCutscene(p, card.cut);
     engine.log(`🛡️ ${p.name} ไพ่ตายของฉัน — สวม${card.armorName}! ${card.effect}`);
     return ` → ${card.armorName}`;
@@ -194,21 +190,17 @@ module.exports = {
   },
   onUniteExpire(engine, p) {
     if (!isDaichi(p)) return;
-    this.settleBemstar(p);
     const had = p.daichiArmor ? CARDS[p.daichiArmor] : null;
     p.daichiArmor = null;
     engine.log(`✨ ${p.name} unite สิ้นสุด${had ? ` — ${had.armorName}หลุดออกไปด้วย` : ""}`);
   },
 
   // ---------- เกราะเบมสตาร์: นับความเสียหายที่ได้รับ (เกราะ+เลือด) แล้วฟื้นคืนตอนต้นเทิร์นหน้า ----------
-  settleBemstar(p) {
-    if (p.daichiBemstarBase == null) return;
-    p.daichiBemstarOwed = (p.daichiBemstarOwed || 0) + Math.max(0, damageTotal(p) - p.daichiBemstarBase);
-    p.daichiBemstarBase = null;
-  },
-  bemstarPreview(p) {
-    const live = p.daichiBemstarBase == null ? 0 : Math.max(0, damageTotal(p) - p.daichiBemstarBase);
-    return (p.daichiBemstarOwed || 0) + live;
+  //  นับเองทีละหน่วยจาก loseHp/loseArmor ของ server — ห้ามอ่าน p.dmgHp/p.dmgArmor แทน
+  //  (ตัวนับนั้นเป็นของหน้าสรุปผลรายเทิร์น ถูกรีเซ็ตตอนต้นเทิร์นก่อนถึงคิวฟื้นคืน จึงอ่านได้ 0 ตลอด = เคยเป็นบั๊ก "ไม่ฟื้นเลย")
+  onDamageTaken(p) {
+    const armor = armorOf(p);
+    if (armor && armor.key === "bemstar") p.daichiBemstarTaken = (p.daichiBemstarTaken || 0) + 1;
   },
 
   // ---------- doAttack: หลังลงความเสียหายของหมัดนี้แล้ว (หมัดที่ถูกหลบไม่มาถึงตรงนี้) ----------
@@ -282,15 +274,13 @@ module.exports = {
       }
       engine.log(`✨ ${p.name} มาUNITEกัน — การ์ดที่ตัดไว้เมื่อเทิร์นก่อน (${stored.map((c) => c.value).join(", ")}) บวกเพิ่มเข้ามือเทิร์นนี้`);
     }
-    // เกราะเบมสตาร์: ฟื้นคืนความเสียหายของเทิร์นก่อน (สูงสุด 3)
-    this.settleBemstar(p);
-    const owed = Math.min(BEMSTAR_HEAL_CAP, p.daichiBemstarOwed || 0);
-    p.daichiBemstarOwed = 0;
+    // เกราะเบมสตาร์: ฟื้นคืนความเสียหายของเทิร์นก่อน (สูงสุด 3) แล้วเริ่มนับของเทิร์นนี้ใหม่
+    const owed = Math.min(BEMSTAR_HEAL_CAP, p.daichiBemstarTaken || 0);
+    p.daichiBemstarTaken = 0;
     if (owed > 0) {
       const heal = engine.healHp(p, owed);
       engine.log(`🦇 ${p.name} เกราะเบมสตาร์ — ดูดซับความเสียหายเมื่อเทิร์นก่อน ฟื้นพลังชีวิต +${heal}`);
     }
-    if (armorOf(p) && p.daichiArmor === "bemstar") p.daichiBemstarBase = damageTotal(p);
   },
 
   // ---------- ไพ่แตกจากการจั่ว: มาUNITEกัน (ตัดการ์ด) มาก่อน แล้วค่อยข้อมูลจำลอง (ล้างมือ) ----------

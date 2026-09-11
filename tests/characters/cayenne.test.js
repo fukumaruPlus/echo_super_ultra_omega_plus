@@ -77,10 +77,9 @@ test('ข้อมูลตัวละครลงทะเบียนคร�
   assert.equal(engine.CHAR_HOOKS.cayenne, cay);
 });
 
-test('ค่าสมดุล: เปราะบาง 30% · ชุดกระสุน 3 ครั้ง · ครั้งที่ 3 โอกาส 50%', () => {
+test('ค่าสมดุล: เปราะบาง 30% · ชุดกระสุน 3 ครั้งแบบการันตี', () => {
   assert.equal(cay.FRAGILE_CHANCE, 0.3);
   assert.equal(cay.BARRAGE_HITS, 3);
-  assert.equal(cay.BARRAGE_LAST_CHANCE, 0.5);
 });
 
 test('วีดีโอทั้ง 3 คลิปมีในตาราง และต้อง afterReveal:false (คิวเองจากโค้ด)', () => {
@@ -194,17 +193,20 @@ test('ชุดกระสุน: แต่ละครั้งเป็นก
   assert.equal(K.cayBarrageShot, 0);
 });
 
-test('ชุดกระสุน: ครั้งที่ 3 มีโอกาส 50% — สุ่มไม่ผ่านจบชุดที่ 2 ครั้ง', () => {
+test('ชุดกระสุน: ครั้งที่ 3 การันตี — ไม่มีการสุ่ม', () => {
   const { K, A } = setup();
   K.cayBarrage = true;
-  Math.random = () => 0.99;
+  Math.random = () => 0.99;                      // สุ่มแย่สุดก็ยังได้ครบ 3 ครั้ง
   attack(K, A);
   engine.endTurn();
   assert.equal(K.cayBarrageShot, 2);
   attack(K, A);
+  engine.endTurn();
+  assert.equal(K.cayBarrageShot, 3);
+  attack(K, A);
+  assert.equal(A.hp, 7);
   assert.equal(cay.continueBarrage(engine), false);
   assert.equal(K.cayBarrageShot, 0);
-  assert.equal(A.hp, 8);
 });
 
 test('ชุดกระสุน + เกพาร์ด: เปราะบางจากครั้งก่อนเพิ่มดาเมจตั้งแต่ครั้งถัดไป (ไม่ใช่ครั้งที่แปะ)', () => {

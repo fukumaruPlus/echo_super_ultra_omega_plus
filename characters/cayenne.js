@@ -48,10 +48,9 @@ const PISTOL_MORALE = 1;
 const PISTOL_HEAL = 3;
 
 // ---------- สกิลรอง แน่จริงก็หลบสิ ----------
-//  การโจมตีปกติ 1 ครั้ง -> โจมตีปกติจริง 3 ครั้งติดกัน (แต่ละครั้งมีอนิเมชัน/สรุปความเสียหายของตัวเอง)
+//  การโจมตีปกติ 1 ครั้ง -> โจมตีปกติจริง 3 ครั้งติดกันแบบการันตี (แต่ละครั้งมีอนิเมชัน/สรุปความเสียหายของตัวเอง)
 const BARRAGE_AMMO = 1;
 const BARRAGE_HITS = 3;
-const BARRAGE_LAST_CHANCE = 0.5; // ครั้งที่ 3 มีโอกาสเกิดขึ้น 50%
 const BULLET_DMG = 1;
 
 // ---------- ท่าไม้ตาย มิสไซล์แห่งคำอำลา ----------
@@ -84,7 +83,6 @@ module.exports = {
   PISTOL_HEAL,
   BARRAGE_AMMO,
   BARRAGE_HITS,
-  BARRAGE_LAST_CHANCE,
   BULLET_DMG,
   MISSILE_AMMO,
   MISSILES,
@@ -230,10 +228,6 @@ module.exports = {
       const next = p.cayBarrageShot + 1;
       const stop = (msg) => { p.cayBarrageShot = 0; p.cayBarrageTargetId = null; if (msg) engine.log(msg); };
       if (!p.alive || next > BARRAGE_HITS) { stop(); continue; }
-      if (next === BARRAGE_HITS && Math.random() >= BARRAGE_LAST_CHANCE) {
-        stop(`🎯 ${p.name} แน่จริงก็หลบสิ — ครั้งที่ ${next} ไม่ลั่นไก (โอกาส ${Math.round(BARRAGE_LAST_CHANCE * 100)}%)`);
-        continue;
-      }
       if (!engine.attackableTargets(p.id).length) { stop(); continue; }
       p.cayBarrageShot = next;
       engine.log(`🎯 ${p.name} แน่จริงก็หลบสิ — ยิงต่อครั้งที่ ${next}/${BARRAGE_HITS}`);

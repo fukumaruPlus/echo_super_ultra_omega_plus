@@ -1674,6 +1674,7 @@ function loseHp(p) {
   if ((p.tempHp || 0) > 0) { p.tempHp--; hisakawaSyncOut(p); return; }
   p.hp--; p.dmgHp++;
   hisakawaSyncOut(p);
+  CHAR_HOOKS.daichi.onDamageTaken(p); // ไดจิ เกราะเบมสตาร์: นับความเสียหายไว้ฟื้นคืนเทิร์นหน้า
   // ไม่อยากให้ใครต้องเจ็บปวด (ริต้า เบอร์นัล, characters/phenex.js): ระหว่างล่อเป้า สะสม "ความเจ็บปวด" +1 ทุกๆ 1 หน่วยเลือดจริงที่เสียไป
   CHAR_HOOKS.phenex.onHpLost(p);
   if (!linkMirror) {
@@ -1706,6 +1707,7 @@ function loseArmor(p) {
   if (friendlyEffectBlocked(p)) return;
   p.armor--; p.dmgArmor++;
   hisakawaSyncOut(p);
+  CHAR_HOOKS.daichi.onDamageTaken(p); // ไดจิ เกราะเบมสตาร์: นับความเสียหายไว้ฟื้นคืนเทิร์นหน้า
   // MonsterLive (ฮิคารุ, characters/hikaru.js): เกราะลดลง -> ฟื้นพลังชีวิตตามเกราะที่เสียไป
   CHAR_HOOKS.hikaru.onArmorLost(engine, p);
   // ไม่อยากให้ใครต้องเจ็บปวด (ริต้า เบอร์นัล, characters/phenex.js): ระหว่างล่อเป้า สะสม "ความเจ็บปวด" +1 ทุกๆ 1 หน่วยเกราะที่เสียไป

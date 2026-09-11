@@ -1393,8 +1393,8 @@ function statusEntries(p, full) {
     const c = p.cayenne;
     out.push({ key: "cayAmmo", v: 1, icon: "🔫", label: `กระสุน ${c.ammo}/${c.ammoMax}`, cls: c.ammo > 0 ? "bg-echo-cyan text-gray-900" : "bg-echo-hp", desc: "ทหารผ่านศึก: กระสุน (แม็ก) เริ่ม 3 เก็บได้สูงสุด 3 — ปืนพกหน่วยรบ +1 · แน่จริงก็หลบสิ ใช้ 1 · มิสไซล์แห่งคำอำลา ใช้ 2" });
     if (!c.gepard) out.push({ key: "cayMorale", v: 1, icon: "🔥", label: `แรงใจ ${c.morale}/${c.moraleNeed}`, cls: "bg-white/20", desc: "แรงใจ: ได้จากปืนพกหน่วยรบครั้งละ 1 — ครบ 5 แปลงร่างเป็น \"เกพาร์ด\" 10 เทิร์น (หมดร่างแล้วเริ่มสะสมใหม่จาก 0)" });
-    if (c.barrage) out.push({ key: "cayBarrage", v: 1, icon: "🎯", label: "แน่จริงก็หลบสิ (บรรจุแล้ว)", cls: "bg-echo-magenta", desc: "การโจมตีปกติครั้งถัดไปกลายเป็นการโจมตี 3 ครั้งติดกัน ครั้งละ 1 หน่วย (ครั้งที่ 3 มีโอกาส 50%) — ค้างไว้จนกว่าจะได้โจมตี" });
-    if (c.barrageShot > 0) out.push({ key: "cayBarrageShot", v: 1, icon: "🎯", label: `แน่จริงก็หลบสิ ครั้งที่ ${c.barrageShot}/${c.barrageHits || 3}`, cls: "bg-echo-magenta", desc: "กำลังยิงชุดกระสุน — แต่ละครั้งเป็นการโจมตีปกติแยกกัน เลือกเป้าหมายได้ทุกครั้ง (ครั้งที่ 3 มีโอกาส 50%)" });
+    if (c.barrage) out.push({ key: "cayBarrage", v: 1, icon: "🎯", label: "แน่จริงก็หลบสิ (บรรจุแล้ว)", cls: "bg-echo-magenta", desc: "การโจมตีปกติครั้งถัดไปกลายเป็นการโจมตี 3 ครั้งติดกัน ครั้งละ 1 หน่วย — ค้างไว้จนกว่าจะได้โจมตี" });
+    if (c.barrageShot > 0) out.push({ key: "cayBarrageShot", v: 1, icon: "🎯", label: `แน่จริงก็หลบสิ ครั้งที่ ${c.barrageShot}/${c.barrageHits || 3}`, cls: "bg-echo-magenta", desc: "กำลังยิงชุดกระสุน — แต่ละครั้งเป็นการโจมตีปกติแยกกัน เลือกเป้าหมายได้ทุกครั้ง" });
     if (c.pending > 0) out.push({ key: "cayPending", v: c.pending, icon: "⏳", label: `ความเสียหายค้าง ${c.pending}`, cls: "bg-echo-hp", desc: "ทหารผ่านศึก: ความเสียหายที่ได้รับตอนไม่ได้อยู่ในร่างเกพาร์ด ถูกเลื่อนไปลงผลตอนต้นเทิร์นถัดไป" });
   }
   // ไดจิ โอโซระ: การ์ดไซเบอร์ที่ถืออยู่ / เกราะที่สวม / ฟื้นคืนจากเกราะเบมสตาร์ / การ์ดที่ตัดเก็บไว้ (ทุกคนเห็นได้)
