@@ -36,10 +36,10 @@ const AMMO_MAX = 3;
 // ---------- ร่วมร่างสหายแห่งเทพ ----------
 const MORALE_NEED = 5;
 const GEPARD_TURNS = 10;
-const FRAGILE_CHANCE = 0.5;
+const FRAGILE_CHANCE = 0.3;
 const FRAGILE_AMT = 1;
 //  "เปราะบาง 1 เทิร์น" แปะกลางเฟสโจมตี — ลูปลดเทิร์นท้ายเทิร์นจะกินไป 1 ทันที
-//  จึงตั้ง 2 เพื่อให้คงอยู่ถึงหมัดถัดไปจริง (ภายในชุดกระสุนเดียวกันก็เห็นผลทันทีตั้งแต่นัดถัดไป)
+//  จึงตั้ง 2 เพื่อให้คงอยู่ถึงการโจมตีครั้งถัดไปจริง (ภายในชุดกระสุนเดียวกันก็เห็นผลตั้งแต่ครั้งถัดไป)
 const FRAGILE_TURNS = 2;
 
 // ---------- สกิลพื้นฐาน ปืนพกหน่วยรบ ----------
@@ -48,9 +48,10 @@ const PISTOL_MORALE = 1;
 const PISTOL_HEAL = 3;
 
 // ---------- สกิลรอง แน่จริงก็หลบสิ ----------
+//  การโจมตีปกติ 1 ครั้ง -> โจมตีปกติจริง 3 ครั้งติดกัน (แต่ละครั้งมีอนิเมชัน/สรุปความเสียหายของตัวเอง)
 const BARRAGE_AMMO = 1;
-const BARRAGE_HITS = 4;
-const BARRAGE_LAST_CHANCE = 0.5; // นัดที่ 4 มีโอกาสยิงออก 50%
+const BARRAGE_HITS = 3;
+const BARRAGE_LAST_CHANCE = 0.5; // ครั้งที่ 3 มีโอกาสเกิดขึ้น 50%
 const BULLET_DMG = 1;
 
 // ---------- ท่าไม้ตาย มิสไซล์แห่งคำอำลา ----------
@@ -97,9 +98,12 @@ module.exports = {
     p.cayAmmo = AMMO_START;  // กระสุน (แม็ก)
     p.cayMorale = 0;         // แรงใจ
     p.cayBarrage = false;    // แน่จริงก็หลบสิ บรรจุไว้แล้ว — ค้างจนกว่าจะได้ออกหมัดโจมตีปกติ
+    p.cayBarrageShot = 0;    // ชุดกระสุนกำลังยิงอยู่: ครั้งที่เท่าไหร่ (0 = ไม่ได้ยิงชุดอยู่)
+    p.cayBarrageTargetId = null; // เป้าหมายล่าสุดของชุด — ใช้ตอนหมดเวลาเลือกเป้าหมาย
     p.cayPistolRound = 0;    // เลขรอบที่กดปืนพกหน่วยรบไปแล้ว (1 ครั้ง/เทิร์น)
     p.cayPending = [];       // ความเสียหายที่ถูกเลื่อนไปเทิร์นถัดไป [{ n, fromId, kind, normal }]
     p._cayNoDelay = false;
+    p._cayBarrageVideo = false;
   },
 
   displayImg(p) {
@@ -129,6 +133,8 @@ module.exports = {
       moraleNeed: MORALE_NEED,
       gepard: gepardOn(p),
       barrage: !!p.cayBarrage,
+      barrageShot: p.cayBarrageShot || 0,
+      barrageHits: BARRAGE_HITS,
       pending: pendingTotal(p),
       pistolRound: p.cayPistolRound || 0,
     };
@@ -188,7 +194,7 @@ module.exports = {
   applyBarrage(engine, p) {
     p.cayAmmo = ammoOf(p) - BARRAGE_AMMO;
     p.cayBarrage = true;
-    engine.log(`🎯 ${p.name} แน่จริงก็หลบสิ — บรรจุกระสุน ${BARRAGE_HITS} นัด ไว้กับการโจมตีปกติครั้งถัดไป (กระสุนเหลือ ${p.cayAmmo}/${AMMO_MAX})`);
+    engine.log(`🎯 ${p.name} แน่จริงก็หลบสิ — การโจมตีปกติครั้งถัดไปจะกลายเป็นการโจมตี ${BARRAGE_HITS} ครั้งติดกัน (กระสุนเหลือ ${p.cayAmmo}/${AMMO_MAX})`);
     return ` — กระสุนเหลือ ${p.cayAmmo}/${AMMO_MAX}`;
   },
   barrageLoaded(p) { return isCay(p) && !!p.cayBarrage; },
@@ -201,17 +207,52 @@ module.exports = {
     p._cayBarrageVideo = true;
     engine.triggerCutscene(p, "cayBarrage");
   },
-  // ได้ออกหมัดแล้ว = ใช้กระสุนชุดนี้ไป ไม่ว่าจะโดนหรือถูกหลบ
-  consumeBarrage(engine, p) {
-    if (!this.barrageLoaded(p)) return false;
-    p.cayBarrage = false;
-    // วีดีโอเพิ่งเล่นไปตอนเข้า doAttack -> ไม่ต้องแจ้งซ้ำ · เล่นไปแล้วในเกมนี้ -> ขึ้นการ์ดแจ้งเตือนเล็กแทน
-    if (p._cayBarrageVideo) p._cayBarrageVideo = false;
-    else engine.triggerCutscene(p, "cayBarrage");
-    return true;
+  // doAttack: หมัดนี้เป็นการโจมตีครั้งที่เท่าไหร่ของชุด (0 = โจมตีปกติธรรมดา)
+  //  ครั้งแรก = ใช้ชุดกระสุนที่บรรจุไว้ · ครั้งที่ 2-3 เปิดมาจาก continueBarrage
+  beginBarrageShot(engine, p, targetId) {
+    if (!isCay(p)) return 0;
+    if (p.cayBarrage) {
+      p.cayBarrage = false;
+      p.cayBarrageShot = 1;
+      // วีดีโอเพิ่งเล่นไปตอนเข้า doAttack -> ไม่ต้องแจ้งซ้ำ · เล่นไปแล้วในเกมนี้ -> ขึ้นการ์ดแจ้งเตือนเล็กแทน
+      if (p._cayBarrageVideo) p._cayBarrageVideo = false;
+      else engine.triggerCutscene(p, "cayBarrage");
+    }
+    if (p.cayBarrageShot > 0) p.cayBarrageTargetId = targetId || null;
+    return p.cayBarrageShot || 0;
   },
 
-  // ความเสียหายต่อ 1 นัด: 1 หน่วยคงที่ — บัฟฝั่งผู้ยิงไม่มีผล แต่ดีบัฟ/บัฟป้องกันของเป้าหมายมีผล
+  // ชุดกระสุนยิงไม่ครบ -> เปิดเฟสโจมตีครั้งถัดไป (เรียกจากต้น endTurn — ทุกทางจบหมัดไหลมาที่นั่น
+  //  ทั้งโดน/ถูกหลบ/ถูกสะท้อน/ถูกลบล้าง จึงหลบได้ทีละครั้งเสมอ) คืน true = เปิดเฟสโจมตีแล้ว ผู้เรียกต้อง return
+  continueBarrage(engine) {
+    for (const p of Object.values(engine.players)) {
+      if (!isCay(p) || !(p.cayBarrageShot > 0)) continue;
+      const next = p.cayBarrageShot + 1;
+      const stop = (msg) => { p.cayBarrageShot = 0; p.cayBarrageTargetId = null; if (msg) engine.log(msg); };
+      if (!p.alive || next > BARRAGE_HITS) { stop(); continue; }
+      if (next === BARRAGE_HITS && Math.random() >= BARRAGE_LAST_CHANCE) {
+        stop(`🎯 ${p.name} แน่จริงก็หลบสิ — ครั้งที่ ${next} ไม่ลั่นไก (โอกาส ${Math.round(BARRAGE_LAST_CHANCE * 100)}%)`);
+        continue;
+      }
+      if (!engine.attackableTargets(p.id).length) { stop(); continue; }
+      p.cayBarrageShot = next;
+      engine.log(`🎯 ${p.name} แน่จริงก็หลบสิ — ยิงต่อครั้งที่ ${next}/${BARRAGE_HITS}`);
+      engine.setAttackerId(p.id);
+      engine.setGameState("ATTACK");
+      engine.startPhaseTimer(engine.ATTACK_TIME, () => {
+        // หมดเวลาเลือก: ยิงเป้าหมายเดิมถ้ายังเล็งได้ ไม่งั้นสุ่ม
+        const t = engine.attackableTargets(engine.attackerId);
+        if (!t.length) { engine.endTurn(); return; }
+        const same = t.find((x) => x.id === p.cayBarrageTargetId);
+        engine.doAttack(engine.attackerId, (same || t[Math.floor(Math.random() * t.length)]).id);
+      });
+      engine.broadcastState();
+      return true;
+    }
+    return false;
+  },
+
+  // ความเสียหายต่อ 1 ครั้ง: 1 หน่วยคงที่ — บัฟฝั่งผู้ยิงไม่มีผล แต่ดีบัฟ/บัฟป้องกันของเป้าหมายมีผล
   bulletDamage(engine, target) {
     const sup = engine.CHAR_HOOKS.the_supplicant;
     let dmg = BULLET_DMG;
@@ -227,57 +268,26 @@ module.exports = {
     return Math.max(0, dmg);
   },
 
-  // เกพาร์ด: โจมตีปกติแต่ละนัดที่เข้าเป้ามีโอกาส 50% แปะ "เปราะบาง"
-  //  แปะหลังความเสียหายของนัดนั้นลงแล้วเสมอ -> มีผลตั้งแต่นัด/หมัดถัดไป
+  // เกพาร์ด: โจมตีปกติแต่ละครั้งที่เข้าเป้ามีโอกาส 30% แปะ "เปราะบาง"
+  //  แปะหลังความเสียหายของครั้งนั้นลงแล้วเสมอ -> มีผลตั้งแต่การโจมตีครั้งถัดไป
   rollFragile(engine, attacker, target) {
     if (!gepardOn(attacker) || !target || !target.alive) return false;
     if (Math.random() >= FRAGILE_CHANCE) return false;
     return !!engine.applyDebuff(target, "fragile", FRAGILE_AMT, FRAGILE_TURNS);
   },
 
-  // ---------- doAttack: หลังลงความเสียหายของหมัดหลัก (นัดที่ 1) แล้ว ----------
-  //  opts.barrage = หมัดนี้คือชุดกระสุน · opts.firstDodged = นัดที่ 1 ถูก "หลบหลีก" · opts.firstDmg = ความเสียหายนัดที่ 1
-  //  คืน { total, fired, landed, fragile, heal, lastFired } หรือ null ถ้าไม่ใช่คาเยนน์
-  afterMainHit(engine, attacker, target, opts) {
+  // ---------- doAttack: หลังลงความเสียหายของหมัดนี้แล้ว (หมัดที่ถูกหลบไม่มาถึงตรงนี้) ----------
+  //  shot = ครั้งที่ของชุดกระสุน (0 = โจมตีปกติธรรมดา) · คืน null ถ้าไม่ใช่คาเยนน์
+  afterMainHit(engine, attacker, target, shot) {
     if (!isCay(attacker)) return null;
-    const o = opts || {};
-    const res = { barrage: !!o.barrage, total: o.firstDodged ? 0 : (o.firstDmg || 0), fired: 1, landed: o.firstDodged ? 0 : 1, dodged: o.firstDodged ? 1 : 0, fragile: 0, heal: 0, lastFired: false };
-    if (!o.firstDodged && this.rollFragile(engine, attacker, target)) res.fragile++;
-
-    if (o.barrage) {
-      for (let i = 2; i <= BARRAGE_HITS; i++) {
-        if (!target.alive) break;
-        if (i === BARRAGE_HITS) {
-          if (Math.random() >= BARRAGE_LAST_CHANCE) { engine.log(`🎯 ${attacker.name} นัดที่ ${i} ไม่ลั่นไก (โอกาส ${Math.round(BARRAGE_LAST_CHANCE * 100)}%)`); break; }
-          res.lastFired = true;
-        }
-        res.fired++;
-        // "หลบหลีก" (สถานะ Universal): หลบได้ทีละนัด — แต่ละนัดกินสแตคหลบ 1 ครั้งตามกติกาเดิม
-        if ((target.statuses.evade || 0) > 0) {
-          const pct = engine.statusAmtOf(target, "evade") || 100;
-          engine.consumeEvadeStack(target);
-          if (Math.random() * 100 < pct) {
-            res.dodged++;
-            engine.log(`💨 ${target.name} หลบกระสุนนัดที่ ${i} ได้ (${pct}%)`);
-            continue;
-          }
-        }
-        const dmg = this.bulletDamage(engine, target);
-        engine.dealMixed(target, dmg, true);
-        res.total += dmg;
-        res.landed++;
-        engine.log(`🎯 ${attacker.name} กระสุนนัดที่ ${i} → ${target.name} -${dmg}`);
-        if (this.rollFragile(engine, attacker, target)) res.fragile++;
-      }
-    }
-
+    const res = { shot: shot || 0, fragile: this.rollFragile(engine, attacker, target), heal: 0 };
     // ปืนพก: การโจมตีปกติเข้าเป้า -> ฟื้นพลังชีวิต 3 (ครั้งเดียวแล้วหมด)
-    if (res.landed > 0 && ((attacker.statuses.cayPistol || 0) > 0)) {
+    if ((attacker.statuses.cayPistol || 0) > 0) {
       delete attacker.statuses.cayPistol;
       res.heal = engine.healHp(attacker, PISTOL_HEAL);
       engine.log(`🔫 ${attacker.name} ปืนพก — ฟื้นพลังชีวิต +${res.heal}`);
     }
-    if (res.fragile > 0) engine.log(`💔 ${attacker.name} เกพาร์ด — ${target.name} ติด "เปราะบาง" (${res.fragile} ครั้ง)`);
+    if (res.fragile) engine.log(`💔 ${attacker.name} เกพาร์ด — ${target.name} ติด "เปราะบาง"`);
     return res;
   },
 
@@ -285,10 +295,8 @@ module.exports = {
     if (!res) return [];
     const color = engine.colorOf(attacker);
     const out = [];
-    if (res.barrage) {
-      out.push({ name: `แน่จริงก็หลบสิ — เข้าเป้า ${res.landed}/${res.fired} นัด${res.dodged ? ` · ถูกหลบ ${res.dodged}` : ""}${res.lastFired ? "" : " · นัดที่ 4 ไม่ลั่นไก"}`, img: IMG.skill2, by: attacker.name, color, side: "atk" });
-    }
-    if (res.fragile > 0) out.push({ name: `เกพาร์ด — แปะเปราะบาง${res.fragile > 1 ? ` ×${res.fragile}` : ""}`, img: IMG.gepard, by: attacker.name, color, side: "atk" });
+    if (res.shot > 0) out.push({ name: `แน่จริงก็หลบสิ — ครั้งที่ ${res.shot}/${BARRAGE_HITS}`, img: IMG.skill2, by: attacker.name, color, side: "atk" });
+    if (res.fragile) out.push({ name: "เกพาร์ด — แปะเปราะบาง (มีผลครั้งถัดไป)", img: IMG.gepard, by: attacker.name, color, side: "atk" });
     if (res.heal > 0) out.push({ name: `ปืนพก — ฟื้นพลังชีวิต +${res.heal}`, img: IMG.skill1, by: attacker.name, color, side: "atk" });
     return out;
   },
@@ -365,7 +373,11 @@ module.exports = {
     }
   },
   onRoundStartTick(engine, p) {
-    if (!isCay(p) || !p.alive) return;
+    if (!isCay(p)) return;
+    // ชุดกระสุนเป็นของเทิร์นก่อน — เริ่มเทิร์นใหม่แล้วต้องไม่ค้าง (กันการโจมตีปกติครั้งหน้ากลายเป็นกระสุนไปเอง)
+    p.cayBarrageShot = 0;
+    p.cayBarrageTargetId = null;
+    if (!p.alive) return;
     this.resolvePendingDamage(engine, p);
   },
   resolvePendingDamage(engine, p) {

@@ -4985,9 +4985,9 @@ function doAttack(byId, targetId) {
   }
   clearPhaseTimer();
   attacker.didAttackRound = true;
-  // คาเยนน์: ออกหมัดแล้ว = ใช้ชุดกระสุน "แน่จริงก็หลบสิ" ไป (ไม่ว่าจะเข้าเป้าหรือถูกหลบ)
-  const cayBarrage = CHAR_HOOKS.cayenne.consumeBarrage(engine, attacker);
-  let cayFirstDodged = false;
+  // คาเยนน์ "แน่จริงก็หลบสิ": หมัดนี้เป็นการโจมตีครั้งที่เท่าไหร่ของชุด (0 = โจมตีปกติธรรมดา)
+  //  แต่ละครั้งคือการโจมตีปกติแยกกันจริง — ครั้งถัดไปเปิดจากต้น endTurn (ดู CHAR_HOOKS.cayenne.continueBarrage)
+  const cayBarrage = CHAR_HOOKS.cayenne.beginBarrageShot(engine, attacker, targetId);
   // โมโรโบชิ ดัน (characters/dan.js): เป้าหมายที่ถูกขับรถตาม "หันมาตีดัน" -> นับหมัด ครบ 2 ครั้งถึงสลัดหลุด
   //  วางไว้ตรงนี้ (ก่อนคิดดาเมจ) เพราะนับที่ "ได้ออกหมัด" ไม่ใช่ "ตีโดน" — ดันหลบได้ก็ยังนับให้
   CHAR_HOOKS.dan.onChasedAttacked(engine, attacker, target);
@@ -5040,13 +5040,7 @@ function doAttack(byId, targetId) {
   if ((target.statuses.evade || 0) > 0) {
     const evadePct = statusAmtOf(target, "evade") || 100;
     consumeEvadeStack(target);
-    const evaded = Math.random() * 100 < evadePct;
-    if (evaded && cayBarrage) {
-      // คาเยนน์ แน่จริงก็หลบสิ: หลบได้ทีละนัด — นัดที่ 1 พลาด แต่นัดที่เหลือยังยิงต่อ (ดู afterMainHit)
-      cayFirstDodged = true;
-      target.wasAttacked = true;
-      lastLog.push(`💨 หลบหลีก! ${target.name} หลบกระสุนนัดที่ 1 ของ ${attacker.name} ได้ (${evadePct}%) — เหลือหลบหลีกอีก ${target.statuses.evade || 0} ครั้ง`);
-    } else if (evaded) {
+    if (Math.random() * 100 < evadePct) {
       // patch 2.1.3.5: ถูกโจมตีไม่ได้แต้มสกิลอีกต่อไป (แม้หลบพ้น)
       target.wasAttacked = true;
       lastLog.push(`💨 หลบหลีก! ${target.name} หลบการโจมตีของ ${attacker.name} ได้ (${evadePct}%) — เหลือหลบหลีกอีก ${target.statuses.evade || 0} ครั้ง`);
@@ -5063,7 +5057,8 @@ function doAttack(byId, targetId) {
       startPhaseTimer(ATTACKFX_TIME, () => runCutsceneQueue(endTurn));
       broadcastState();
       return;
-    } else lastLog.push(`💨 ${target.name} พยายามหลบ (${evadePct}%) แต่ไม่พ้น — การโจมตีดำเนินต่อ (เหลือหลบหลีกอีก ${target.statuses.evade || 0} ครั้ง)`);
+    }
+    lastLog.push(`💨 ${target.name} พยายามหลบ (${evadePct}%) แต่ไม่พ้น — การโจมตีดำเนินต่อ (เหลือหลบหลีกอีก ${target.statuses.evade || 0} ครั้ง)`);
   }
 
   // ---------- ชิกิ: ฉันมองเห็นมันแล้ว (characters/shiki.js) — เป้าหมายเส้นตายครบ 6 = สังหารทันที (บังคับตาย) ----------
@@ -5256,8 +5251,8 @@ function doAttack(byId, targetId) {
   //  ดาเมจคงที่เสมอ ไม่รับโบนัสพลังโจมตี/บัฟใดๆ ของตัวที่กำลังคุมอยู่ (คิดท้ายสุดเพื่อทับทุกอย่าง)
   const hisakawaDreamAtk = CHAR_HOOKS.hisakawa_sister.isDreamAttack(attacker);
   if (hisakawaDreamAtk) dmg = CHAR_HOOKS.hisakawa_sister.DREAM_FOLLOWUP_DMG;
-  // คาเยนน์ แน่จริงก็หลบสิ: นัดที่ 1 ของชุด — 1 หน่วยคงที่ บัฟฝั่งผู้ยิงไม่มีผล แต่ดีบัฟของเป้าหมายมีผล (ทับทุกอย่างข้างบน)
-  if (cayBarrage) dmg = cayFirstDodged ? 0 : CHAR_HOOKS.cayenne.bulletDamage(engine, target);
+  // คาเยนน์ แน่จริงก็หลบสิ: ทุกครั้งของชุด 1 หน่วยคงที่ บัฟฝั่งผู้ยิงไม่มีผล แต่ดีบัฟของเป้าหมายมีผล (ทับทุกอย่างข้างบน)
+  if (cayBarrage) dmg = CHAR_HOOKS.cayenne.bulletDamage(engine, target);
 
   // ---------- ริต้า เบอร์นัล (characters/phenex.js): ฝันไปเถอะ — ตั้งรับ สะท้อนความเสียหายทั้งหมดกลับผู้โจมตีแทนที่จะรับเอง ----------
   if (CHAR_HOOKS.phenex.tryReflectHit(engine, attacker, target, dmg)) return;
@@ -5290,10 +5285,8 @@ function doAttack(byId, targetId) {
   if (attackerBeat || phenexPurgeAtk || doomPierceAtk) dealDirect(target, dmg, true); // กันตายทะลุเกราะ / อย่าอยู่เลย แกน่ะ!: ทะลุเกราะเข้าเลือดจริง
   else dealMixed(target, dmg, true);               // กฎปกติ: ลดเกราะก่อน ถ้าไม่มีเกราะจึงเข้าเลือดจริง
   CHAR_HOOKS.escanor.onNormalAttackReceived(engine, attacker, target, escanorFormBeforeHit);
-  // คาเยนน์ (characters/cayenne.js): กระสุนนัด 2-4 ของ "แน่จริงก็หลบสิ" · เปราะบาง 50% ต่อนัด (เกพาร์ด) · ปืนพกฟื้นเลือด
-  //  ต้องมาก่อนทุกอย่างที่อ่าน dmg ด้านล่าง เพื่อให้สรุปผล/ผลต่อเนื่องเห็นความเสียหายรวมทั้งชุด
-  const cayAttackFx = CHAR_HOOKS.cayenne.afterMainHit(engine, attacker, target, { barrage: cayBarrage, firstDodged: cayFirstDodged, firstDmg: dmg });
-  if (cayAttackFx && cayBarrage) dmg = cayAttackFx.total;
+  // คาเยนน์ (characters/cayenne.js): เปราะบาง 30% (เกพาร์ด — มีผลตั้งแต่ครั้งถัดไป) · ปืนพกฟื้นเลือด
+  const cayAttackFx = CHAR_HOOKS.cayenne.afterMainHit(engine, attacker, target, cayBarrage);
   // ผู้สังหารเมจ (characters/mageslayer.js): Fury — สูบพลังชีวิตและมอบ [ดูดซับเวท] ตามขั้น แล้วเคลียร์สต็อก
   //  (การขโมยพลังงานจากตราล่าเวททำที่ท่อดาเมจกลาง mageslayerMarkSteal ไปแล้ว)
   CHAR_HOOKS.mageslayer.onAttackPostDamage(engine, attacker, target, dmg);
@@ -5594,6 +5587,9 @@ function seraphAdvance() {
 }
 
 function endTurn() {
+  // คาเยนน์ "แน่จริงก็หลบสิ": ชุดกระสุนยังยิงไม่ครบ -> เปิดเฟสโจมตีครั้งถัดไปแทนการจบเทิร์น
+  //  วางไว้บนสุดเพราะทุกทางจบหมัด (โดน/ถูกหลบ/ถูกสะท้อน/ถูกลบล้าง) ไหลมาจบที่ endTurn เหมือนกันหมด
+  if (CHAR_HOOKS.cayenne.continueBarrage(engine)) return;
   // โปรดิวเซอร์ (luminous burst): ตาข่ายสำรอง — ถ้าหมัดที่ทำให้ครบ "ถูกหลบ" doAttack จะ return
   //  ตั้งแต่ด่านหลบ ไม่ผ่าน postAttackFollowup เลย รางวัลจึงไม่มีวันจ่าย (และ luminous มีการหลบ 40%
   //  ของคาโฮะติดมาด้วย จึงเกิดบ่อยมาก) · flushBurst เป็น idempotent เรียกซ้ำไม่มีผลข้างเคียง
@@ -6076,7 +6072,7 @@ io.on('connection', (socket) => {
       muimiEmergencyUses: CHAR_HOOKS.muimi.EMERGENCY_USES, muimiEmergencyUsedRound: 0,
       muimiLoseStreak: 0, muimiHeartRound: 0, muimiForcedBustRound: 0, muimiUltCasts: 0, muimiUltCastRound: 0, muimiUltLock: 0,
       tepeuCookTurns: 0, tepeuPonderTurns: 0, tepeuEyeTurns: 0, tepeuLoseStreak: 0, tepeuKillTargetId: null,
-      cayAmmo: 0, cayMorale: 0, cayBarrage: false, cayPistolRound: 0, cayPending: [],
+      cayAmmo: 0, cayMorale: 0, cayBarrage: false, cayBarrageShot: 0, cayPistolRound: 0, cayPending: [],
       piggy: 0, senaNext: false, kotoneExtraAtk: false,
       bardNotes: [], bardNotesUsed: 0, bardPending: null,
       bloodSection: 0, soulSection: 0, bardLinks: {},

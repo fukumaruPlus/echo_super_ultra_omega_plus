@@ -40,7 +40,7 @@ module.exports = function buildTransforms(img) {
     //  seconds วัดจากความยาวจริง (23.15 / 3.97 / 12.93 วิ) แล้วปัดขึ้นเผื่อเวลาตัดฉาก
     //  เพลง cayenne_theme มาจาก activeMusic ของตัวละคร (ค้างตลอดร่างเกพาร์ด) ไม่ใช่ฟิลด์ music ตรงนี้
     cayGepard:  { img: cayChar.IMG.gepard, video: cayChar.VIDEO.gepard, title: "ร่วมร่างสหายแห่งเทพ", label: "เกพาร์ด", seconds: 24, music: null, afterReveal: false },
-    cayBarrage: { img: cayChar.IMG.skill2, video: cayChar.VIDEO.skill2, title: "แน่จริงก็หลบสิ", label: "ยิงรัว 4 นัด", seconds: 5, music: null, afterReveal: false },
+    cayBarrage: { img: cayChar.IMG.skill2, video: cayChar.VIDEO.skill2, title: "แน่จริงก็หลบสิ", label: "ยิงรัว 3 ครั้ง", seconds: 5, music: null, afterReveal: false },
     cayMissile: { img: cayChar.IMG.skill3, video: cayChar.VIDEO.skill3, title: "มิสไซล์แห่งคำอำลา", label: "ปล่อยท่าไม้ตาย", seconds: 14, music: null, afterReveal: false },
     lumiBurst:    { img: lumiChar.IMG.luminous, video: "/characters/producer_lumi/luminus/luminus_burst.mp4", title: "LUMINOUS BURST", label: "ทุกคนตีครบแล้ว", seconds: 16, music: null, afterReveal: false },
     // ---------- ไบรอัน (GT-R34) (patch 3.5 new) ----------

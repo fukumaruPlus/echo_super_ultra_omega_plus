@@ -77,6 +77,12 @@ test('ข้อมูลตัวละครลงทะเบียนคร�
   assert.equal(engine.CHAR_HOOKS.cayenne, cay);
 });
 
+test('ค่าสมดุล: เปราะบาง 30% · ชุดกระสุน 3 ครั้ง · ครั้งที่ 3 โอกาส 50%', () => {
+  assert.equal(cay.FRAGILE_CHANCE, 0.3);
+  assert.equal(cay.BARRAGE_HITS, 3);
+  assert.equal(cay.BARRAGE_LAST_CHANCE, 0.5);
+});
+
 test('วีดีโอทั้ง 3 คลิปมีในตาราง และต้อง afterReveal:false (คิวเองจากโค้ด)', () => {
   for (const k of ['cayGepard', 'cayBarrage', 'cayMissile']) {
     assert.ok(engine.TRANSFORMS[k] && engine.TRANSFORMS[k].video, `ต้องมีคลิป ${k}`);
@@ -157,54 +163,97 @@ test('แน่จริงก็หลบสิ: ใช้กระสุน 1 
   assert.equal(cay.canUseSkill(engine, K, 'secondary'), false);
 });
 
-// ---------------------------------------------------------------- ชุดกระสุน 4 นัด
-test('ชุดกระสุน: นัดละ 1 · นัดที่ 4 ไม่ลั่น (สุ่มไม่ผ่าน) · บัฟพลังโจมตีของผู้ยิงไม่มีผล', () => {
-  const { K, A } = setup();
+// ---------------------------------------------------------------- ชุดกระสุน: โจมตีปกติจริงทีละครั้ง
+test('ชุดกระสุน: แต่ละครั้งเป็นการโจมตีแยกกัน (สรุปผลทีละครั้ง) ครั้งละ 1 · บัฟผู้ยิงไม่มีผล', () => {
+  const { K, A, C } = setup();
   K.cayBarrage = true;
   K.statuses.might = 3; K.statusAmt.might = 3; // บัฟต้องไม่มีผล
-  Math.random = () => 0.99;                     // ไม่ติดเปราะบาง · นัดที่ 4 ไม่ลั่น
+  Math.random = () => 0;                         // ครั้งที่ 3 เกิดขึ้น
+
   attack(K, A);
-  assert.equal(A.hp, 7, '3 นัด นัดละ 1');
-  assert.equal(engine.lastAttack.dmg, 3);
+  assert.equal(A.hp, 9);
+  assert.equal(engine.lastAttack.dmg, 1, 'สรุปความเสียหายเฉพาะครั้งนี้');
   assert.equal(K.cayBarrage, false, 'ออกหมัดแล้วใช้ชุดกระสุนไป');
+  assert.equal(K.cayBarrageShot, 1);
+
+  engine.endTurn();                              // จบหมัด -> เปิดเฟสโจมตีครั้งที่ 2 แทนการจบเทิร์น
+  assert.equal(engine.gameState, 'ATTACK');
+  assert.equal(engine.attackerId, 'K');
+  assert.equal(K.cayBarrageShot, 2);
+
+  attack(K, C);                                  // เลือกเป้าหมายใหม่ได้
+  assert.equal(C.hp, 9);
+  assert.equal(engine.lastAttack.dmg, 1);
+
+  engine.endTurn();
+  assert.equal(K.cayBarrageShot, 3);
+  attack(K, A);
+  assert.equal(A.hp, 8);
+
+  assert.equal(cay.continueBarrage(engine), false, 'ครบ 3 ครั้งแล้วจบชุด');
+  assert.equal(K.cayBarrageShot, 0);
 });
 
-test('ชุดกระสุน + เกพาร์ด: เปราะบางจากนัดก่อนเพิ่มดาเมจตั้งแต่นัดถัดไป (ไม่ใช่นัดที่แปะ)', () => {
+test('ชุดกระสุน: ครั้งที่ 3 มีโอกาส 50% — สุ่มไม่ผ่านจบชุดที่ 2 ครั้ง', () => {
+  const { K, A } = setup();
+  K.cayBarrage = true;
+  Math.random = () => 0.99;
+  attack(K, A);
+  engine.endTurn();
+  assert.equal(K.cayBarrageShot, 2);
+  attack(K, A);
+  assert.equal(cay.continueBarrage(engine), false);
+  assert.equal(K.cayBarrageShot, 0);
+  assert.equal(A.hp, 8);
+});
+
+test('ชุดกระสุน + เกพาร์ด: เปราะบางจากครั้งก่อนเพิ่มดาเมจตั้งแต่ครั้งถัดไป (ไม่ใช่ครั้งที่แปะ)', () => {
   const { K, A } = setup();
   gepard(K);
   K.cayBarrage = true;
-  Math.random = () => 0;                         // ติดเปราะบางทุกนัด · นัดที่ 4 ลั่น
+  Math.random = () => 0;                         // ติดเปราะบางทุกครั้ง
   attack(K, A);
-  // นัด 1 = 1 (แปะเปราะบางหลังโดน) · นัด 2-4 = 2 ต่อนัด (เปราะบาง 1 ไม่ซ้อนจำนวน)
-  assert.equal(A.hp, 10 - (1 + 2 + 2 + 2));
-  assert.equal(engine.lastAttack.dmg, 7);
+  assert.equal(A.hp, 9, 'ครั้งที่ 1 = 1 (แปะเปราะบางหลังโดน)');
   assert.equal(A.statusAmt.fragile, 1);
   assert.equal(A.statuses.fragile, cay.FRAGILE_TURNS);
+  engine.endTurn();
+  attack(K, A);
+  assert.equal(A.hp, 7, 'ครั้งที่ 2 = 2 (เปราะบาง 1 ไม่ซ้อนจำนวน)');
 });
 
-test('ชุดกระสุน: "หลบหลีก" หลบได้ทีละนัด — นัดแรกถูกหลบแต่นัดที่เหลือยังยิงต่อ', () => {
+test('ชุดกระสุน: หลบได้แค่ครั้งนั้น — ครั้งที่เหลือยังยิงต่อ', () => {
   const { K, A } = setup();
   K.cayBarrage = true;
   engine.grantEvadeStack(A);
   A.statusAmt.evade = 100;
-  Math.random = () => 0.99;                      // หลบหลีก 100% ผ่าน · นัดที่ 4 ไม่ลั่น
+  Math.random = () => 0.99;
   attack(K, A);
-  assert.equal(A.hp, 8, 'นัด 1 ถูกหลบ นัด 2-3 เข้า');
-  assert.ok(!A.statuses.evade, 'สแตคหลบถูกใช้ไป 1');
-  assert.equal(engine.gameState, 'ATTACKING', 'การโจมตีไม่จบตั้งแต่นัดแรกที่ถูกหลบ');
+  assert.equal(A.hp, 10, 'ครั้งที่ 1 ถูกหลบ');
+  assert.ok(engine.lastAttack.dodge);
+  engine.endTurn();
+  assert.equal(engine.gameState, 'ATTACK', 'ยังได้ยิงครั้งที่ 2');
+  attack(K, A);
+  assert.equal(A.hp, 9);
 });
 
-test('ดีบัฟของเป้าหมายมีผลกับกระสุน (คุ้มครองลดดาเมจต่อนัด)', () => {
+test('ดีบัฟของเป้าหมายมีผลกับกระสุน (คุ้มครองลดดาเมจต่อครั้ง)', () => {
   const { K, A } = setup();
   K.cayBarrage = true;
   A.statuses.guard = 3; A.statusAmt.guard = 1;
   Math.random = () => 0.99;
   attack(K, A);
-  assert.equal(A.hp, 10, 'คุ้มครอง 1 กินกระสุนนัดละ 1 หมด');
+  assert.equal(A.hp, 10, 'คุ้มครอง 1 กินกระสุน 1 หน่วยหมด');
+});
+
+test('ชุดกระสุนไม่ค้างข้ามเทิร์น', () => {
+  const { K } = setup();
+  K.cayBarrageShot = 2;
+  cay.onRoundStartTick(engine, K);
+  assert.equal(K.cayBarrageShot, 0);
 });
 
 // ---------------------------------------------------------------- โจมตีปกติ
-test('เกพาร์ด: โจมตีปกติติดเปราะบาง 50% โดยหมัดนั้นยังไม่แรงขึ้น · ไม่ใช่เกพาร์ดไม่ติด', () => {
+test('เกพาร์ด: โจมตีปกติติดเปราะบาง 30% โดยหมัดนั้นยังไม่แรงขึ้น · ไม่ใช่เกพาร์ดไม่ติด', () => {
   const { K, A, C } = setup();
   Math.random = () => 0;
   attack(K, A);
@@ -215,6 +264,14 @@ test('เกพาร์ด: โจมตีปกติติดเปราะ
   attack(K, C);
   assert.equal(C.hp, 10 - base, 'หมัดที่แปะเปราะบางยังไม่แรงขึ้น');
   assert.equal(C.statusAmt.fragile, 1);
+});
+
+test('เกพาร์ด: สุ่มเกิน 30% ไม่ติดเปราะบาง', () => {
+  const { K, A } = setup();
+  gepard(K);
+  Math.random = () => 0.35;
+  attack(K, A);
+  assert.ok(!A.statuses.fragile);
 });
 
 test('ปืนพก: โจมตีปกติเข้าเป้าฟื้นพลังชีวิต 3 ครั้งเดียวแล้วหมด', () => {
@@ -269,8 +326,7 @@ test('ทหารผ่านศึก: ความเสียหายที
 });
 
 test('ทหารผ่านศึก: หมัดที่ถูกเลื่อนขึ้นป้ายฝั่งป้องกัน', () => {
-  const { K, A } = setup();
-  A.characterId = 'temari';
+  const { K } = setup();
   engine.setGameState('ATTACK');
   engine.setAttackerId('A');
   engine.doAttack('A', 'K');
@@ -308,12 +364,15 @@ test('แน่จริงก็หลบสิ: วีดีโอเล่น
   assert.equal(cay.barrageNeedsVideo(K), true);
   cay.startBarrageVideo(engine, K);
   assert.equal(cay.barrageNeedsVideo(K), false, 'กันวนซ้ำหลังวีดีโอ');
-  assert.equal(cay.consumeBarrage(engine, K), true);
+  assert.equal(cay.beginBarrageShot(engine, K, 'A'), 1);
   assert.deepEqual(triggered, ['cayBarrage'], 'ไม่แจ้งซ้ำหลังเพิ่งเล่นวีดีโอ');
+  assert.equal(cay.beginBarrageShot(engine, K, 'A'), 1, 'ครั้งถัดไปของชุดเดียวกันไม่เล่นวีดีโอ/แจ้งเตือนอีก');
+  assert.deepEqual(triggered, ['cayBarrage']);
 
+  K.cayBarrageShot = 0;
   K.cutsceneShown.cayBarrage = true;
   K.cayBarrage = true;
   assert.equal(cay.barrageNeedsVideo(K), false, 'เคยเล่นแล้วในเกมนี้');
-  cay.consumeBarrage(engine, K);
+  cay.beginBarrageShot(engine, K, 'A');
   assert.deepEqual(triggered, ['cayBarrage', 'cayBarrage'], 'ครั้งถัดไปผ่าน triggerCutscene -> การ์ดแจ้งเตือน');
 });
