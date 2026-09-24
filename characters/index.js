@@ -45,7 +45,8 @@ const daisuke = require("./daisuke");
 const yaguruma = require("./yaguruma");
 const kagami = require("./kagami");
 const tsurugi = require("./tsurugi");
-const usagi = require("./usagi"); // อุซากิ (เอาฮา · unique)
+const usagi = require("./usagi");
+const shotaro = require("./shotaro"); // ฮิดาริ โชว์ทาโร่ (กลาง) // อุซากิ (เอาฮา · unique)
 const ort = require("./ort"); // บอสมหันตภัย (บอตเท่านั้น — โหมด Type Mercury)
 
 const CHARACTER_MODULES = [
@@ -91,6 +92,7 @@ const CHARACTER_MODULES = [
   kagami,
   tsurugi,
   usagi,
+  shotaro,
   ort,
 ];
 

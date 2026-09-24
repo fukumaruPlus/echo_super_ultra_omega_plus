@@ -94,7 +94,7 @@ test('ultimate: opponents (not teammates, not ORT) get 3 questions for 3 turns; 
     usagi.onRoundStartAfterLoop(engine);
     assert.ok(foe.usagiQuiz, `turn ${turn + 1}: the opponent gets a quiz`);
     assert.equal(mate.usagiQuiz || null, null, 'teammates are skipped');
-    assert.equal(boss.usagiQuiz || null, null, 'ORT is skipped');
+    assert.equal(boss.usagiQuiz || null, null, 'ORT gets no quiz — it just takes the full hit');
     const qz = foe.usagiQuiz;
     usagi.answerQuiz(engine, foe, qz.items[0].a);       // ถูก
     usagi.answerQuiz(engine, foe, qz.items[1].a + 1);   // ผิด
@@ -104,6 +104,7 @@ test('ultimate: opponents (not teammates, not ORT) get 3 questions for 3 turns; 
   usagi.onRoundStartAfterLoop(engine);
   assert.equal(foe.usagiQuiz, null, 'no 4th turn');
   assert.equal(foe.armor + foe.hp, 5 - 3, 'one wrong answer per turn = 3 damage');
+  assert.equal(boss.armor + boss.hp, 7 - 9, 'ORT takes 3 every turn for 3 turns (9 total)');
 });
 
 test('quiz clock pauses during cutscenes and unanswered questions count as wrong', () => {

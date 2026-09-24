@@ -2109,7 +2109,8 @@ function resetCombat(p) {
   CHAR_HOOKS.ippo.resetCombat(p);    // อิปโป: อัตราหลบสะสม / Dempsey Charge / คูลดาวน์รายสกิล
   // ผู้วิงวอน: คลังคำวิงวอน/โควตาสกิล 2 ครั้ง/เทิร์น + ฟิลด์ "ผู้ถูกตราพิพากษา" ซึ่งอยู่ที่ตัวเป้าหมาย (จึงล้างให้ทุกคน)
   CHAR_HOOKS.the_supplicant.resetCombat(p);
-  CHAR_HOOKS.usagi.resetCombat(p); // อุซากิ: โควตาสกิลพื้นฐาน / ปรุๆ / ข้อเสนอสลับไพ่ / โจทย์คณิต (ติดที่ผู้ถูกทำโจทย์)
+  CHAR_HOOKS.usagi.resetCombat(p);
+  CHAR_HOOKS.shotaro.resetCombat(p); // ฮิดาริ โชว์ทาโร่: ความน่าสงสัย / คำทาย / Maximum Drive // อุซากิ: โควตาสกิลพื้นฐาน / ปรุๆ / ข้อเสนอสลับไพ่ / โจทย์คณิต (ติดที่ผู้ถูกทำโจทย์)
   // ไบรอัน: น้ำมัน/ตัวสะสมน้ำมันที่รถกิน/ธงวีดีโอครั้งแรก + ธง "ถูกแช่" ที่อยู่ที่ผู้เล่นทุกคน
   CHAR_HOOKS.brian.resetCombat(p);
   // โปรดิวเซอร์: ไอดอลที่ยืนอยู่ / เลือดโปรดิวเซอร์ / แต้ม "ไอดอล" / คิวดาเมจหน่วง ฯลฯ
@@ -2524,6 +2525,9 @@ function buildStateFor(viewerId) {
         // อุซากิ: ปรุๆ (เห็นทุกคน) · ข้อเสนอสลับไพ่ / โจทย์คณิต (เห็นเฉพาะเจ้าตัว — ไม่ส่งเฉลย)
         usagi: p.characterId === "usagi" ? CHAR_HOOKS.usagi.publicState(p) : undefined,
         ...(mine ? CHAR_HOOKS.usagi.privateState(engine, p) : {}),
+        // ฮิดาริ โชว์ทาโร่: ความน่าสงสัย/ร่างโจ๊กเกอร์ (เห็นทุกคน) · คำทายของเทิร์นนี้ (เห็นเจ้าตัวคนเดียว)
+        shotaro: p.characterId === "shotaro" ? CHAR_HOOKS.shotaro.publicState(p) : undefined,
+        ...(mine ? CHAR_HOOKS.shotaro.privateState(engine, p) : {}),
         modeVote: p.modeVote || null,
         locked: p.locked,
         busted: (show || promoShow || connorReads || teamReveal) ? bustedOf(p) : false,
@@ -3510,7 +3514,8 @@ function dealRound() {
     CHAR_HOOKS.daisuke.onRoundStartTick(engine, p); // ค่าแต้มสกิลของ Clock Up + การฟื้นฟูของ PUT ON
     CHAR_HOOKS.yaguruma.onRoundStartTick(engine, p);
     CHAR_HOOKS.kagami.onRoundStartTick(engine, p);
-    CHAR_HOOKS.usagi.onRoundStartTick(engine, p); // อุซากิ: โควตาสกิลพื้นฐาน 2 ครั้ง + ปรุๆ ลดเอง
+    CHAR_HOOKS.usagi.onRoundStartTick(engine, p);
+    CHAR_HOOKS.shotaro.onRoundStartTick(engine, p); // โชว์ทาโร่: ร่างโจ๊กเกอร์หมด -> Maximum Drive ที่ค้างหายไป // อุซากิ: โควตาสกิลพื้นฐาน 2 ครั้ง + ปรุๆ ลดเอง
     CHAR_HOOKS.tsurugi.onRoundStartTick(engine, p);
 
     // ---------- ซาโตรุ อาเคฟุ (patch 2.0.8.2): ดาเมจต่อเนื่องทุก 2 เทิร์น ----------
@@ -4094,6 +4099,7 @@ function useSkillCore(id, tier, targets, item) {
   const isHarukaBasic = p.characterId === "haruka" && tier === "basic";
   // อุซากิ: สกิลพื้นฐาน (กินไอเทม) มีโควตา 2 ครั้ง/เทิร์นของตัวเอง ไม่กินโควตาสกิลหลักของเทิร์น
   const isUsagiPick = p.characterId === "usagi";
+  const isShotaroPick = p.characterId === "shotaro";
   const isUsagiBasic = isUsagiPick && tier === "basic";
   if (isHarukaBasic && (p.harukaBasicUses || 0) >= CHAR_HOOKS.haruka.BASIC_USES_PER_TURN) return;
   if (isSupPick && (p.supSkillUsesRound || 0) >= CHAR_HOOKS.the_supplicant.SKILL_USES_PER_TURN) return;
@@ -4119,7 +4125,8 @@ function useSkillCore(id, tier, targets, item) {
   if (isYagurumaPick && !CHAR_HOOKS.yaguruma.canUseSkill(engine, p, tier)) return;
   const isKagamiPick = p.characterId === "kagami";
   if (isKagamiPick && !CHAR_HOOKS.kagami.canUseSkill(engine, p, tier)) return;
-  if (isUsagiPick && !CHAR_HOOKS.usagi.canUseSkill(engine, p, tier, targets, item)) return; // อุซากิ: ต้องมีไอเทม / เป้าหมาย / ท่าไม้ตายไม่ซ้อน
+  if (isUsagiPick && !CHAR_HOOKS.usagi.canUseSkill(engine, p, tier, targets, item)) return;
+  if (isShotaroPick && !CHAR_HOOKS.shotaro.canUseSkill(engine, p, tier, targets, item)) return; // โชว์ทาโร่: เป้าหมาย+คำทาย / ร่างโจ๊กเกอร์ / ความน่าสงสัย 3 // อุซากิ: ต้องมีไอเทม / เป้าหมาย / ท่าไม้ตายไม่ซ้อน
   const isTsurugiPick = p.characterId === "tsurugi";
   if (isTsurugiPick && !CHAR_HOOKS.tsurugi.canUseSkill(engine, p, tier)) return;
   // พี่จ๋าอยู่ไหน (อาริมะ มิยาโกะ): กดซ้ำไม่ได้จนกว่าจะได้โจมตี
@@ -4378,7 +4385,8 @@ function useSkillCore(id, tier, targets, item) {
   if (isYagurumaPick) flashSuffix = CHAR_HOOKS.yaguruma.applyInstantSkill(engine, p, tier) || flashSuffix;
   if (isKagamiPick) flashSuffix = CHAR_HOOKS.kagami.applyInstantSkill(engine, p, tier) || flashSuffix;
   if (isTsurugiPick) flashSuffix = CHAR_HOOKS.tsurugi.applyInstantSkill(engine, p, tier) || flashSuffix;
-  if (isUsagiPick) flashSuffix = CHAR_HOOKS.usagi.applyInstantSkill(engine, p, tier, targets, item) || flashSuffix; // อุซากิ (characters/usagi.js)
+  if (isUsagiPick) flashSuffix = CHAR_HOOKS.usagi.applyInstantSkill(engine, p, tier, targets, item) || flashSuffix;
+  if (isShotaroPick) flashSuffix = CHAR_HOOKS.shotaro.applyInstantSkill(engine, p, tier, targets, item) || flashSuffix; // ฮิดาริ โชว์ทาโร่ // อุซากิ (characters/usagi.js)
   // ไรเดอร์ Zect: กด Clock Up/Clock Over กลางเฟสจั่วไพ่ — ต้องแก้เวลาที่เหลือตอนนี้
   //  ก่อนที่ pausePlayingForCutscene() จะอ่าน timeLeft ไปเก็บไว้คืนหลังคลิปจบ
   if ((isDaisukePick || isYagurumaPick || isKagamiPick || isTsurugiPick) && tier === "secondary") syncClockUpPhaseTime();
@@ -4999,6 +5007,8 @@ function resolveRound() {
   // ฟุจิตะ โคโตเนะ (characters/kotone.js): ท่าไม้ตายในร่าง [พร้อมลุย] — ทำงานหลังเปิดไพ่ แต่ต้องอยู่ "ก่อน"
   //  การหาผู้ชนะ เพราะผล "บังคับแตก" เปลี่ยนผู้ชนะของรอบนี้ (เหตุผลเดียวกับ ANATA ด้านบน)
   CHAR_HOOKS.kotone.resolveFormUlts(engine);
+  // ฮิดาริ โชว์ทาโร่ (ยอดนักสืบ): ตัดสินคำทายจากแต้มสุดท้าย — หลังท่าที่บังคับจั่ว และก่อนทางลัดของการไล่ล่า/การแข่ง
+  CHAR_HOOKS.shotaro.resolveGuesses(engine);
 
   // ---------- คอนเนอร์ RK800 (สกิลติดตัว 2 จับกุมขั้นเด็ดขาด, characters/conner.js) ----------
   //  ระหว่างการไล่ล่า: ไม่มีผู้ชนะ/ผู้แพ้ ไม่มีดาเมจแพ้จั่ว/ไพ่แตก ไม่มี Overload Force — นับแค่แต้มดวลกัน
@@ -5521,7 +5531,8 @@ function doAttack(byId, targetId) {
   // โมโรโบชิ ดัน (characters/dan.js): เป้าหมายที่ถูกขับรถตาม "หันมาตีดัน" -> นับหมัด ครบ 2 ครั้งถึงสลัดหลุด
   //  วางไว้ตรงนี้ (ก่อนคิดดาเมจ) เพราะนับที่ "ได้ออกหมัด" ไม่ใช่ "ตีโดน" — ดันหลบได้ก็ยังนับให้
   CHAR_HOOKS.dan.onChasedAttacked(engine, attacker, target);
-  CHAR_HOOKS.usagi.onAttack(engine, attacker); // อุซากิ: ออกหมัด = ปรุๆ +2 (นับแม้โดนหลบ — จึงอยู่ก่อนด่านหลบหลีก)
+  CHAR_HOOKS.usagi.onAttack(engine, attacker);
+  CHAR_HOOKS.shotaro.onAttack(engine, attacker, target); // โชว์ทาโร่ร่างโจ๊กเกอร์: แปะเปราะบางตอนกดโจมตี (หมัดนี้แรงขึ้นทันที) // อุซากิ: ออกหมัด = ปรุๆ +2 (นับแม้โดนหลบ — จึงอยู่ก่อนด่านหลบหลีก)
   attacker.nanayaReattackReady = false; // หัวใจฆาตกร (นานายะ ชิกิ): กำลังใช้โอกาสโจมตีซ้ำนี้อยู่ (หรือไม่เกี่ยวข้องกับตัวละครนี้)
 
   let phenexTaunted = false;
@@ -5824,6 +5835,8 @@ function doAttack(byId, targetId) {
   const yagurumaStingFired = CHAR_HOOKS.yaguruma.stingArmed(attacker);
   const kagamiKickFired = CHAR_HOOKS.kagami.kickArmed(attacker);
   const tsurugiSlashFired = CHAR_HOOKS.tsurugi.slashArmed(attacker);
+  // โชว์ทาโร่ (Maximum Drive): ผ่านด่านหลบมาแล้ว = ใช้ท่าตรงนี้ — ปาดบัฟก่อนหมัดลง + คิววีดีโอ (เล่นก่อนฉากความเสียหาย)
+  const shotaroDriveFired = CHAR_HOOKS.shotaro.prepareDriveOnAttack(engine, attacker, target);
   CHAR_HOOKS.daisuke.stripArmorOnAttack(engine, attacker, target);
   CHAR_HOOKS.yaguruma.stripResistOnAttack(engine, attacker, target); // Rider Sting: เจาะ "ต้านสถานะ" ก่อน ดีบัฟที่ตามมาจึงติด
   // Rider Kick (// คากามิ อาราตะ): เป้าหมายกาง "ต้านสถานะ" ไว้ -> แลกดีบัฟทั้งชุดเป็นหมัดทะลุเกราะเพดาน 3
@@ -6004,6 +6017,10 @@ function doAttack(byId, targetId) {
   const addFx = (x, side) => { if (x) fxSkills.push({ ...x, side }); };
   for (const fx of hisakawaAttackFx || []) addFx(fx, fx.side || "atk");
   if (isOrt(target) && dmg > 0) ortFx("hit");
+  if (shotaroDriveFired) {
+    CHAR_HOOKS.shotaro.afterDriveHit(engine, attacker, target); // ลุกไหม้ + เปราะบาง 3 เทิร์น หลังหมัดลง
+    addFx({ name: "Maximum Drive (+1 · ปาดบัฟ · ลุกไหม้ · เปราะบาง)", img: CHAR_HOOKS.shotaro.IMG.skill2, by: attacker.name, color: colorOf(attacker) }, "atk");
+  }
   if (usagiCritFx.crit) addFx({ name: `ปรุๆ คริติคอล ×2 (${usagiCritFx.chance}%)`, img: CHAR_HOOKS.usagi.IMG.base, by: attacker.name, color: colorOf(attacker) }, "atk");
   if (ortCritFx.crit) addFx({ name: "คริติคอล ×2", img: CHAR_HOOKS.ort.IMG.base, by: attacker.name, color: colorOf(attacker) }, "atk");
   for (const fx of ignisAttackFx || []) addFx(fx, fx.side || "atk");
@@ -6097,7 +6114,7 @@ function doAttack(byId, targetId) {
   //  / อย่าอยู่เลย แกน่ะ! (ริต้า เบอร์นัล patch 2.1.6) / ฉันยัง...มองเห็นอยู่!!! กันตาย + อย่างนายน่ะ จะไปเข้าใจอะไร (สึงาชิ ทาคุโตะ patch 2.2.4):
   //  เล่นวีดีโอที่ค้างคิวก่อน แล้วค่อยขึ้นสรุปความเสียหาย
   //  (ปกติทุกท่าอื่นจะขึ้นสรุปความเสียหายก่อนแล้วค่อยเล่นวีดีโอค้างคิวตอนจบ — ท่าเหล่านี้กลับลำดับเฉพาะตัว)
-  if ((storiumAtk || phenexPurgeAtk || miyakoUltAtk || triggerMultiAtk || triggerZeperionAtk || escanorAttackVideoQueued || (beatSaveFired && target.characterId === "takuto") || takutoUlt2VideoQueued || eijiSwordFx.videoQueued || harukaPunishFx.videoQueued || (harukaCounterFx && harukaCounterFx.videoQueued) || (danCounterFx && danCounterFx.videoQueued) || (yuiCounterFx && yuiCounterFx.videoQueued) || batGunFired || daisukeRiderFired || yagurumaStingFired || kagamiKickFired || tsurugiSlashFired) && cutsceneQueue.length) runCutsceneQueue(showAttackFx);
+  if ((storiumAtk || phenexPurgeAtk || miyakoUltAtk || triggerMultiAtk || triggerZeperionAtk || escanorAttackVideoQueued || (beatSaveFired && target.characterId === "takuto") || takutoUlt2VideoQueued || eijiSwordFx.videoQueued || harukaPunishFx.videoQueued || (harukaCounterFx && harukaCounterFx.videoQueued) || (danCounterFx && danCounterFx.videoQueued) || (yuiCounterFx && yuiCounterFx.videoQueued) || batGunFired || daisukeRiderFired || yagurumaStingFired || kagamiKickFired || tsurugiSlashFired || shotaroDriveFired) && cutsceneQueue.length) runCutsceneQueue(showAttackFx);
   else showAttackFx();
 }
 

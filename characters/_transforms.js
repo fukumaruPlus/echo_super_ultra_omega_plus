@@ -20,6 +20,7 @@ const daichiChar = require("./daichi");
 const daisukeChar = require("./daisuke");
 const yagurumaChar = require("./yaguruma");
 const kagamiChar = require("./kagami");
+const shotaroChar = require("./shotaro"); // ฮิดาริ โชว์ทาโร่: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
 const usagiChar = require("./usagi"); // อุซากิ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
 const tsurugiChar = require("./tsurugi"); // คามิชิโร่ ซึรุงิ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร // คากามิ อาราตะ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร // โซ ยากุรุมะ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร // คาซามะ ไดสุเกะ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
 const BAT_CAR_IMG = "/characters/bat_ben/bat_update/bat_ben_car.webp";
@@ -135,6 +136,9 @@ module.exports = function buildTransforms(img) {
     yuiSuplex:   { img: yuiImg.skill2, video: "/characters/yui/skill2/yui_skill2.mp4",       title: "เยอรมันซูเพล็ก", label: "สวนกลับ",        seconds: 19, music: null, afterReveal: false },
     yuiSong:     { img: yuiImg.skill3, video: "/characters/yui/skill3/yui_skill3.mp4",       title: "ทำนองเพลงร็อก",  label: "บรรเลงสำเร็จ",    seconds: 4, music: null, afterReveal: false },
     // อุซากิ: เล่นทุกครั้ง (queueCutscene) — ท่าไม้ตายตอนกด / สกิลรองตอนกด "เอา" แล้วค่อยสลับไพ่
+    // ฮิดาริ โชว์ทาโร่: Lost Driver เต็มครั้งแรกครั้งเดียว (triggerCutscene) · Maximum Drive เล่นทุกครั้งก่อนฉากความเสียหาย (queueCutscene)
+    shotaroJoker: { img: shotaroChar.IMG.skill3, video: shotaroChar.VIDEO.joker, title: "Lost Driver", label: "ร่างโจ๊กเกอร์ 10 เทิร์น", seconds: 18, music: null, afterReveal: false },
+    shotaroDrive: { img: shotaroChar.IMG.skill2, video: shotaroChar.VIDEO.drive, title: "Maximum Drive", label: "โจ๊กเกอร์ Extreme", seconds: 16, music: null, afterReveal: false },
     usagiUlt:    { img: usagiChar.IMG.skill3, video: usagiChar.VIDEO.ult,  title: "ฮัยย๊ะ ฮ๊ะ ปรุๆ อิอิ อิยะ ฮ๊ะ", label: "โจทย์คณิต 3 เทิร์น", seconds: 3, music: null, afterReveal: false },
     usagiSwap:   { img: usagiChar.IMG.skill2, video: usagiChar.VIDEO.swap, title: "ปรุ้ต.....", label: "สลับไพ่ทั้งมือ", seconds: 5, music: null, afterReveal: false },
     yuiSongFail: { img: yuiImg.skill3, video: "/characters/yui/skill3/yui_skill3_false.mp4", title: "เสียงเพี้ยน",    label: "บรรเลงล้มเหลว",   seconds: 4, music: null, afterReveal: false },

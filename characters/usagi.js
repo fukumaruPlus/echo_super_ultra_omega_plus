@@ -8,7 +8,8 @@
 //    เอา = วีดีโอ usagi_skill2 แล้วสลับไพ่ทั้งมือกัน (ไพ่แตกก็ติดไปด้วย · ทั้งคู่จั่วต่อได้ตามปกติ)
 //    ไม่เอา / ไม่ตอบก่อนเปิดไพ่ = ไม่สลับ (แต้มที่จ่ายไปไม่คืน)
 //  ท่าไม้ตาย ฮัยย๊ะ ฮ๊ะ ปรุๆ อิอิ อิยะ ฮ๊ะ (6 แต้ม) — วีดีโอ usagi_skill3 + เพลง usagi_theme 3 เทิร์น
-//    ต้นเทิร์นทั้ง 3 เทิร์นถัดไป ฝ่ายตรงข้ามทุกคน (ไม่รวมเพื่อนร่วมทีม/ORT) ต้องทำโจทย์คณิต 3 ข้อ ข้อละ 5 วินาที
+//    ต้นเทิร์นทั้ง 3 เทิร์นถัดไป ฝ่ายตรงข้ามทุกคน (ไม่รวมเพื่อนร่วมทีม) ต้องทำโจทย์คณิต 3 ข้อ ข้อละ 5 วินาที
+//    ORT (บอต) ทำโจทย์ไม่ได้ = รับความเสียหายเต็ม 3 ทุกเทิร์น
 //    ตอบผิด/ไม่ทัน = ความเสียหาย 1 ต่อข้อ (ลดเกราะก่อน) · ระหว่างคัตซีน นาฬิกาโจทย์หยุด
 //    ระบบเดียวกับ QTE: เก็บเส้นตาย (ms) ไว้ที่ server แล้วตัดสินตอนคำตอบมาถึง — ไม่มี setTimeout ฝั่ง server
 //  สกิลติดตัว อุ อุ นาๆ อุนาา — "ปรุๆ" 0-8 (p.usagiPuru)
@@ -85,7 +86,18 @@ module.exports = {
       if (left <= 0) delete u.statuses.usagiMath;
       let n = 0;
       for (const t of Object.values(engine.players)) {
-        if (t === u || !t.alive || t.isBoss || engine.sameTeam(u, t) || t.usagiQuiz) continue;
+        if (t === u || !t.alive || engine.sameTeam(u, t) || t.usagiQuiz) continue;
+        // ORT ทำโจทย์ไม่ได้ (บอต) = ผิดครบทุกข้อ รับความเสียหายเต็มทันทีทุกเทิร์นที่ท่าไม้ตายทำงาน
+        //  เป็นดาเมจจากสกิล -> ORT สวนกลับอุซากิตามสกิลติดตัว 2 ของมันเอง
+        if (t.isBoss) {
+          engine.withEffectSource(u, () => {
+            engine.dealMixed(t, QUIZ_COUNT);
+            engine.resolveDamageAftermath(t);
+          });
+          engine.log(`🧮 ${t.name} ทำโจทย์คณิตไม่เป็น — รับความเสียหาย -${QUIZ_COUNT}`);
+          if (engine.ortFx) engine.ortFx("hit");
+          continue;
+        }
         const items = Array.from({ length: QUIZ_COUNT }, makeQuestion);
         t.usagiQuiz = { items, idx: 0, wrong: 0, fromId: u.id, leftMs: QUIZ_MS, deadline: Date.now() + QUIZ_MS, paused: false };
         n++;

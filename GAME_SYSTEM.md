@@ -445,6 +445,16 @@ qtePending() / sweepQte()                กันสรุปรอบ + กว
 - ท่าไม้ตายมี 6 แบบผ่าน `dynamicSkillFor` (`ultimate_<idol>` × 5 + `ultimate2`) — สลับ **ทั้งที่ `useSkill`
   และ `buildStateFor`** เหมือนไบรอัน · ช่องแรกสลับ `basic`↔`basic2` ตามว่าไอดอลล้มหรือยัง
 
+**ฮิดาริ โชว์ทาโร่ (กลาง)** — `characters/shotaro.js`
+- ยอดนักสืบ: `useSkill` basic รับเป้าหมายทาง `targets` และคำทายทาง `item` (`low`/`mid`/`top`/`bust`) เก็บที่ `p.shotaroGuess`
+  (เห็นเจ้าตัวคนเดียว) แล้ว **ตัดสินใน `resolveRound` ถัดจาก `kotone.resolveFormUlts`** — หลังท่าที่บังคับจั่ว และก่อนทางลัดของการไล่ล่า/การแข่ง
+- ร่างโจ๊กเกอร์ = สถานะ `shotaroJoker` 10 เทิร์น (นับถอยหลังตามลูปกลาง) · Lost Driver ใช้ `triggerCutscene` (วีดีโอเต็มครั้งแรกครั้งเดียว)
+- สกิลติดตัว: `onAttack` แปะเปราะบาง 1 เทิร์น **ก่อนด่านหลบ** (หมัดนั้นแรงขึ้นเลย · หายเองตอนจบเทิร์น) — ข้ามถ้าเป้าหมายมีเปราะบางอยู่แล้ว
+- Maximum Drive (`p.shotaroDrive`): +1 ผ่าน `damageBonus` (คิดก่อน `computeAttackBase` ซึ่งอยู่ก่อนจุดใช้ท่า) · ใช้ท่าที่
+  `prepareDriveOnAttack` ถัดจาก Rider Slash = **ผ่านด่านหลบแล้วเท่านั้น** (หลบได้ = ไม่มีวีดีโอ ท่าไม่หาย) · ลุกไหม้/เปราะบาง 3 เทิร์นลงหลังหมัด
+  · `shotaroDriveFired` อยู่ในรายการ "เล่นวีดีโอก่อนฉากสรุปความเสียหาย" ท้าย `doAttack`
+- เทสต์: [tests/characters/shotaro.test.js](tests/characters/shotaro.test.js)
+
 **อุซากิ (เอาฮา · unique)** — `characters/usagi.js`
 - สกิลพื้นฐาน (กินไอเทมในกระเป๋า) กดได้ 2 ครั้ง/เทิร์น และ **ไม่กินโควตาสกิลของเทิร์น** (`isUsagiBasic` ในสองบรรทัดโควตาของ `useSkill`)
   · client เปิด `UsagiItemModal` แล้วส่ง uid ของไอเทมมาทาง `item`
@@ -453,7 +463,7 @@ qtePending() / sweepQte()                กันสรุปรอบ + กว
 - ท่าไม้ตาย = **ระบบโจทย์คณิต** ยืมแนวคิด QTE: เก็บเส้นตายเป็น ms ที่ `p.usagiQuiz` ของผู้ถูกทำโจทย์ ไม่มี setTimeout ฝั่ง server
   · แจกที่ `onRoundStartAfterLoop` · `usagiMath` (NO_TICK) = เทิร์นที่เหลือ ลดเองตอนแจก · **นาฬิกาหยุดเมื่อไม่ได้อยู่เฟส PLAYING**
     (`syncPause` ที่หัว `broadcastState`) · client ได้ `leftMs` ไม่ใช่เวลาเครื่อง server · ไม่ส่งเฉลย · ค้างอยู่ = `pendingAnswer` ของ
-    `checkAllLocked` และ `resolveRound` กวาดข้อที่เหลือเป็นผิด · ข้ามเพื่อนร่วมทีม (`sameTeam`) และ ORT
+    `checkAllLocked` และ `resolveRound` กวาดข้อที่เหลือเป็นผิด · ข้ามเพื่อนร่วมทีม (`sameTeam`) · ORT ไม่ได้โจทย์แต่รับดาเมจเต็ม 3 ทุกเทิร์น (ORT สวนกลับอุซากิตามปกติ)
 - สกิลติดตัว ปรุๆ: `onAttack` ก่อนด่านหลบใน `doAttack` (นับแม้โดนหลบ) · คริติคอลคูณยอดสุทธิถัดจากของ ORT · ATK +1 ผ่าน `damageBonus`
 - เทสต์: [tests/characters/usagi.test.js](tests/characters/usagi.test.js)
 
