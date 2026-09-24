@@ -3111,7 +3111,7 @@ function startMatch() {
   // Type Mercury: ไม่มีฉากเปิดตัวผู้เล่น — ใช้ฉากเปิดตัว ORT (OrtArrival ฝั่ง client) แทน
   //  server พักเกมไว้ในเฟส CUTSCENE (ไม่มีคลิป) ให้ฉากเล่นจบก่อน แล้วค่อยเล่นวีดีโอเปิดตัวตัวละครที่คิวไว้ (ถ้ามี)
   if (mercuryActive()) {
-    createOrt(CHAR_HOOKS.ort.RAID_BARS);
+    createOrt(CHAR_HOOKS.ort.raidBarsFor(humanPlayers().length)); // หลอดเริ่มต้นเพิ่มตามจำนวนผู้เล่น
     ortArrivalSeq++;
     ortArrivalActive = true;
     cutsceneInfo = null;

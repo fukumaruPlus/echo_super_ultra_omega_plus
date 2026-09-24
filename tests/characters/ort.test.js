@@ -40,6 +40,10 @@ test('bar break refills HP/armor and only the last bar is fatal', () => {
   assert.equal(ort.tryBarBreak(engine, b), false, 'last bar dies for real');
 });
 
+test('raid bars scale with players: 5 up to 4 players, +1 each after (7 players = 8)', () => {
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7].map(ort.raidBarsFor), [5, 5, 5, 5, 6, 7, 8]);
+});
+
 test('kill resistance: chances below 40% do nothing to ORT', () => {
   const b = boss();
   assert.equal(ort.killChanceAgainst(b, 0.2), 0);
