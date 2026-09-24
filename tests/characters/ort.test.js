@@ -12,6 +12,8 @@ function makeEngine(players, extra = {}) {
     effectSourceId: null,
     log: (m) => logs.push(m),
     ortFx: (k) => fx.push(k),
+    skillFlash: () => {},
+    colorOf: () => "#fff",
     withEffectSource(src, fn) { const prev = engine.effectSourceId; engine.effectSourceId = src.id || src; try { return fn(); } finally { engine.effectSourceId = prev; } },
     dealMixed(t, n) { const a = Math.min(t.armor, n); t.armor -= a; t.hp -= n - a; },
     resolveDamageAftermath(t) { if (t.hp <= 0) t.alive = false; },
@@ -55,12 +57,19 @@ test('evolution: +1 bar every kill, attack capped at 3 total', () => {
   for (let i = 0; i < 4; i++) ort.onKill(engine, human('v' + i));
   assert.equal(b.ortBars, 9);
   assert.equal(b.ortAtk, 3);
+  // ตายตอนกวาดท้ายเทิร์น (ไม่มี effectSourceId) แต่ ORT ตีเป็นคนสุดท้ายในเทิร์นนี้ = นับให้ ORT
+  engine.effectSourceId = null;
+  engine.roundNumber = 7;
+  ort.onKill(engine, { ...human('late'), lastDamageSourceId: b.id, lastDamageRound: 7 });
+  assert.equal(b.ortBars, 10, 'kill from the end-of-turn sweep still counts');
+  ort.onKill(engine, { ...human('stale'), lastDamageSourceId: b.id, lastDamageRound: 6 });
+  assert.equal(b.ortBars, 10, 'a hit from an earlier turn does not count');
   engine.effectSourceId = 'someone-else';
   ort.onKill(engine, human('v9'));
-  assert.equal(b.ortBars, 9, 'kills by others do not count');
+  assert.equal(b.ortBars, 10, 'kills by others do not count');
 });
 
-test('data lost: first skill of a turn is erased next turn and moves when another skill is used', () => {
+test('data lost: first skill of a turn is erased for 2 turns, moves when another skill is used', () => {
   const b = boss();
   const h = human('p1');
   const players = { [b.id]: b, [h.id]: h };
@@ -73,16 +82,25 @@ test('data lost: first skill of a turn is erased next turn and moves when anothe
   ort.onRoundStart(engine);
   assert.equal(ort.skillErased(engine, h, 'basic'), true);
   assert.equal(ort.skillErased(engine, h, 'secondary'), false);
-  // no skill this turn -> erasure stays
+  assert.equal(ort.lostTurnsLeft(engine, h), 2);
   engine.roundNumber = 3;
   ort.onRoundStart(engine);
-  assert.equal(ort.skillErased(engine, h, 'basic'), true);
-  // use a different skill -> erasure moves next turn
-  ort.onSkillUsed(engine, h, 'ultimate');
+  assert.equal(ort.skillErased(engine, h, 'basic'), true, 'still erased on the 2nd turn');
+  assert.equal(ort.lostTurnsLeft(engine, h), 1);
   engine.roundNumber = 4;
   ort.onRoundStart(engine);
-  assert.equal(ort.skillErased(engine, h, 'basic'), false);
+  assert.equal(ort.skillErased(engine, h, 'basic'), false, 'data comes back after 2 turns');
+  assert.equal(h.ortLostTier, null);
+  // using a different skill moves the erasure next turn and restarts the 2 turns
+  ort.onSkillUsed(engine, h, 'secondary');
+  engine.roundNumber = 5;
+  ort.onRoundStart(engine);
+  ort.onSkillUsed(engine, h, 'ultimate');
+  engine.roundNumber = 6;
+  ort.onRoundStart(engine);
+  assert.equal(ort.skillErased(engine, h, 'secondary'), false);
   assert.equal(ort.skillErased(engine, h, 'ultimate'), true);
+  assert.equal(ort.lostTurnsLeft(engine, h), 2);
   // ORT gone -> nothing is erased
   b.alive = false;
   assert.equal(ort.skillErased(engine, h, 'ultimate'), false);

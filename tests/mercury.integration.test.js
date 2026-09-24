@@ -26,6 +26,45 @@ async function waitForHttp() {
   throw new Error('Server did not become ready');
 }
 
+// ตัวละครที่มีวีดีโอเปิดตัว (คอนเนอร์) — ฉากเปิดตัว ORT ต้องจบก่อน แล้วคลิปของตัวละครค่อยเล่นต่อ
+test('Type Mercury: ORT arrival comes first, then character intro videos, then turn 1', { timeout: 30000 }, async () => {
+  const p = 35000 + (process.pid % 1000);
+  const u = `http://127.0.0.1:${p}`;
+  const server = spawn(process.execPath, ['server.js'], {
+    cwd: projectRoot,
+    env: { ...process.env, PORT: String(p), MERCURY_ARRIVAL_SECONDS: '1' },
+    stdio: 'ignore',
+  });
+  const socket = io(u, { autoConnect: false, forceNew: true, reconnection: false });
+  try {
+    for (let i = 0; i < 50; i++) { try { if ((await fetch(u)).ok) break; } catch {} await delay(100); }
+    socket.connect();
+    await new Promise((r) => socket.once('roster', r));
+    const lobby = waitForState(socket, (s) => s.gameState === 'LOBBY');
+    socket.emit('join', { name: 'Connor fan', position: 1, characterId: 'conner' });
+    await lobby;
+    const seen = [];
+    socket.on('state', (s) => {
+      if (!s.mercury) return;
+      const step = s.gameState === 'CUTSCENE' ? (s.cutscene ? `video:${s.cutscene.kind || s.cutscene.title || 'clip'}` : 'arrival') : s.gameState;
+      if (seen[seen.length - 1] !== step) seen.push(step);
+    });
+    const mode = waitForState(socket, (s) => s.gameState === 'TEAM_MODE');
+    socket.emit('toggleReady');
+    await mode;
+    const playing = waitForState(socket, (s) => s.gameState === 'PLAYING' && s.roundNumber === 1, 20000);
+    socket.emit('selectGameMode', { mode: 'mercury' });
+    await playing;
+    const firstVideo = seen.findIndex((x) => x.startsWith('video:'));
+    assert.equal(seen[0], 'arrival', `ORT arrival holds first (${seen.join(' > ')})`);
+    assert.ok(firstVideo > 0, `character intro video plays after the arrival (${seen.join(' > ')})`);
+    assert.equal(seen[seen.length - 1], 'PLAYING');
+  } finally {
+    socket.close();
+    server.kill();
+  }
+});
+
 test('Type Mercury: solo player enters the raid, ORT spawns, turns run, surrender ends the raid', { timeout: 30000 }, async () => {
   const server = spawn(process.execPath, ['server.js'], {
     cwd: projectRoot,

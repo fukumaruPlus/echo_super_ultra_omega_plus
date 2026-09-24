@@ -71,10 +71,11 @@ function isTargetable(p, iAmAttacker, c) {
   // คอนเนอร์ RK800: สกิลรองเลือกใครก็ได้ที่ไม่ใช่ตัวเอง/เพื่อนร่วมทีม — ท่าไม้ตายเลือกได้เฉพาะระดับ "อาชญากร"
   //  (ฝั่ง server กันซ้ำที่ CHAR_HOOKS.conner.prepareTarget อีกชั้น ตรงนี้แค่กันกดพลาด)
   const connorTarget = !!c.connorSel && !self && !friendly && (c.connorSel !== "ultimate" || p.connorLevel === "criminal");
+  const usagiTarget = !!c.usagiSel && !self; // อุซากิ (ปรุ้ต.....): ใครก็ได้ที่ไม่ใช่ตัวเอง รวม ORT/เพื่อนร่วมทีม
   const danTarget = !!c.danSel && !self && !friendly; // โมโรโบชิ ดัน: เล็งใครก็ได้ที่ไม่ใช่ตัวเอง/เพื่อนร่วมทีม
   const supTarget = !!c.supSel; // ผู้วิงวอน: เล็งได้ทุกคนบนสนามรวมทั้งตัวเอง (ทั้งสามท่ามอบผลให้เป้าหมาย)
   const brianTarget = !!c.brianSel && !self && !friendly; // ไบรอัน: ท้าแข่งใครก็ได้ที่ไม่ใช่ตัวเอง/เพื่อนร่วมทีม
-  return (normalAttackTarget || !!c.anataSel || c.appleSel || c.bbSel || c.shSel || c.skSel || c.doomSel || c.saObSel || escanorSkillTarget || c.ignisSel || c.ignisImpactSel || c.bgSel || !!c.bardPending || c.nanayaSel || c.tpSel || c.kaiCreateSel || c.kaiPunishSel || c.msMarkSel || c.msRuptureSel || c.psSealSel || bylethStrikeTarget || connorTarget || danTarget || supTarget || brianTarget || gunTarget) && p.alive;
+  return (normalAttackTarget || !!c.anataSel || c.appleSel || c.bbSel || c.shSel || c.skSel || c.doomSel || c.saObSel || escanorSkillTarget || c.ignisSel || c.ignisImpactSel || c.bgSel || !!c.bardPending || c.nanayaSel || c.tpSel || c.kaiCreateSel || c.kaiPunishSel || c.msMarkSel || c.msRuptureSel || c.psSealSel || bylethStrikeTarget || connorTarget || usagiTarget || danTarget || supTarget || brianTarget || gunTarget) && p.alive;
 }
 // แตะ/คลิกการ์ดคู่ต่อสู้แล้วต้องทำอะไร — ไล่ตามโหมดเลือกเป้าหมายที่เปิดอยู่ ไม่มีเลยก็โจมตีปกติ
 function resolveAttackPick(id, c) {
@@ -98,6 +99,7 @@ function resolveAttackPick(id, c) {
   if (c.kaiPunishSel) return c.pickKaiPunish(id);
   if (c.bylethStrikeSel) return c.pickBylethStrike(id);
   if (c.connorSel) return c.pickConnor(id);
+  if (c.usagiSel) return c.pickUsagi(id);
   if (c.danSel) return c.pickDan(id);
   if (c.msMarkSel) return c.pickMsMark(id);
   if (c.msRuptureSel) return c.pickMsRupture(id);
@@ -917,6 +919,18 @@ const SLOTS = {
   6: [[7, 15], [4, 38], [4, 62], [7, 85], [50, 12], [50, 88]],
 };
 
+// โหมดปกติหลัง ORT บุกเทิร์น 60: ORT นั่งกลางด้านบน ผู้เล่นคนอื่นใช้ผังที่เว้นช่องกลางไว้ให้
+const ORT_SEAT = [3, 50];
+const ORT_SIDE_SLOTS = {
+  0: [],
+  1: [[9, 20]],
+  2: [[9, 20], [9, 80]],
+  3: [[9, 18], [9, 82], [48, 12]],
+  4: [[9, 18], [9, 82], [44, 13], [44, 87]],
+  5: [[7, 15], [7, 85], [44, 12], [44, 88], [4, 31]],
+  6: [[7, 13], [7, 87], [4, 31], [4, 69], [50, 12], [50, 88]],
+};
+
 // Type Mercury: เพื่อนร่วมทีมเรียงแถวเดียวกลางจอ ใต้ตัว ORT (ฝั่งเดียวกับเรา) — [top%, left%, scale]
 //  ย่อการ์ดตามจำนวนคนให้ 6 ใบวางพอในความกว้างออกแบบขั้นต่ำ 900px (การ์ดเต็มกว้าง 236px)
 function raidSlots(n) {
@@ -1407,6 +1421,7 @@ const STATUS_INFO = {
   // ---------- ยุย โยชิโอกะ (patch 3.0 new) ----------
   yuiTaunt:   { icon: "\u{1F4E3}", label: "ปากแจ๋ว", cls: "bg-echo-magenta", desc: "ปากแจ๋ว: การโจมตีปกติของทุกคนถูกล่อมาที่ยุยตลอดเทิร์นนี้" },
   yuiWrestle: { icon: "\u{1F93C}", label: "นักมวยปล้ำ", cls: "bg-echo-armor", desc: "นักมวยปล้ำ: ความเสียหายที่ได้รับเบาลง 1 หน่วย และถ้าถูกโจมตีปกติจะจับทุ่มสวนคืน 2 หน่วย — สวนครบโควตาเมื่อไหร่สถานะจบทันทีแม้ยังไม่ครบเทิร์น (จำนวนครั้งที่เหลือแสดงเป็นตัวเลขบนป้าย)" },
+  usagiMath:  { icon: "🧮", label: "โจทย์คณิต (เทิร์นที่เหลือ)", cls: "bg-echo-magenta", desc: "ฮัยย๊ะ ฮ๊ะ ปรุๆ อิอิ อิยะ ฮ๊ะ (อุซากิ): ต้นเทิร์นฝ่ายตรงข้ามทุกคนต้องทำโจทย์คณิต 3 ข้อ ข้อละ 5 วินาที — ผิด/ไม่ทัน = ความเสียหาย 1 ต่อข้อ · ตัวเลข = จำนวนเทิร์นที่ยังเหลือ" },
   yuiRock:    { icon: "\u{1F3B8}", label: "girl don't cry", cls: "bg-echo-gold text-gray-900", desc: "girl don't cry (ยุย): พลังโจมตี +1 · และคนที่แต้มสกิลน้อยที่สุดในวงจะได้รับแต้มสกิล +1 ทุกเทิร์น (ประเมินใหม่ทุกเทิร์น)" },
   yuiBeats:   { icon: "\u{1F941}", label: "my soul your beats", cls: "bg-echo-hp", desc: "my soul your beats (ยุย): เมื่อมีใครในวงจั่วการ์ด คนอื่นในวงจะถูกดึงให้จั่วตามด้วย (คนที่เปิดไพ่ไปแล้วไม่โดน) · และถ้าการ์ดแตกจะรับความเสียหาย 1 หน่วยตอนสรุปรอบ" },
   yuiWait:    { icon: "\u{1F3B6}", label: "กำลังบรรเลง", cls: "bg-echo-cyan text-gray-900", desc: "สมบัติล้ำค่าที่สุด.....: ยุยกำลังบรรเลงเรียกวิญญาณกลับมา — ทำอะไรไม่ได้เลย (จั่วการ์ด ใช้สกิล ใช้ไอเทมไม่ได้) จนกว่าเป้าหมายจะฟื้น · ถ้ายุยตกรอบก่อน ผลจะหายไปทั้งหมด" },
@@ -1560,6 +1575,12 @@ function statusEntries(p, full) {
       cls: (p.brianFuel || 0) <= 2 ? "bg-echo-hp" : "bg-echo-cyan text-gray-900",
       desc: `น้ำมันคงเหลือ — ฟื้นเทิร์นละ 1 (หยุดฟื้นระหว่างอยู่ในรถ) · ชนะการจั่ว +2 (ได้แม้อยู่ในรถ)${p.brianCar ? ` · ตอนนี้รถกินเทิร์นละ ${perTurn} หน่วย = ขับต่อได้อีกราว ${Math.ceil((p.brianFuel || 0) / perTurn)} เทิร์น` : ""}`,
     });
+  }
+  // อุซากิ: ปรุๆ เป็นข้อมูลสาธารณะ (อัตราคริติคอล/พลังโจมตีของเธอ)
+  if (p.usagi) {
+    const u = p.usagi;
+    out.push({ key: "usagiPuru", v: 1, icon: "🐰", label: `ปรุๆ ${u.puru}/${u.puruMax}`, cls: u.puru >= 5 ? "bg-echo-hp" : "bg-echo-gold text-gray-900",
+      desc: `ปรุๆ: คริติคอล ${u.puru * 7}% (ดาเมจ ×2)${u.puru >= 5 ? " · พลังโจมตี +1" : " · ครบ 5 หน่วยพลังโจมตี +1"} · ออกหมัดได้ +2 · ไม่ได้เพิ่มครบ 3 เทิร์นลด 1 (ตอนนี้นับไป ${u.idle}/3)` });
   }
   if (p.character?.id === "the_supplicant") {
     out.push({ key: "supPrayers", v: 1, icon: "🙏", label: `คำวิงวอน ${p.supPrayers || 0}/${p.supPrayersMax || 15}`, cls: "bg-echo-cyan text-gray-900", desc: "ภาชนะคำวิงวอน: ล้างดีบัฟได้ 1 ขั้น = +1 — ครบ 4 ได้ \"กระแสเวท\" ถาวร · ครบ 8 เพิ่มฟื้นพลังงาน +1 ต่อการล้าง 1 ขั้น · ครบ 12 เพิ่มเกราะศรัทธา +1 ต่อการล้าง 1 ขั้น" });
@@ -2230,7 +2251,9 @@ function OtherPlayer({ p, phase, slot, targetable, onAttack, picked, onInspect, 
   return (
     <div
       ref={hostRef}
-      className={`absolute -translate-x-1/2 flex flex-col items-center gap-1.5 ${twin ? "w-52 sm:w-60" : "w-[236px]"}`}
+      // Tailwind v4: -translate-x-1/2 ใช้ property `translate` แยกจาก `transform` — ใส่ทั้งคู่ = เลื่อนซ้ำ 2 เท่า
+      //  ที่นั่งแบบย่อ (โหมด Raid) จึงเลื่อนกึ่งกลางใน transform เองแทนคลาส
+      className={`absolute ${seatScale ? "" : "-translate-x-1/2"} flex flex-col items-center gap-1.5 ${twin ? "w-52 sm:w-60" : "w-[236px]"}`}
       style={{ top: `${slot[0]}%`, left: `${slot[1]}%`, ...(seatScale ? { transform: `translateX(-50%) scale(${seatScale})`, transformOrigin: "top center" } : null) }}
     >
       <div
@@ -2275,6 +2298,12 @@ function OtherPlayer({ p, phase, slot, targetable, onAttack, picked, onInspect, 
           ไม่สนใจ z-index หรือ overflow ถ้าวางไว้ข้างในจะหายทั้งใบ เหลือแต่เงาที่เล็ดลอดออกมา
           (กรอบนอกกว้างเท่ากันและไม่มี clip-path จึงวางตำแหน่งเดิมได้เป๊ะ) */}
       <TeamBadge teamId={p.teamId} className="absolute -top-3 -right-3 z-20" />
+      {p.isBoss && p.ort && (
+        <span className="absolute -top-3 -left-3 z-20 text-[11px] font-bold px-2 py-0.5 text-white whitespace-nowrap"
+          style={{ background: "rgba(127,29,29,.92)", border: "1px solid #ff3d6e" }}>
+          มหันตภัย · {p.ort.bars} หลอด · ATK {p.ort.atk}
+        </span>
+      )}
       {targetable && (
         <span className="p-target-badge absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] px-2 py-0.5 rounded-full text-white whitespace-nowrap z-10">
           🎯 เป้าหมาย
@@ -2981,7 +3010,8 @@ const SKILL_TIER_ACCENT = { basic: "var(--color-echo-cyan)", secondary: "var(--c
 const OrtLostTierContext = createContext(null);
 function SkillSlot({ label, tier, skill, points, disabled: disabledProp, onUse, ammo, cost, size, cooldown }) {
   const [broken, setBroken] = useState(false);
-  const dataLost = useContext(OrtLostTierContext) === tier;
+  const lost = useContext(OrtLostTierContext);
+  const dataLost = !!lost && lost.tier === tier;
   const disabled = disabledProp || dataLost;
   const hasAmmo = skill && skill.ammo != null;
   const ammoLeft = hasAmmo ? (ammo ?? skill.ammo) : null;
@@ -3029,6 +3059,7 @@ function SkillSlot({ label, tier, skill, points, disabled: disabledProp, onUse, 
             <span>
               <span className="block text-sm font-black text-[#ff8fab]">DATA LOST</span>
               <span className="block text-xs font-bold text-white">ข้อมูลสูญหาย</span>
+              <span className="block text-[11px] text-white/80">อีก {lost.turns} เทิร์น</span>
             </span>
           </span>
         )}
@@ -3093,6 +3124,117 @@ function QtePanel({ qte }) {
         />
       </div>
       <div className="text-xs opacity-75">กดผิดหรือกดไม่ทัน = แต้มเสียฟรี</div>
+    </div>
+  );
+}
+
+// ---------- อุซากิ (ท่าไม้ตาย): โจทย์คณิต ข้อละ 5 วินาที ----------
+//  server ส่ง "เหลือกี่มิลลิวินาที" มา (ไม่ใช่เวลาของเครื่อง server — นาฬิกาคนละเครื่องไม่ตรงกัน) · ไม่ส่งเฉลย
+//  paused = มีคัตซีนคั่นอยู่ นาฬิกาหยุด · key ของคอมโพเนนต์เปลี่ยนทุกข้อ ช่องคำตอบจึงว่างใหม่เสมอ
+function UsagiQuizPanel({ quiz }) {
+  const [value, setValue] = useState("");
+  const [left, setLeft] = useState(quiz.leftMs);
+  const sent = useRef(false);
+  useEffect(() => {
+    if (quiz.paused) return undefined;
+    const end = Date.now() + quiz.leftMs;
+    const tick = () => setLeft(Math.max(0, end - Date.now()));
+    const t = setInterval(tick, 50);
+    return () => clearInterval(t);
+  }, [quiz.leftMs, quiz.paused]);
+  const expired = !quiz.paused && left <= 0;
+  useEffect(() => {
+    if (expired && !sent.current) { sent.current = true; socket.emit("usagiQuizTimeout"); }
+  }, [expired]);
+  const submit = (e) => {
+    e.preventDefault();
+    if (sent.current || value.trim() === "" || !/^-?\d+$/.test(value.trim())) return;
+    sent.current = true;
+    socket.emit("usagiQuizAnswer", { value: Number(value.trim()) });
+  };
+  const pct = Math.max(0, Math.min(100, (left / quiz.perMs) * 100));
+  return (
+    <div className="absolute inset-x-0 top-[24%] z-50 flex flex-col items-center gap-2 text-hard">
+      <div className="text-sm font-black bg-black/70 rounded-full px-4 py-1 border border-white/25">
+        🧮 โจทย์คณิตของอุซากิ — ข้อ {quiz.idx + 1}/{quiz.total}{quiz.paused ? " · หยุดชั่วคราว" : ""}
+      </div>
+      <form onSubmit={submit} className="flex flex-col items-center gap-2 bg-black/80 rounded-2xl border-4 px-6 py-4" style={{ borderColor: "var(--color-p-accent-bright)" }}>
+        <span className="text-4xl font-black" style={{ fontFamily: P_DISPLAY }}>{quiz.q} = ?</span>
+        <div className="flex gap-2">
+          <input
+            autoFocus
+            inputMode="numeric"
+            aria-label="คำตอบ"
+            value={value}
+            onChange={(e) => setValue(e.target.value.replace(/[^0-9-]/g, "").slice(0, 6))}
+            className="w-32 text-center text-2xl font-black rounded-lg bg-white/10 border border-white/30 px-2 py-1 outline-none focus:border-echo-cyan"
+          />
+          <button type="submit" className="px-4 rounded-lg font-black bg-echo-gold text-gray-900">ตอบ</button>
+        </div>
+        <div className="w-56 h-2 bg-black/60 rounded-full overflow-hidden border border-white/20">
+          <div className="h-full transition-none" style={{ width: `${pct}%`, background: pct < 35 ? "var(--color-echo-hp)" : "var(--color-p-accent-bright)" }} />
+        </div>
+      </form>
+      <div className="text-xs opacity-75">ตอบผิดหรือไม่ทัน = ความเสียหาย 1 ต่อข้อ · คำตอบเป็นจำนวนเต็ม (ติดลบได้)</div>
+    </div>
+  );
+}
+
+// ---------- อุซากิ (สกิลรอง ปรุ้ต.....): เห็นแต้มของเป้าหมายแล้วเลือก "เอา" หรือ "ไม่เอา" ----------
+//  ไม่มีปุ่มปิดเฉยๆ — ต้องตอบ (ไม่ตอบก่อนเปิดไพ่ = ไม่เอา) · แต้มที่จ่ายไปไม่คืนทั้งสองทาง
+function UsagiSwapModal({ offer }) {
+  const answer = (accept) => { clickSound(); socket.emit("usagiSwapAnswer", { accept }); };
+  return (
+    <div className="fixed inset-0 z-40 bg-black/60 grid place-items-center p-4">
+      <div className="bg-echo-navy rounded-2xl p-5 max-w-sm w-full shadow-2xl text-center flex flex-col gap-3">
+        <div className="text-lg font-black text-echo-gold">🐰 ปรุ้ต.....</div>
+        <div className="text-sm opacity-80">ไพ่ในมือของ <b>{offer.targetName}</b> ตอนนี้ ({offer.cardCount} ใบ)</div>
+        <div className={`text-5xl font-black ${offer.busted ? "text-echo-hp" : "text-white"}`} style={{ fontFamily: P_DISPLAY }}>
+          {offer.busted ? "แตก!" : `${offer.score} แต้ม`}
+        </div>
+        <div className="text-xs opacity-70">เอา = สลับไพ่ทั้งมือกัน (ไพ่แตกก็ติดมาด้วย) · แต้มสกิลที่จ่ายไปไม่คืนแม้ไม่เอา</div>
+        <div className="flex gap-2">
+          <button onClick={() => answer(true)} className="flex-1 py-2 rounded-lg font-black bg-echo-gold text-gray-900">เอา!</button>
+          <button onClick={() => answer(false)} className="flex-1 py-2 rounded-lg font-black bg-white/10 border border-white/30">ไม่เอา</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- อุซากิ (สกิลพื้นฐาน): เลือกไอเทมในกระเป๋าที่จะกิน ----------
+function UsagiItemModal({ me, onPick, onClose }) {
+  const items = me.inventory || [];
+  const left = me.usagi ? me.usagi.basicLeft : 0;
+  return (
+    <div className="fixed inset-0 z-40 bg-black/60 grid place-items-center p-4" onClick={onClose}>
+      <div className="bg-echo-navy rounded-2xl p-5 max-w-lg w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-baseline gap-2 mb-1">
+          <span className="text-lg font-black text-echo-gold">🐰 อี!!!!ย๊าาาา!ฮ๊า~~~</span>
+          <span className="text-xs opacity-60">เลือกไอเทมที่จะกิน · กดได้อีก {left} ครั้งเทิร์นนี้</span>
+        </div>
+        <div className="text-xs opacity-70 mb-3">ราคา 5 เหรียญขึ้นไป: ฟื้นพลังชีวิต 3 + ต้านสถานะผิดปกติ 2 เทิร์น · ต่ำกว่านั้น: ฟื้นพลังชีวิต 1 + ต้านสถานะผิดปกติ 1 เทิร์น</div>
+        {items.length === 0 ? (
+          <div className="text-center opacity-70 py-6">กระเป๋าว่าง — ไม่มีอะไรให้กิน</div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 max-h-[50vh] overflow-y-auto">
+            {items.map((it) => {
+              const info = shopInfoOf(it);
+              const rich = (it.price || 0) >= 5;
+              return (
+                <button key={it.uid} onClick={() => onPick(it.uid)} className="flex items-center gap-2 text-left rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 p-2">
+                  <ItemIcon info={info} className="w-10 h-10" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold truncate">{info.label(it)}</span>
+                    <span className={`block text-xs ${rich ? "text-echo-gold" : "opacity-70"}`}>🪙 {it.price || 0} · ฟื้น {rich ? 3 : 1}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <button onClick={onClose} className="mt-3 w-full py-2 rounded-lg bg-white/10 border border-white/20 text-sm">ยกเลิก</button>
+      </div>
     </div>
   );
 }
@@ -3617,8 +3759,11 @@ function FlyingCardsLayer({ flights, onDone }) {
 // ห่อกระดานด้วย context ของ ORT (ช่องสกิลที่ "ข้อมูลสูญหาย") — ใช้ได้ทั้งแผงจอคอมและมือถือ
 export default function Game(props) {
   const me = props.state?.players?.find((p) => p.id === props.state.youId);
+  const lostTier = me?.ortLostTier || null;
+  const lostTurns = me?.ortLostTurns || 0;
+  const lostCtx = useMemo(() => (lostTier ? { tier: lostTier, turns: lostTurns } : null), [lostTier, lostTurns]);
   return (
-    <OrtLostTierContext.Provider value={me?.ortLostTier || null}>
+    <OrtLostTierContext.Provider value={lostCtx}>
       <GameBoard {...props} />
     </OrtLostTierContext.Provider>
   );
@@ -3656,6 +3801,8 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
   const [bylethInfoOpen, setBylethInfoOpen] = useState(false);     // ไบเลธ: หน้าต่างอ่านผลของหลักสูตรที่เปิดอยู่ (ทุกคนเปิดได้)
   const [bylethSwordOpen, setBylethSwordOpen] = useState(false);   // ไบเลธ: หน้าต่างเลือกแบบของ "ดาบต้องสาป"
   const [bylethCourseOpen, setBylethCourseOpen] = useState(false);  // ไบเลธ: หน้าต่างเลือกหลักสูตรของท่าไม้ตาย
+  const [usagiSel, setUsagiSel] = useState(false);   // อุซากิ: โหมดเลือกเป้าหมาย "ปรุ้ต....."
+  const [usagiItemOpen, setUsagiItemOpen] = useState(false); // อุซากิ: หน้าต่างเลือกไอเทมที่จะกิน
   const [connorSel, setConnorSel] = useState(null);                 // คอนเนอร์: โหมดเลือกเป้าหมาย ("secondary" | "ultimate" | null)
   const [danSel, setDanSel] = useState(null);
   const [yuiSongOpen, setYuiSongOpen] = useState(false);            // ยุย: เมนูเลือกเพลงก่อนเริ่ม QTE                       // โมโรโบชิ ดัน: โหมดเลือกเป้าหมาย ("secondary" | "ultimate" | null)
@@ -3713,8 +3860,12 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
   //  others ยังรวม ORT ไว้เพื่อให้ระบบเลือกเป้าหมาย (ANATA ฯลฯ) นับ ORT เป็นเป้าได้ตามปกติ
   const raid = !!state.mercury;
   const boss = raid ? state.players.find((p) => p.isBoss) : null;
-  const seatOthers = raid ? others.filter((p) => !p.isBoss) : others;
-  const slots = raid ? raidSlots(seatOthers.length) : (SLOTS[Math.min(others.length, 6)] || []);
+  // โหมดปกติหลัง ORT บุกเทิร์น 60: ORT นั่งกลางด้านบนเสมอ (ORT_SEAT) — ผู้เล่นคนอื่นใช้ผังที่เว้นกลางด้านบนไว้
+  const invader = !raid ? others.find((p) => p.isBoss) : null;
+  const seatOthers = (raid || invader) ? others.filter((p) => !p.isBoss) : others;
+  const slots = raid ? raidSlots(seatOthers.length)
+    : invader ? (ORT_SIDE_SLOTS[Math.min(seatOthers.length, 6)] || [])
+    : (SLOTS[Math.min(others.length, 6)] || []);
   const iAmAttacker = phase === "ATTACK" && state.attackerId === state.youId;
   const attacker = state.players.find((p) => p.id === state.attackerId);
   const rankedTiers = rankTiers(state.players);
@@ -4089,6 +4240,9 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
     if (tier === "ultimate" && ch?.id === "temari") { setAnataSel([]); setSkillOpen(false); return; }
     // Apple guy: สกิลพื้นฐานเปิดเมนูเลือกของส่งมอบ / สกิลรองเข้าโหมดเลือกเป้าหมายมอบของ
     if (tier === "basic" && ch?.id === "appleguy") { setAppleOpen(true); setSkillOpen(false); return; }
+    // อุซากิ: สกิลพื้นฐานเปิดหน้าต่างเลือกไอเทมที่จะกิน / สกิลรองเข้าโหมดเลือกเป้าหมาย
+    if (tier === "basic" && ch?.id === "usagi") { setUsagiItemOpen(true); setSkillOpen(false); return; }
+    if (tier === "secondary" && ch?.id === "usagi") { setUsagiSel(true); setSkillOpen(false); return; }
     if (tier === "secondary" && ch?.id === "appleguy") { setAppleSel(true); setSkillOpen(false); return; }
     // โทโนะ ชิกิ: สกิลพื้นฐานเปิดเมนูเลือกระดับมีดพับประจำตระกูล (1-5)
     if (tier === "basic" && ch?.id === "tohno") { setTohnoOpen(true); setSkillOpen(false); return; }
@@ -4268,6 +4422,15 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
     setConnorPredictOpen(false);
   };
   // เลือกเป้าหมาย ข่มขวัญ/จับกุม หรือ จัดการปิดคดี (คอนเนอร์) -> ส่งไป server ทันที
+  const pickUsagi = (id) => {
+    socket.emit("useSkill", { tier: "secondary", targets: [id] });
+    setUsagiSel(false);
+  };
+  const pickUsagiItem = (uid) => {
+    clickSound();
+    socket.emit("useSkill", { tier: "basic", item: uid });
+    setUsagiItemOpen(false);
+  };
   const pickConnor = (id) => {
     socket.emit("useSkill", { tier: connorSel, targets: [id] });
     setConnorSel(null);
@@ -4462,6 +4625,10 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
     if (connorSel && (phase !== "PLAYING" || done)) setConnorSel(null);
   }, [connorSel, phase, done]);
   useEffect(() => {
+    if (usagiSel && (phase !== "PLAYING" || done)) setUsagiSel(false);
+    if (usagiItemOpen && (phase !== "PLAYING" || done)) setUsagiItemOpen(false);
+  }, [usagiSel, usagiItemOpen, phase, done]);
+  useEffect(() => {
     if (danSel && (phase !== "PLAYING" || me?.skillUsed || done)) setDanSel(null);
   }, [danSel, phase, me?.skillUsed, done]);
   useEffect(() => {
@@ -4500,6 +4667,7 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
     brianSel, pickBrian,
     bylethStrikeSel, pickBylethStrike,
     connorSel, pickConnor,
+    usagiSel, pickUsagi,
     danSel, pickDan,
     pickAnata, pickGive, pickBb, pickSh, pickSk, pickDoom, pickSaOb, pickEscanor, pickIgnis, pickIgnisImpact, pickBg, pickBard, pickNanaya, pickTp,
     pickKaiCreate, pickKaiPunish, pickMsMark, pickMsRupture,
@@ -4724,6 +4892,9 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
         </div>
         {deckOpen && <DeckLedgerModal ledger={state.deckLedger || []} onClose={() => setDeckOpen(false)} />}
         {me?.qte && <QtePanel key={me.qte.idx} qte={me.qte} />}
+        {me?.usagiQuiz && <UsagiQuizPanel key={`${me.usagiQuiz.idx}-${me.usagiQuiz.q}`} quiz={me.usagiQuiz} />}
+        {me?.usagiSwapOffer && <UsagiSwapModal offer={me.usagiSwapOffer} />}
+        {usagiItemOpen && me && <UsagiItemModal me={me} onPick={pickUsagiItem} onClose={() => { clickSound(); setUsagiItemOpen(false); }} />}
 
         {/* ---------- แผงตัวเรา (ล่างสุด กดง่ายด้วยนิ้วโป้ง) ----------
             ออกแบบใหม่: รูป/แต้มรวม ลอยเป็นป้ายเฉียงเจาะทับขอบบนแผง (ไม่ใช่แถวในกล่องเหมือนเดิม)
@@ -5006,7 +5177,7 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
       {/* Type Mercury: ไม่ใช้ฉากหลังกลางวัน/กลางคืน (ระบบกลางวัน/กลางคืนยังทำงานตามปกติ) — ORT เป็นฉากหลังแทน */}
       {!raid && <GameBackground cycle={state.cycle} round={state.roundNumber} bardBg={state.bardBg} shikiBg={state.shikiBg} hisakawaBg={state.hisakawaBg} overloadForce={state.overloadForce} lowQ={lowQ} seraph={!!state.seraph} />}
       {/* Type Mercury: ORT เป็นฉากหลังเต็มจอ อยู่หลังทุกอย่างบนกระดาน (ที่นั่ง/แผงเรา/ปุ่ม ทับอยู่ด้านหน้า) */}
-      {boss && <OrtBossPanel layer="canvas" boss={boss} phase={phase} lowQ={lowQ} targetable={isTargetable(boss, iAmAttacker, targetChain)} />}
+      {boss && !muteScenes && <OrtBossPanel layer="canvas" boss={boss} phase={phase} lowQ={lowQ} walking={phase === "PLAYING" && boss.alive} targetable={isTargetable(boss, iAmAttacker, targetChain)} />}
         {state.fullForce && <div className="full-force-speed" />}
         {frozenByClockUp && (
           <div className="clockup-freeze"><span>⏱️ CLOCK UP — เวลาหยุดนิ่ง</span></div>
@@ -5018,8 +5189,8 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
       {/* กองการ์ดกลาง ทับตำแหน่งโลโก้กลางโต๊ะเดิม (โลโก้เป็นแค่วอเตอร์มาร์กจางๆ ด้านหลัง) — ใหญ่ขึ้นชัดเจน */}
       {raid ? (
         // Type Mercury: กองกลางย้ายเป็นลิ้นชักทางขวา (เปิด/ปิดได้) — เว้นกลางจอไว้ให้ ORT
-        <RaidDeckDrawer>
-          <DeckPile hostRef={deckRef} size="lg" onClick={() => setDeckOpen(true)} />
+        <RaidDeckDrawer anchorRef={deckRef}>
+          <DeckPile size="lg" onClick={() => setDeckOpen(true)} />
         </RaidDeckDrawer>
       ) : (
         <div className="absolute inset-x-0 top-[40%] flex justify-center pointer-events-none">
@@ -5035,6 +5206,9 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
 
       {/* QTE (ยุย) — ลอยกลางจอ ไม่บังกองการ์ด */}
       {me?.qte && <QtePanel key={me.qte.idx} qte={me.qte} />}
+      {me?.usagiQuiz && <UsagiQuizPanel key={`${me.usagiQuiz.idx}-${me.usagiQuiz.q}`} quiz={me.usagiQuiz} />}
+      {me?.usagiSwapOffer && <UsagiSwapModal offer={me.usagiSwapOffer} />}
+      {usagiItemOpen && me && <UsagiItemModal me={me} onPick={pickUsagiItem} onClose={() => { clickSound(); setUsagiItemOpen(false); }} />}
 
       {/* ตัวจับเวลา + รอบ */}
       {(phase === "PLAYING" || phase === "ATTACK") && (
@@ -5063,6 +5237,20 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
       )}
       {raid && <RaidSurrender state={state} me={me} />}
 
+      {/* โหมดปกติ: ORT ที่บุกเข้ามาเทิร์น 60 นั่งกลางด้านบน */}
+      {invader && (
+        <OtherPlayer
+          key={invader.id}
+          p={invader}
+          phase={phase}
+          slot={ORT_SEAT}
+          targetable={isTargetable(invader, iAmAttacker, targetChain)}
+          picked={!!anataSel && anataSel.includes(invader.id)}
+          onAttack={(id) => resolveAttackPick(id, targetChain)}
+          onInspect={setStatusViewId}
+          hostRef={(el) => registerOther(invader.id, el)}
+        />
+      )}
       {/* ผู้เล่นคนอื่น (โหมด Raid: เพื่อนร่วมทีมเรียงแถวใต้ ORT และเห็นแต้มกันตลอด) */}
       {seatOthers.map((p, i) => (
         <OtherPlayer
@@ -5210,6 +5398,12 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
       )}
 
       {/* โหมดเลือกเป้าหมาย Witch Mark / Mana Rupture (ผู้สังหารเมจ) — เลือกได้เฉพาะคนอื่น */}
+      {usagiSel && (
+        <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-40 text-center text-hard whitespace-nowrap">
+          <span className="text-xl font-black text-echo-gold animate-pulse bg-black/60 rounded-full px-5 py-1.5">🐰 เลือกเป้าหมาย “ปรุ้ต.....” (ดูแต้มก่อนตัดสินใจ)</span>
+          <button onClick={() => { clickSound(); setUsagiSel(false); }} className="ml-2 text-sm font-bold bg-black/60 rounded-full px-3 py-1 border border-white/30">ยกเลิก</button>
+        </div>
+      )}
       {connorSel && (
         <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-40 text-center text-hard whitespace-nowrap">
           <span className="text-xl font-black text-echo-hp animate-pulse bg-black/60 rounded-full px-5 py-1.5">{connorSel === "ultimate" ? "⚖️ เลือกเป้าหมาย “จัดการปิดคดี” (เฉพาะระดับอาชญากร)" : "🚔 เลือกเป้าหมาย “ข่มขวัญ/จับกุม”"}</span>

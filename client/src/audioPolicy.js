@@ -16,7 +16,9 @@ export function musicForState(state, { lowQ = false, scene = null, cycleSeq = 0,
   }
   if (state?.skillMusic) return { name: state.skillMusic, seq: state.skillMusicSeq };
   // Type Mercury: เพลงประจำตัว ORT ตลอดทั้ง Raid (รวมฉากเปิดตัว ORT ซึ่งเป็นเฟส CUTSCENE ที่ไม่มีคลิป)
-  if (state?.mercury && ["PLAYING", "SUMMARY", "ATTACK", "ATTACKING", "TRANSITION", "CUTSCENE", "GAMEOVER"].includes(phase)) return { name: "ort_theme" };
+  if (state?.mercury && ["PLAYING", "SUMMARY", "ATTACK", "ATTACKING", "TRANSITION", "CUTSCENE"].includes(phase)) return { name: "ort_theme" };
+  // โหมดปกติ: ORT บุกเทิร์น 60 — เพลง ORT เฉพาะช่วงฉากเปิดตัว แล้วกลับไปเพลงสนามตามเดิม
+  if (state?.ortArrival?.active && phase === "CUTSCENE") return { name: "ort_theme" };
   // ช่วงโจมตี: เพลงเฉพาะกิจทับเพลงกลางวัน/กลางคืน และเริ่มจากต้นทุกครั้งที่เข้าช่วง (attackSeq ขยับ)
   if (phase === "ATTACK" || phase === "ATTACKING") return { name: "battle_phase", seq: attackSeq };
   if (["PLAYING", "SUMMARY", "ATTACK", "ATTACKING", "TRANSITION", "CUTSCENE"].includes(phase)) {

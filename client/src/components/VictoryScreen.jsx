@@ -58,7 +58,7 @@ export default function VictoryScreen({ state, onBackToLobby }) {
       const ws = state.players.filter((p) => p.alive);
       return { heading: ws.map((w) => w.name).join(" และ "), winners: ws };
     }
-    const c = state.players.find((p) => p.alive);
+    const c = state.players.find((p) => p.alive && !p.isBoss); // ORT (บุกเทิร์น 60) ไม่ใช่ผู้ชิงชัย
     return { heading: c ? c.name : "จบเกม", winners: c ? [c] : [] };
   }, [state.gameMode, state.winningTeamId, state.allyWin, state.players, state.mercury?.result]);
 
@@ -88,7 +88,7 @@ export default function VictoryScreen({ state, onBackToLobby }) {
         )}
 
         {winners.length > 0 && (
-          <div className="flex justify-center gap-7 mt-3">
+          <div className="flex flex-wrap justify-center gap-7 mt-3 max-w-[92vw]">
             {winners.map((p, i) => <WinnerPortrait key={p.id} p={p} i={i} />)}
           </div>
         )}

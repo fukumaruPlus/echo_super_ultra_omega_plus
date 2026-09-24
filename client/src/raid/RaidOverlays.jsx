@@ -14,6 +14,9 @@ import "./raid-board.css";
 export function RaidRespawn({ state, me, roster }) {
   const m = state.mercury;
   const [hidden, setHidden] = useState(false);
+  // ลงสนามแล้ว -> ครั้งหน้าที่ตายต้องเห็นหน้าเลือกตัวเต็มจออีก (ไม่ค้างโหมด "ดูสนาม" จากการตายครั้งก่อน)
+  const alive = !!me?.alive;
+  useEffect(() => { if (alive) setHidden(false); }, [alive]);
   if (!m || m.result || !me || me.alive || !roster?.length) return null;
 
   const lost = m.lost || [];
@@ -56,12 +59,17 @@ export function RaidRespawn({ state, me, roster }) {
 // โหวตยอมแพ้ — เสียงข้างมาก + นับถอยหลัง (คนที่ไม่กดไม่ถูกนับ)
 export function RaidSurrender({ state, me }) {
   const v = state.mercury?.surrender;
-  const [now, setNow] = useState(() => Date.now());
+  // server ส่ง "เหลือกี่มิลลิวินาที" — นับถอยหลังจากนาฬิกาเครื่องเราเอง (นาฬิกา server กับเครื่องผู้เล่นไม่ตรงกัน)
+  const leftMs = v ? v.leftMs : null;
+  const [left, setLeft] = useState(0);
   useEffect(() => {
-    if (!v) return undefined;
-    const t = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(t);
-  }, [v]);
+    if (leftMs == null) return undefined;
+    const end = Date.now() + leftMs;
+    const tick = () => setLeft(Math.max(0, Math.ceil((end - Date.now()) / 1000)));
+    const first = setTimeout(tick, 0);
+    const t = setInterval(tick, 250);
+    return () => { clearTimeout(first); clearInterval(t); };
+  }, [leftMs]);
   if (!state.mercury || state.mercury.result || !me || state.gameState === "GAMEOVER") return null;
   const vote = (yes) => { clickSound(); socket.emit("mercurySurrender", { yes }); };
   if (!v) {
@@ -71,7 +79,6 @@ export function RaidSurrender({ state, me }) {
       </div>
     );
   }
-  const left = Math.max(0, Math.ceil((v.endsAt - now) / 1000));
   return (
     <div className="raid-surrender">
       <div className="raid-surrender-vote" role="status">
@@ -87,11 +94,13 @@ export function RaidSurrender({ state, me }) {
 }
 
 // กองการ์ดกลางแบบลิ้นชักทางขวา (โหมด Raid เว้นกลางจอไว้ให้ ORT) — กดแถบเพื่อเปิด/ปิด
-export function RaidDeckDrawer({ children }) {
+// anchorRef: จุดที่การ์ดบิน "ออกจากกองกลาง" — ผูกไว้ที่แถบลิ้นชักซึ่งเห็นอยู่ตลอด
+//  (ตัวกองการ์ดข้างในถูกเลื่อนออกนอกจอตอนลิ้นชักปิด การ์ดจะบินมาจากนอกจอ)
+export function RaidDeckDrawer({ children, anchorRef }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="raid-deck-drawer" data-open={open ? "true" : "false"}>
-      <button type="button" className="raid-deck-tab" aria-expanded={open} onClick={() => { clickSound(); setOpen((o) => !o); }}>
+      <button type="button" ref={anchorRef} className="raid-deck-tab" aria-expanded={open} onClick={() => { clickSound(); setOpen((o) => !o); }}>
         {open ? "ปิดกองกลาง ▶" : "◀ กองกลาง"}
       </button>
       <div className="raid-deck-body">

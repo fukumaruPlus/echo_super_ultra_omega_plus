@@ -4,7 +4,7 @@ import { createOrtStage } from "./ortStage";
 import "./raid-board.css";
 
 // ฉากเปิดตัว ORT ตอนเข้าโหมด Type Mercury — "หายนะกำลังมาเยือน"
-//  ใช้แทนฉากเปิดตัวผู้เล่น (GameIntro) ในโหมดนี้ · server พักเกมไว้ MERCURY_ARRIVAL_SECONDS (14 วิ) ให้ทุกคนดูพร้อมกัน
+//  ใช้แทนฉากเปิดตัวผู้เล่น (GameIntro) ในโหมดนี้ · server พักเกมไว้ MERCURY_ARRIVAL_SECONDS (15 วิ) ให้ทุกคนดูพร้อมกัน แล้ววีดีโอเปิดตัวตัวละครค่อยเล่นต่อ
 //
 //  ลำดับฉาก (มิลลิวินาที)
 //   0     ม่านเหล็กลายเตือนภัยกระแทกปิดจอจากบน-ล่าง (ม่านของโหมด)
@@ -24,7 +24,7 @@ const DOOM_TEXT = "หายนะกำลังมาเยือน";
 //  (แยกทีละ code point สระ ั ื จะหลุดไปเป็น span เดี่ยวลอยอยู่ผิดที่)
 const DOOM_GLYPHS = typeof Intl !== "undefined" && Intl.Segmenter
   ? [...new Intl.Segmenter("th", { granularity: "grapheme" }).segment(DOOM_TEXT)].map((x) => x.segment)
-  : DOOM_TEXT.match(/.[ัิ-ฺ็-๎]*/g);
+  : DOOM_TEXT.match(/.[\u0E31\u0E33-\u0E3A\u0E47-\u0E4E]*/g);
 
 export default function OrtArrival({ lowQ, onDone }) {
   const canvasRef = useRef(null);

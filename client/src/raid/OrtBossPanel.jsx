@@ -13,7 +13,8 @@ import "./raid-board.css";
 //   "ui"     = แถบข้อมูล + พื้นที่คลิกโจมตี วางไว้ "ใน" กรอบกระดาน (อยู่ชั้นเดียวกับที่นั่ง จึงกดได้)
 //   "full"   = กรอบเดียวครบทุกอย่าง (หน้าจอมือถือ)
 // statusNode: ป้ายสถานะของบอส (Game.jsx ส่ง <StatusChips> มาให้ — ชื่อสถานะภาษาไทยอยู่ที่นั่น)
-export default function OrtBossPanel({ boss, phase, targetable, onAttack, onInspect, lowQ, compact = false, layer = "full", hostRef, statusNode }) {
+// walking: ORT เดินวนตลอดช่วงเปิดการ์ด (เฟสจั่ว) และหยุดเมื่อเข้าช่วงโจมตี — กระดานส่ง phase === "PLAYING" มา
+export default function OrtBossPanel({ boss, phase, targetable, onAttack, onInspect, lowQ, compact = false, layer = "full", hostRef, statusNode, walking = false }) {
   const withCanvas = layer !== "ui";
   const withUi = layer !== "canvas";
   const canvasRef = useRef(null);
@@ -30,6 +31,7 @@ export default function OrtBossPanel({ boss, phase, targetable, onAttack, onInsp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [withCanvas]);
   useEffect(() => { stageRef.current?.setLowQ(lowQ); }, [lowQ]);
+  useEffect(() => { stageRef.current?.setWalking(walking); }, [walking]);
 
   if (!boss) return null;
   const info = boss.ort || { bars: 1, atk: 1, atkMax: 3 };

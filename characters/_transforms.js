@@ -20,6 +20,7 @@ const daichiChar = require("./daichi");
 const daisukeChar = require("./daisuke");
 const yagurumaChar = require("./yaguruma");
 const kagamiChar = require("./kagami");
+const usagiChar = require("./usagi"); // อุซากิ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
 const tsurugiChar = require("./tsurugi"); // คามิชิโร่ ซึรุงิ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร // คากามิ อาราตะ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร // โซ ยากุรุมะ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร // คาซามะ ไดสุเกะ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
 const BAT_CAR_IMG = "/characters/bat_ben/bat_update/bat_ben_car.webp";
 const BAT_SHOT_IMG = "/characters/bat_ben/bat_update/skill1.2/bat_ben_skill1.2.jpg";
@@ -133,6 +134,9 @@ module.exports = function buildTransforms(img) {
     //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก (17.56 -> 19 · 2.60/2.84 -> 4 · 14.35 -> 16)
     yuiSuplex:   { img: yuiImg.skill2, video: "/characters/yui/skill2/yui_skill2.mp4",       title: "เยอรมันซูเพล็ก", label: "สวนกลับ",        seconds: 19, music: null, afterReveal: false },
     yuiSong:     { img: yuiImg.skill3, video: "/characters/yui/skill3/yui_skill3.mp4",       title: "ทำนองเพลงร็อก",  label: "บรรเลงสำเร็จ",    seconds: 4, music: null, afterReveal: false },
+    // อุซากิ: เล่นทุกครั้ง (queueCutscene) — ท่าไม้ตายตอนกด / สกิลรองตอนกด "เอา" แล้วค่อยสลับไพ่
+    usagiUlt:    { img: usagiChar.IMG.skill3, video: usagiChar.VIDEO.ult,  title: "ฮัยย๊ะ ฮ๊ะ ปรุๆ อิอิ อิยะ ฮ๊ะ", label: "โจทย์คณิต 3 เทิร์น", seconds: 3, music: null, afterReveal: false },
+    usagiSwap:   { img: usagiChar.IMG.skill2, video: usagiChar.VIDEO.swap, title: "ปรุ้ต.....", label: "สลับไพ่ทั้งมือ", seconds: 5, music: null, afterReveal: false },
     yuiSongFail: { img: yuiImg.skill3, video: "/characters/yui/skill3/yui_skill3_false.mp4", title: "เสียงเพี้ยน",    label: "บรรเลงล้มเหลว",   seconds: 4, music: null, afterReveal: false },
     yuiDead:     { img: yuiImg.base,   video: "/characters/yui/yui_dead.mp4",                title: "ความปรารถนา",    label: "คำอธิษฐานเป็นจริง", seconds: 16, music: null, afterReveal: false },
     // ---------- อิสึกะ ชิโด (patch 2.9 new) ----------

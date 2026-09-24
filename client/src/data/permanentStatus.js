@@ -14,5 +14,5 @@ export const PERMANENT_STATUS_KEYS = new Set([
   "miyakoHeal", "miyakoUlt", "ohger", "overweight", "rsHopper",
   "saphir", "spear", "star", "supFaith", "takutoThirdAtk",
   "tepeuCook", "tepeuPonder", "triggerDarkWail", "triggerForm", "triggerLight",
-  "triggerMulti", "triggerZeperion", "yaak",
+  "triggerMulti", "triggerZeperion", "usagiMath", "yaak",
 ]);

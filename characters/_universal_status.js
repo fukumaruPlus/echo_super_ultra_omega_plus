@@ -486,6 +486,7 @@ function tickEvadeStacks(engine, p) {
 //  ใช้ร่วมกับแฝดที่ "พักอยู่" ของฮิซาคาว่า (characters/hisakawa_sister.js) เพื่อให้กติกาการนับเวลา
 //  ของแฝดสองคนตรงกัน — เดิมฝั่งที่พักลดเทิร์นทุก key ทำให้มาร์กถาวรสลายไปเองระหว่างพัก
 const NO_TICK_STATUS = new Set([
+  "usagiMath", // อุซากิ: เทิร์นที่เหลือของโจทย์คณิต — ลดเองตอนแจกโจทย์ต้นเทิร์น (characters/usagi.js)
   "chill", "hburn", "hbleed", "melody", "star", "emeraude", "saphir", "lance", "takutoThirdAtk",
   "doomCrucible", "doomDrain", "doomExplode", "doomLockon", "fortune", "linked", "rsHopper",
   "cassius", "yaak", "spear", "ohger", "evade", "empower", "miyakoHeal", "miyakoCombo", "miyakoUlt",

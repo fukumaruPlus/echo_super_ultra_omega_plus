@@ -96,7 +96,7 @@
   background: radial-gradient(ellipse at center, rgba(255, 61, 110, .22), rgba(255, 61, 110, 0) 70%);
 }
 .ort-hitzone:focus-visible { outline: 2px solid #ff3d6e; outline-offset: 2px; }
-.ort-hitzone .ort-target-badge { top: 50%; }
+.ort-hitzone .ort-target-badge { top: 18%; } /* แต้มของ ORT อยู่ที่ 30% ของจอ — ป้ายต้องไม่บัง */
 .ort-hitzone-anchor { position: absolute; top: 28%; left: 50%; width: 1px; height: 1px; }
 .ort-panel-compact .ort-panel-hud .raid-boss { font-size: 20px; }
 .ort-panel-compact .ort-panel-hud { padding: 8px 10px 12px; }
@@ -163,7 +163,7 @@
   position: absolute; left: 50%; top: 60px; width: 120vmax; height: 120vmax; margin-left: -60vmax;
   background: conic-gradient(from 0deg, rgba(255, 30, 60, .38), transparent 18%, transparent 50%, rgba(255, 30, 60, .38) 68%, transparent 86%);
   animation: ortSiren 1.1s linear infinite;
-  mix-blend-mode: screen;
+  will-change: transform;
 }
 @keyframes ortSiren { to { transform: rotate(360deg); } }
 
@@ -175,8 +175,8 @@
 }
 .ort-arrival-open .ort-arrival-mode { animation: ortModeFlash 1.5s ease both; }
 @keyframes ortModeFlash {
-  0% { opacity: 0; transform: scale(1.3); filter: blur(8px); }
-  15% { opacity: 1; transform: scale(1); filter: blur(0); }
+  0% { opacity: 0; transform: scale(1.3); }
+  15% { opacity: 1; transform: scale(1); }
   80% { opacity: 1; }
   100% { opacity: 0; transform: scale(.94); }
 }
@@ -218,8 +218,8 @@
   animation-delay: calc(var(--i) * 70ms);
 }
 @keyframes ortSlam {
-  from { opacity: 0; transform: scale(3.2) translateY(-20px); filter: blur(10px); }
-  to { opacity: 1; transform: scale(1); filter: blur(0); }
+  from { opacity: 0; transform: scale(3.2) translateY(-20px); }
+  to { opacity: 1; transform: scale(1); }
 }
 .ort-arrival-doom-sub { font-size: clamp(14px, 2vw, 22px); letter-spacing: .14em; color: #a9b8e0; animation: ortDoomSub .6s ease 1.4s both; }
 @keyframes ortDoomSub { from { opacity: 0; letter-spacing: .5em; } to { opacity: 1; } }

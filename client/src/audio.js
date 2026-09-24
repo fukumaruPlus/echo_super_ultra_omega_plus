@@ -41,6 +41,8 @@ const FILES = {
   full_force: "/theme_song/FULL FORCE.mp3",
   // ORT บอสมหันตภัย (โหมด Type Mercury) — ตอนนี้เล่นในหน้าตัวอย่างอนิเมชัน
   ort_theme: "/characters/ort/ort_theme.mp3",
+  // อุซากิ: เพลงตลอดช่วงท่าไม้ตาย (โจทย์คณิต 3 เทิร์น)
+  usagi_theme: "/characters/usagi/usagi_theme.mp3",
   // ยูนะ ไอดอลประจำสนาม (patch 2.2.6): เพลงล็อกทั้งสนามตลอด 5 เทิร์นที่เอฟเฟกต์ทำงาน
   yuna_longing: "/characters/yuna/Longing.mp3",
   yuna_delete: "/characters/yuna/Delete.mp3",

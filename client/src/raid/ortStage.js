@@ -89,13 +89,32 @@ function prepSprites(img) {
   gg.globalCompositeOperation = "destination-in";
   gg.drawImage(sprite, 0, 0);
 
+  // แสงเบลอ: เบลอครั้งเดียวตรงนี้ (ขนาดภาพต้นฉบับ) แทนการตั้ง ctx.filter = blur ทุกเฟรมบนจอเต็ม
+  //  — ตัวหลังกิน GPU หนักมากที่ความละเอียดจอสูง และเป็นต้นเหตุหลักของฉากเปิดตัวกระตุก
+  const pad = 16;
+  const glowBlur = makeCanvas(w + pad * 2, h + pad * 2);
+  const bg2 = glowBlur.getContext("2d");
+  bg2.filter = "blur(6px)";
+  bg2.drawImage(glow, pad, pad);
+  bg2.filter = "none";
+
   const white = makeCanvas(w, h);
   const wg = white.getContext("2d");
   wg.drawImage(sprite, 0, 0);
   wg.globalCompositeOperation = "source-in";
   wg.fillStyle = "#f2fdff";
   wg.fillRect(0, 0, w, h);
-  return { sprite, glow, white };
+  return { sprite, glow, glowBlur, glowPad: pad, white };
+}
+// เตรียมภาพ ORT ครั้งเดียวต่อหน้าเว็บ แล้วใช้ร่วมกันทุกเวที (ฉากเปิดตัว + ฉากหลังกระดาน)
+//  prepSprites อ่านพิกเซลทั้งภาพ (getImageData) — ทำซ้ำทุกครั้งที่สร้างเวทีทำให้สะดุดตอนเข้าโหมด
+let assetsPromise = null;
+function loadAssets() {
+  if (!assetsPromise) {
+    assetsPromise = Promise.all([loadImg(ORT_IMG.scene), loadImg(ORT_IMG.body)])
+      .then(([scene, body]) => ({ scene, spr: body ? prepSprites(body) : null }));
+  }
+  return assetsPromise;
 }
 
 /**
@@ -104,6 +123,8 @@ function prepSprites(img) {
  *  - demo = false (บนกระดานจริง): เลือด/หลอดมาจาก server — ท่าทางเป็นแค่ภาพ ไม่แตะตัวเลข
  *  - play(name)  เล่นท่า (ดู ORT_ACTIONS)
  *  - setLowQ(v)  โหมดประหยัด: ตัดอนุภาคส่วนใหญ่ + ไม่สั่นจอ
+ *  - setWalking(v) เดินย่ำอยู่กับที่วนไปเรื่อยๆ (กระดานสั่งเปิดช่วงเปิดการ์ด ปิดตอนเข้าช่วงโจมตี)
+ *                  ท่าอื่น (โดนตี/สวนกลับ ฯลฯ) เล่นทับได้ จบแล้วเดินต่อเอง · เข้า-ออกค่อยๆ ผสม ไม่กระตุก
  *  - destroy()
  * onHud(S) ถูกเรียกทุกครั้งที่หลอดเลือด/เกราะ/พลังโจมตีเปลี่ยน (ใช้วาด HUD ฝั่ง React)
  */
@@ -113,6 +134,7 @@ export function createOrtStage(canvas, { lowQ = false, onHud = () => {}, onActio
   let calm = lowQ || prefersReduce;
   let W = 0, H = 0, dpr = 1, raf = 0, dead = false;
   let scene = null, spr = null, bg = null;
+  let grads = { fog: "rgba(0,0,0,0)", vignette: "rgba(0,0,0,0)" };
 
   const S = { bars: 5, hp: ORT_BAR_HP, armor: ORT_BAR_ARMOR, atk: 1 };
   const emitHud = () => onHud({ ...S });
@@ -120,6 +142,9 @@ export function createOrtStage(canvas, { lowQ = false, onHud = () => {}, onActio
   let motes = [], dust = [], shards = [], rings = [], texts = [], slashes = [], bursts = [], inbound = [];
   const fx = { shake: 0, flash: 0, flashColor: "62,230,255", bossFlash: 0, glitch: 0, glowBoost: 0, hitstop: 0, lostText: 0 };
   let act = null, advance = 0, holdAdvance = 0, lastStep = -1;
+  // เดินวน: walking = สั่งให้เดินไหม · walkBlend 0..1 = น้ำหนักท่าเดินที่ผสมอยู่ (ค่อยๆ เข้า/ออก)
+  let walking = false, walkBlend = 0, walkT = 0, walkStep = -1;
+  const WALK_PERIOD = 0.85; // วินาทีต่อ 1 ก้าว
   let bossAlpha = 1, rift = 0, titleT = 0;
 
   function seedMotes() {
@@ -143,11 +168,16 @@ export function createOrtStage(canvas, { lowQ = false, onHud = () => {}, onActio
   function resize() {
     const r = canvas.getBoundingClientRect();
     if (!r.width || !r.height) return;
-    dpr = Math.min(2, window.devicePixelRatio || 1);
+    dpr = Math.min(1.25, window.devicePixelRatio || 1); // ภาพวาดนิ่งขยาย — ความละเอียดสูงกว่านี้ไม่ได้ช่วยให้คมขึ้น แต่กินเครื่องมาก
     W = r.width; H = r.height;
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
     prepBg();
     seedMotes();
+    const fog = ctx.createLinearGradient(0, H * .8, 0, H);
+    fog.addColorStop(0, "rgba(5,8,23,0)"); fog.addColorStop(1, "rgba(5,8,23,.85)");
+    const vignette = ctx.createRadialGradient(W / 2, H * .55, H * .3, W / 2, H * .55, W * .75);
+    vignette.addColorStop(0, "rgba(0,0,0,0)"); vignette.addColorStop(1, "rgba(0,0,0,.6)");
+    grads = { fog, vignette };
   }
   const ro = typeof ResizeObserver === "function" ? new ResizeObserver(resize) : null;
   ro?.observe(canvas);
@@ -155,8 +185,8 @@ export function createOrtStage(canvas, { lowQ = false, onHud = () => {}, onActio
   // ---------- เอฟเฟกต์ ----------
   const shake = (n) => { if (!calm) fx.shake = Math.max(fx.shake, n); };
   function addText(text, color, size, x, y) { texts.push({ text, color, size, x: x ?? W / 2, y: y ?? H * .42, vy: -40, life: 1.3, max: 1.3 }); }
-  function stomp(x) {
-    shake(9);
+  function stomp(x, strength = 9) {
+    shake(strength);
     rings.push({ x, y: H * .965, r: 10, life: .7, max: .7 });
     const n = calm ? 5 : 18;
     for (let i = 0; i < n; i++) dust.push({ x, y: H * .96, vx: (Math.random() - .5) * 260, vy: -Math.random() * 60, life: .9, max: .9, s: 2 + Math.random() * 4 });
@@ -259,7 +289,7 @@ export function createOrtStage(canvas, { lowQ = false, onHud = () => {}, onActio
   // ---------- วาด ----------
   function drawBoss(tt, pose) {
     if (!spr || bossAlpha <= 0) return;
-    const { sprite, glow, white } = spr;
+    const { sprite, glow, white } = spr; // glowBlur อ่านจาก spr ตรงๆ ด้านล่าง
     const breath = Math.sin(tt * 1.3);
     const s = 1 + advance * .14 + pose.s;
     const h = H * .9 * s;
@@ -301,9 +331,10 @@ export function createOrtStage(canvas, { lowQ = false, onHud = () => {}, onActio
     const pulse = .55 + .35 * Math.sin(tt * 2.1) + fx.glowBoost * .5;
     ctx.globalCompositeOperation = "lighter";
     ctx.globalAlpha = Math.min(1, pulse * .6) * bossAlpha;
-    if (!calm) ctx.filter = "blur(7px)";
-    ctx.drawImage(glow, X, Y, w, h);
-    ctx.filter = "none";
+    if (!calm) {
+      const k = w / sprite.width, p = spr.glowPad * k;
+      ctx.drawImage(spr.glowBlur, X - p, Y - p, w + p * 2, h + p * 2);
+    }
     ctx.globalAlpha = Math.min(1, pulse * .45) * bossAlpha;
     ctx.drawImage(glow, X, Y, w, h);
     if (fx.bossFlash > 0) { ctx.globalAlpha = fx.bossFlash * .85; ctx.drawImage(white, X, Y, w, h); }
@@ -499,6 +530,20 @@ export function createOrtStage(canvas, { lowQ = false, onHud = () => {}, onActio
     if (!act || act.name !== "walk") {
       if (holdAdvance > 0) holdAdvance -= dt; else advance = Math.max(0, advance - dt * .35);
     }
+    // เดินวน — ท่าเฉพาะกิจ (act) เล่นทับ: ระหว่างนั้นน้ำหนักท่าเดินลดลงเหลือ 0 แล้วค่อยกลับมาเมื่อท่าจบ
+    {
+      const want = walking && !act ? 1 : 0;
+      walkBlend += Math.sign(want - walkBlend) * Math.min(Math.abs(want - walkBlend), dt * 3.5);
+      if (walkBlend > 0.001) {
+        walkT += dt;
+        const sp = (walkT / WALK_PERIOD) % 1, idx = Math.floor(walkT / WALK_PERIOD);
+        const lift = Math.sin(Math.PI * sp) * walkBlend, dir = idx % 2 ? 1 : -1;
+        pose = { ...pose, y: pose.y - lift * .018, r: pose.r + dir * lift * .022, x: pose.x + dir * lift * .006 };
+        // เท้ากระแทกพื้นต้นทุกก้าว — สั่นเบา (ORT เป็นฉากหลังเต็มจอ สั่นแรงทุกก้าวจะรบกวนการเล่น)
+        if (idx !== walkStep && walkStep !== -1 && walkBlend > .6) stomp(W / 2 + dir * W * .07, 2.5);
+        walkStep = idx;
+      } else { walkT = 0; walkStep = -1; }
+    }
     fx.flash = Math.max(0, fx.flash - rdt * 2.4);
     fx.bossFlash = Math.max(0, fx.bossFlash - rdt * 3.5);
     fx.glitch = Math.max(0, fx.glitch - rdt);
@@ -521,25 +566,21 @@ export function createOrtStage(canvas, { lowQ = false, onHud = () => {}, onActio
     }
     drawRift();
     drawBoss(gt, pose);
-    const fog = ctx.createLinearGradient(0, H * .8, 0, H);
-    fog.addColorStop(0, "rgba(5,8,23,0)"); fog.addColorStop(1, "rgba(5,8,23,.85)");
-    ctx.fillStyle = fog;
+    ctx.fillStyle = grads.fog;
     ctx.fillRect(0, H * .8, W, H * .2);
     drawFx(dt);
     ctx.restore();
     drawLostOverlay();
     drawTitle();
     if (fx.flash > 0) { ctx.fillStyle = `rgba(${fx.flashColor},${fx.flash * .45})`; ctx.fillRect(0, 0, W, H); }
-    const vg = ctx.createRadialGradient(W / 2, H * .55, H * .3, W / 2, H * .55, W * .75);
-    vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.6)");
-    ctx.fillStyle = vg;
+    ctx.fillStyle = grads.vignette;
     ctx.fillRect(0, 0, W, H);
   }
 
-  Promise.all([loadImg(ORT_IMG.scene), loadImg(ORT_IMG.body)]).then(([sc, body]) => {
+  loadAssets().then((a) => {
     if (dead) return;
-    scene = sc;
-    if (body) spr = prepSprites(body);
+    scene = a.scene;
+    spr = a.spr;
     resize();
   });
   if (demo) emitHud();
@@ -549,6 +590,7 @@ export function createOrtStage(canvas, { lowQ = false, onHud = () => {}, onActio
     play,
     busy: () => !!act,
     setLowQ(v) { calm = !!v || prefersReduce; seedMotes(); },
+    setWalking(v) { walking = !!v; },
     destroy() { dead = true; cancelAnimationFrame(raf); ro?.disconnect(); },
   };
 }

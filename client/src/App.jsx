@@ -41,6 +41,7 @@ export default function App() {
   const [introPlayers, setIntroPlayers] = useState([]);
   // Type Mercury: ฉากเปิดตัว ORT แทนฉากเปิดตัวผู้เล่น
   const [showArrival, setShowArrival] = useState(false);
+  const arrivalSeqRef = useRef(null); // ฉากเปิดตัว ORT ครั้งที่เล่นไปแล้ว (กันเล่นซ้ำในการพักเกมรอบเดียวกัน)
   const prevGameStateRef = useRef(null);
   const [roster, setRoster] = useState([]);
   const [takenChars, setTakenChars] = useState([]); // ตัวละคร unique ที่มีคนเลือกไปแล้ว (คอนเนอร์ RK800)
@@ -94,9 +95,17 @@ export default function App() {
       //  ซึ่งทำลายแก่นของโหมด (ตัวตนต้องถูกซ่อนจนกว่าจะลงดวล) โหมดนี้มีฉากเปิดของตัวเอง
       //  คือ "บูตระบบ SE.RA.PH" ที่โชว์ทุกคนเป็นเงาดำ ??? แทน (seraph/scenes.jsx)
       //  Type Mercury: ไม่มีฉากเปิดตัวผู้เล่น — เล่นฉากเปิดตัว ORT (ม่านเตือนภัย + "หายนะกำลังมาเยือน") แทน
-      if (!wasInMatch && nowInMatch && s.mercury) {
+      //  ฉากเปิดตัว ORT: เล่นเมื่อ server กำลังพักเกมรอฉากนี้จริง (ortArrival.active) — ทั้งตอนเริ่ม Raid และตอน ORT
+      //  บุกเทิร์น 60 ของโหมดปกติ (ซึ่งเกิดกลางแมตช์) · รีคอนเนกต์หลังช่วงพักจะไม่เล่นซ้ำ เพราะ active เป็น false แล้ว
+      if (["LOBBY", "TEAM_MODE", "TEAM_SETUP"].includes(s.gameState)) setShowArrival(false);
+      const arrival = s.ortArrival;
+      if (arrival?.active && arrival.seq !== arrivalSeqRef.current) {
+        arrivalSeqRef.current = arrival.seq;
         curtainRef.current?.skip("ortarrival");
         setShowArrival(true);
+      } else if (!wasInMatch && nowInMatch && s.mercury) {
+        // เข้ากลาง Raid (รีคอนเนกต์) — ไม่มีฉากเปิดตัวผู้เล่นด้วย
+        curtainRef.current?.skip("game");
       } else if (!wasInMatch && nowInMatch && !s.seraph) {
         curtainRef.current?.skip("gameintro");
         setIntroPlayers(s.players);

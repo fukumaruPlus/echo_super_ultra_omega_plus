@@ -12,9 +12,10 @@
 //     ตั้งแต่ KILL_RESIST_MIN ขึ้นไป (และทอยติด) = เสีย 1 หลอด ไม่ได้ตายทั้งตัว
 //   · ไม่มีแต้มสกิล/เหรียญ (server.js กันที่ maxSkillOf/addSkill/addGold)
 //
-//  สกิลติดตัว 1 ศัตรูของเหล่า Echo — สกิลแรกที่ผู้เล่นกดในเทิร์นล่าสุด "ข้อมูลสูญหาย" กดไม่ได้ในเทิร์นถัดไป
-//    (กดสกิลอื่นแทน = ช่องที่ถูกลบย้ายไปที่สกิลนั้นในเทิร์นถัดไป · ไม่กดเลย = ช่องเดิมยังถูกลบค้าง)
+//  สกิลติดตัว 1 ศัตรูของเหล่า Echo — สกิลแรกที่ผู้เล่นกดในเทิร์นหนึ่ง "ข้อมูลสูญหาย" กดไม่ได้ LOST_TURNS (2) เทิร์นถัดไป
+//    (กดสกิลอื่นแทน = ช่องที่ถูกลบย้ายไปที่สกิลนั้นในเทิร์นถัดไป และนับ 2 เทิร์นใหม่ · ครบ 2 เทิร์นแล้วหายเอง)
 //    · p.ortPendingLost = tier แรกที่กดในเทิร์นนี้ (ยังไม่มีผล) -> onRoundStart แปลงเป็น p.ortLostTier
+//    · p.ortLostUntil = เลขรอบสุดท้ายที่ยังถูกลบอยู่ (เก็บเป็นเลขรอบ ไม่ใช่ตัวนับ — ไม่ต้องมีใครลดให้)
 //  สกิลติดตัว 2 สิ่งต้องห้ามของจักรวาล
 //    · โชคลาภ +1 เมื่อ ORT มีไพ่ในมือครบ 2 ใบ (ใบที่ 3 จึงเป็นการจั่วแบบโชคลาภ) — 1 ครั้งต่อเทิร์น
 //    · สวนกลับทันทีเมื่อ: ถูกสกิลทำดาเมจ (รวมสกิลหมู่) / ถูกเลือกเป็นเป้าของสกิล (แม้เป็นบัฟ/ดีบัฟ) / ถูกยิงด้วยปืน
@@ -34,6 +35,7 @@ const KILL_RESIST_MIN = 0.4;
 const RAID_BARS = 5;
 const NORMAL_BARS = 3;
 const FORTUNE_AT_HAND = 2;
+const LOST_TURNS = 2;
 const TIERS = ["basic", "secondary", "ultimate"];
 const TIER_NAME = { basic: "สกิลพื้นฐาน", secondary: "สกิลรอง", ultimate: "ท่าไม้ตาย" };
 const IMG = { base: "/characters/ort/ort_body.jpg" };
@@ -47,7 +49,7 @@ let flushing = false;
 
 module.exports = {
   id: ID,
-  BAR_HP, BAR_ARMOR, ATK_MAX, RAID_BARS, NORMAL_BARS, KILL_RESIST_MIN, CRIT_CHANCE, KILL_CHANCE, IMG,
+  BAR_HP, BAR_ARMOR, ATK_MAX, LOST_TURNS, RAID_BARS, NORMAL_BARS, KILL_RESIST_MIN, CRIT_CHANCE, KILL_CHANCE, IMG,
   isOrt,
   bossOf,
 
@@ -68,6 +70,7 @@ module.exports = {
   // ฟิลด์ของสกิลติดตัว 1 ที่ติดบนผู้เล่นจริง — ต้องล้างทุกแมตช์ (server.js resetCombat)
   resetCombat(p) {
     p.ortLostTier = null;
+    p.ortLostUntil = 0;
     p.ortPendingLost = null;
     p.ortFirstSkillRound = 0;
   },
@@ -198,7 +201,8 @@ module.exports = {
 
   // ---------- สกิลติดตัว 1: ศัตรูของเหล่า Echo ----------
   skillErased(engine, p, tier) {
-    return !!bossOf(engine) && !isOrt(p) && TIERS.includes(tier) && p.ortLostTier === tier;
+    return !!bossOf(engine) && !isOrt(p) && TIERS.includes(tier) && p.ortLostTier === tier
+      && engine.roundNumber <= (p.ortLostUntil || 0);
   },
   onSkillUsed(engine, p, tier) {
     if (!bossOf(engine) || isOrt(p) || !TIERS.includes(tier)) return;
@@ -212,13 +216,16 @@ module.exports = {
     let erased = 0;
     for (const p of Object.values(engine.players)) {
       if (isOrt(p)) continue;
-      if (!boss) { p.ortLostTier = null; p.ortPendingLost = null; continue; }
+      if (!boss) { p.ortLostTier = null; p.ortLostUntil = 0; p.ortPendingLost = null; continue; }
+      // ครบ 2 เทิร์นแล้ว -> ข้อมูลกลับมา
+      if (p.ortLostTier && engine.roundNumber > (p.ortLostUntil || 0)) { p.ortLostTier = null; p.ortLostUntil = 0; }
       if (!p.ortPendingLost) continue;
       p.ortLostTier = p.ortPendingLost;
+      p.ortLostUntil = engine.roundNumber + LOST_TURNS - 1;
       p.ortPendingLost = null;
       if (p.alive) {
         erased++;
-        engine.log(`📡 ${TIER_NAME[p.ortLostTier]} ของ ${p.name} ข้อมูลสูญหาย — ใช้ไม่ได้ในเทิร์นนี้`);
+        engine.log(`📡 ${TIER_NAME[p.ortLostTier]} ของ ${p.name} ข้อมูลสูญหาย — ใช้ไม่ได้ ${LOST_TURNS} เทิร์น`);
       }
     }
     if (erased) engine.ortFx("lost");
@@ -260,6 +267,8 @@ module.exports = {
           engine.resolveDamageAftermath(t);
         });
         fired++;
+        // ป้ายเด้งบนกระดานทุกครั้งที่สวน — สวนหลายคนติดกันจะได้เห็นครบทุกคน (ท่าบนตัวบอสเล่นทับกันจนดูเหมือนครั้งเดียว)
+        engine.skillFlash({ name: `สวนกลับ ${t.name} -${dmg}${crit ? " คริติคอล" : ""}`, img: IMG.base, by: boss.name, color: engine.colorOf(boss) });
         engine.log(`⚡ ${boss.name} สวนกลับ ${t.name} -${dmg}${crit ? " (คริติคอล)" : ""}${t.alive ? "" : " — ตกรอบ!"}`);
       }
     } finally { flushing = false; }
@@ -269,8 +278,11 @@ module.exports = {
 
   // ---------- สกิลติดตัว 3: การวิวัฒนาการ ----------
   // เรียกจาก instantDeath() หลังผู้เล่นตายจริง — ตัดสินผู้สังหารจาก effectSourceId
+  //  ผู้เล่นที่ ORT ตีจนเลือดหมดส่วนใหญ่ "ตาย" ตอนกวาดท้ายเทิร์น (ไม่มี effectSourceId แล้ว) —
+  //  จึงดูผู้ทำดาเมจล่าสุดในเทิร์นเดียวกันด้วย (server.js บันทึกไว้ที่ adjustIncomingDamage)
   onKill(engine, victim) {
-    const killer = engine.players[engine.effectSourceId];
+    const lastHit = victim.lastDamageRound === engine.roundNumber ? engine.players[victim.lastDamageSourceId] : null;
+    const killer = engine.players[engine.effectSourceId] || lastHit;
     if (!isOrt(killer) || isOrt(victim) || !killer.alive) return;
     killer.ortKills = (killer.ortKills || 0) + 1;
     killer.ortBars = (killer.ortBars || 1) + 1;
@@ -278,6 +290,12 @@ module.exports = {
     if (atkUp) killer.ortAtk = (killer.ortAtk || ATK_BASE) + 1;
     engine.log(`🧬 ${killer.name} วิวัฒนาการ — หลอดเลือด +1 (รวม ${killer.ortBars})${atkUp ? ` · พลังโจมตี +1 (รวม ${killer.ortAtk})` : " · พลังโจมตีเต็มแล้ว"}`);
     engine.ortFx("evolve");
+  },
+
+  // เทิร์นที่เหลือของช่องที่ถูกลบ (0 = ไม่มี) — ส่งให้เจ้าของคนเดียว
+  lostTurnsLeft(engine, p) {
+    if (!this.skillErased(engine, p, p.ortLostTier)) return 0;
+    return (p.ortLostUntil || 0) - engine.roundNumber + 1;
   },
 
   // ข้อมูลที่ client ใช้วาดบอส (ส่งทุกคนเหมือนกัน)

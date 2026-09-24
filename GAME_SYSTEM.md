@@ -445,6 +445,18 @@ qtePending() / sweepQte()                กันสรุปรอบ + กว
 - ท่าไม้ตายมี 6 แบบผ่าน `dynamicSkillFor` (`ultimate_<idol>` × 5 + `ultimate2`) — สลับ **ทั้งที่ `useSkill`
   และ `buildStateFor`** เหมือนไบรอัน · ช่องแรกสลับ `basic`↔`basic2` ตามว่าไอดอลล้มหรือยัง
 
+**อุซากิ (เอาฮา · unique)** — `characters/usagi.js`
+- สกิลพื้นฐาน (กินไอเทมในกระเป๋า) กดได้ 2 ครั้ง/เทิร์น และ **ไม่กินโควตาสกิลของเทิร์น** (`isUsagiBasic` ในสองบรรทัดโควตาของ `useSkill`)
+  · client เปิด `UsagiItemModal` แล้วส่ง uid ของไอเทมมาทาง `item`
+- สกิลรองเป็น 2 จังหวะ: `useSkill` จ่ายแต้ม + ตั้ง `p.usagiSwapOffer` (แต้มเป้าหมายส่งให้เจ้าตัวคนเดียวใน `buildStateFor`)
+  → socket `usagiSwapAnswer` เอา = `pausePlayingForCutscene` (วีดีโอก่อน) แล้วสลับ `cards` ทั้งมือ · ไม่ตอบก่อนเปิดไพ่ = ไม่เอา
+- ท่าไม้ตาย = **ระบบโจทย์คณิต** ยืมแนวคิด QTE: เก็บเส้นตายเป็น ms ที่ `p.usagiQuiz` ของผู้ถูกทำโจทย์ ไม่มี setTimeout ฝั่ง server
+  · แจกที่ `onRoundStartAfterLoop` · `usagiMath` (NO_TICK) = เทิร์นที่เหลือ ลดเองตอนแจก · **นาฬิกาหยุดเมื่อไม่ได้อยู่เฟส PLAYING**
+    (`syncPause` ที่หัว `broadcastState`) · client ได้ `leftMs` ไม่ใช่เวลาเครื่อง server · ไม่ส่งเฉลย · ค้างอยู่ = `pendingAnswer` ของ
+    `checkAllLocked` และ `resolveRound` กวาดข้อที่เหลือเป็นผิด · ข้ามเพื่อนร่วมทีม (`sameTeam`) และ ORT
+- สกิลติดตัว ปรุๆ: `onAttack` ก่อนด่านหลบใน `doAttack` (นับแม้โดนหลบ) · คริติคอลคูณยอดสุทธิถัดจากของ ORT · ATK +1 ผ่าน `damageBonus`
+- เทสต์: [tests/characters/usagi.test.js](tests/characters/usagi.test.js)
+
 **คูลดาวน์ท่าไม้ตายที่วัดเป็น "เลขรอบ" (ชิโด · เอจิ)** — คูลดาวน์ที่กินเวลาข้ามเทิร์นห้ามเก็บเป็นตัวนับใน
 `p.statuses` ถ้าไม่อยากให้มันไปโผล่ในรายการสถานะให้ทุกคนเห็น จึงเก็บเป็น **เลขรอบที่ล็อกถึง**
 (`p.shidoRewindLock` / `p.eijiUltLock`) แล้วเทียบกับ `engine.roundNumber` — ไม่ต้องมีใครลดเทิร์นให้
@@ -638,6 +650,8 @@ qtePending() / sweepQte()                กันสรุปรอบ + กว
 ### 11.1 โหมด Type Mercury (Raid Boss ORT)
 
 - `gameMode = "mercury"` · เล่นได้ 1-7 คน (`validGameMode`) · ห้องรอคนเดียวกดพร้อมก็เข้าหน้าเลือกรูปแบบสนามได้
+- **ปิดในโหมดนี้**: ยูนะทั้งหมด (สุ่มเอฟเฟกต์สนาม `rollWindow` + เพลง Longing ชุบคนตายคนแรก) และ Overload Force
+  (กันที่จุดทอยใน `resolveRound` และหัว `triggerOverloadForce()`) — ท่าไม้ตายของเอจิที่บังคับเปิดสนามยูนะยังใช้ได้ตามปกติ
 - หน้าโหวตแบ่ง 2 ชั้นด้วย `group` ใน `modeOptionsFor()`: `normal` (ffa/duo/trio) · `special` (seraph/mercury)
   โหมดใน `SUSPENDED_MODES` ยังโผล่เป็นปุ่มเทา (`suspended: true`) และ `voteGameMode` ปฏิเสธ
 - **ORT = ผู้เล่นปลอม id `ORT_ID` ("__ort__") ที่นั่ง 8** สร้างใน `startMatch()` ผ่าน `createOrt()` ซึ่งใช้
@@ -650,7 +664,8 @@ qtePending() / sweepQte()                กันสรุปรอบ + กว
 - **หลอดเลือด** = `p.ortBars` · ดักที่หัว `instantDeath()` จุดเดียว → ครอบทั้งเลือดหมดและสกิลสังหารทันที
 - **ต้านการสังหาร 40%** ดักที่ `miyakoKillChance()` (เนตรทุกตัวผ่านจุดนี้) + เทเปาที่ไม่ผ่านจุดนั้นเรียก `ort.killChanceAgainst` เอง
 - **ข้อมูลสูญหาย (สกิลติดตัว 1)**: `p.ortPendingLost` (สกิลแรกของเทิร์นนี้ จองที่จุดหักแต้มใน `useSkillCore`) →
-  `dealRound` แปลงเป็น `p.ortLostTier` · ส่งให้เจ้าของคนเดียวใน `buildStateFor` · client ปิดปุ่มผ่าน context ใน `SkillSlot`
+  `dealRound` แปลงเป็น `p.ortLostTier` อยู่ 2 เทิร์น (`p.ortLostUntil` = เลขรอบสุดท้าย) · ส่งให้เจ้าของคนเดียวใน `buildStateFor`
+  (`ortLostTier` + `ortLostTurns`) · client ปิดปุ่มผ่าน context ใน `SkillSlot`
 - **สวนกลับ (สกิลติดตัว 2)**: จองใน `ort.queueCounter` จาก 3 ทาง (ดาเมจที่ไม่ใช่โจมตีปกติผ่าน `adjustIncomingDamage` /
   เป้าของ `useSkill` / ปืนใน `useInventoryItem`) แล้วลงดาเมจที่ `flushOrtCounters()` — ท้าย `useSkill`/`useInventoryItem`
   (ยกเว้นเข้าเฟส CUTSCENE) · หลังคลิปใน `pausePlayingForCutscene` · `goSummary` · `endTurn` · ธง `flushing` กันสวนกันไปมา
@@ -660,10 +675,18 @@ qtePending() / sweepQte()                กันสรุปรอบ + กว
 - **ผลของ Raid** (`mercuryAdvance` ใน callback ของ `endTurn`): ORT ตาย = ชนะ · ไม่มีใครในสนามและเลือกตัวไม่ได้แล้ว = แพ้ ·
   ตายหมดแต่ยังเลือกได้ = `mercuryHold` (เกมหยุด เวลาไม่เดิน จน `mercuryPick` สั่งเดินต่อ) · โหวตยอมแพ้ = `mercurySurrenderVote`
   (เกินครึ่งห้องจบทันที / หมดเวลา `MERCURY_SURRENDER_SECONDS` นับเฉพาะคนที่กด เสมอ = สู้ต่อ)
-- `sameTeam()` คืน true ระหว่างผู้เล่นจริงทุกคนในโหมดนี้ (ตีกันเอง/เอฟเฟกต์ลบใส่กันไม่ได้) · เพื่อนร่วมทีมเห็นแต้มกันตลอด (`teamReveal`)
+- `sameTeam()` คืน true ระหว่างผู้เล่นจริงทุกคนในโหมดนี้ (ตีกันเอง/ผลหมู่ลงเพื่อนไม่ได้) · **ยกเว้นเป้าที่ผู้เล่นกดเลือกเอง**
+  ในสกิล/ไอเทมที่กำลังทำงาน (`withExplicitTargets` ห่อ `useSkill`/`useInventoryItem` และส่งต่อไปถึงผลหลังวีดีโอใน
+  `pausePlayingForCutscene`) — มอบบัฟ/รับศิษย์ให้เพื่อนจึงเกิดผลจริง · เพื่อนร่วมทีมเห็นแต้มกันตลอด (`teamReveal`)
+- **วิวัฒนาการนับการสังหารจาก "ผู้ทำดาเมจล่าสุดในเทิร์นเดียวกัน"** (`p.lastDamageSourceId`/`lastDamageRound` บันทึกที่
+  `adjustIncomingDamage`) — ผู้เล่นที่ ORT ตีจนเลือดหมดไม่ตายใน `doAttack` แต่ตายตอนกวาดท้าย `endTurn` ซึ่งไม่มี `effectSourceId` แล้ว
 - ฉากเปิดตัว: server พักเฟส CUTSCENE (ไม่มีคลิป) `MERCURY_ARRIVAL_SECONDS` (env ย่อได้ในเทสต์) · client เล่น `OrtArrival`
   แทน `GameIntro` · อนิเมชันบนตัวบอสยิงผ่าน event `ortFx` (ไม่หยุดเกม) → `OrtBossPanel` เรียก `ortStage.play(kind)`
-- เทสต์: [tests/characters/ort.test.js](tests/characters/ort.test.js) · [tests/mercury.integration.test.js](tests/mercury.integration.test.js)
+- **โหมดปกติ (ffa/duo/trio): ORT บุกเข้าสนามก่อนเทิร์น `ORT_NORMAL_ROUND` (60)** ผ่าน `maybeOrtInvades()` ท้าย `endTurn` — 3 หลอด
+  พักเกมรอฉากเปิดตัวเหมือน Raid (`ortArrivalActive` + `state.ortArrival` บอก client ว่าเล่นฉากหรือไม่) · นั่งกลางด้านบน (`ORT_SEAT`)
+  · ORT เป็น **ระบบกำจัดผู้เล่น ไม่ใช่ผู้ชิงชัย**: `normalGameOver()` นับเฉพาะผู้เล่นจริง (เหลือคนเดียว/ทีมเดียว = ชนะ ·
+  ตายหมด = เสมอ) และ `checkOrtEarlyWin()` จบเกมทันทีเมื่อมีคนตายกลางเฟสจั่วจนเหลือคนเดียว (ท้าย hit/useSkill/useInventoryItem/หลังคลิป)
+- เทสต์: [tests/characters/ort.test.js](tests/characters/ort.test.js) · [tests/mercury.integration.test.js](tests/mercury.integration.test.js) · [tests/ort-invasion.test.js](tests/ort-invasion.test.js)
 
 
 ## 12. โหมดทีม
