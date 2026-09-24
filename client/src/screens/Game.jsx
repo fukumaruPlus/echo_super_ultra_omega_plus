@@ -1,11 +1,13 @@
 import { GUTS_AMMO_INFO, shopInfoOf } from "../data/shop";
 import { useTick, TickSeconds } from "../tickStore";
 import { PERMANENT_STATUS_KEYS } from "../data/permanentStatus";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Card from "../components/Card";
 import Button from "../components/Button";
 import VictoryScreen from "../components/VictoryScreen";
+import OrtBossPanel from "../raid/OrtBossPanel";
+import { RaidRespawn, RaidSurrender, RaidDeckDrawer } from "../raid/RaidOverlays";
 import ArenaBackdrop from "../components/ArenaBackdrop";
 import { RoundBanner, CycleScene } from "../components/BattleScenes";
 import { AvModal, AvButton } from "../components/avalon";
@@ -911,6 +913,15 @@ const SLOTS = {
   //  และ top 4% ทำให้ปลายล่างของการ์ดยังอยู่เหนือกองการ์ดที่เริ่มต้นที่ 40% อีกชั้นหนึ่ง
   6: [[7, 15], [4, 38], [4, 62], [7, 85], [50, 12], [50, 88]],
 };
+
+// Type Mercury: เพื่อนร่วมทีมเรียงแถวเดียวกลางจอ ใต้ตัว ORT (ฝั่งเดียวกับเรา) — [top%, left%, scale]
+//  ย่อการ์ดตามจำนวนคนให้ 6 ใบวางพอในความกว้างออกแบบขั้นต่ำ 900px (การ์ดเต็มกว้าง 236px)
+function raidSlots(n) {
+  if (!n) return [];
+  const scale = n <= 2 ? 0.8 : n <= 4 ? 0.68 : 0.58;
+  const span = Math.min(80, (n - 1) * (26 * scale + 2)); // ระยะจากกึ่งกลางการ์ดใบแรกถึงใบสุดท้าย
+  return Array.from({ length: n }, (_, i) => [45, n === 1 ? 50 : 50 - span / 2 + (span * i) / (n - 1), scale]);
+}
 
 // เอฟเฟครอบการ์ด: Beat Mode = สายฟ้าเขียว (ถาวร) / สวมเกราะราชัน = โกลว์แดง
 function auraClass(p) {
@@ -2207,14 +2218,17 @@ function PlaqueRule() {
 //  คลิกตอนไม่ได้เลือกเป้า = เปิดหน้าต่างดูสถานะของคนนั้น (onInspect)
 // การ์ดแนวนอน: รูปซ้าย · ชื่อ/เลือด/เกราะ/แต้มสกิลเรียงเป็นแถวทางขวา · สถานะเป็นแถบล่างในกล่องเดียวกัน
 //  แบบแนวตั้งที่เกจขนาบสองข้างอ่านยาก (ต้องเทียบสีเอาเองว่าเสาไหนคือเลือด) — แถวมีไอคอนกับตัวเลขกำกับชัดกว่า
-function OtherPlayer({ p, phase, slot, targetable, onAttack, picked, onInspect, hostRef }) {
+// alwaysScore: Type Mercury — เพื่อนร่วมทีมเห็นแต้มการ์ดกันตลอดเวลา (server ส่ง score มาให้แล้ว)
+// slot[2] (ถ้ามี) = ย่อการ์ด — ผังที่นั่งของโหมด Raid วางเพื่อนร่วมทีมหลายคนเรียงแถวเดียว
+function OtherPlayer({ p, phase, slot, targetable, onAttack, picked, onInspect, hostRef, alwaysScore = false }) {
   const summary = phase === "SUMMARY";
   const twin = p.hisakawa;
+  const seatScale = slot[2];
   return (
     <div
       ref={hostRef}
       className={`absolute -translate-x-1/2 flex flex-col items-center gap-1.5 ${twin ? "w-52 sm:w-60" : "w-[236px]"}`}
-      style={{ top: `${slot[0]}%`, left: `${slot[1]}%` }}
+      style={{ top: `${slot[0]}%`, left: `${slot[1]}%`, ...(seatScale ? { transform: `translateX(-50%) scale(${seatScale})`, transformOrigin: "top center" } : null) }}
     >
       <div
         onClick={targetable ? () => { clickSound(); onAttack(p.id); } : () => { clickSound(); onInspect(p.id); }}
@@ -2278,7 +2292,7 @@ function OtherPlayer({ p, phase, slot, targetable, onAttack, picked, onInspect, 
       {!twin && <ConnorStressBar p={p} />}
       {/* ใบโปรโมทสินค้า (Apple guy): แต้มการ์ดถูกเปิดเผยให้ทุกคนเห็นแม้ยังไม่เปิดไพ่ */}
       {/* connorScanned: คอนเนอร์กด "วิเคราะห์สถานการณ์" -> เห็นแต้มของคนนี้ตั้งแต่ยังไม่เปิดไพ่ (เห็นคนเดียว) */}
-      {(summary || (p.statuses?.promo || 0) > 0 || p.connorScanned) && p.score !== null && (
+      {(summary || alwaysScore || (p.statuses?.promo || 0) > 0 || p.connorScanned) && p.score !== null && p.score !== undefined && (
         <div className={`score-pop text-2xl font-black ${p.isWinner ? "text-echo-gold" : p.busted ? "text-echo-hp" : p.connorScanned && !summary ? "text-echo-cyan" : "text-white"}`}>
           {p.busted ? "แตก!" : `${p.score} แต้ม`}{p.connorScanned && !summary ? " 🧠" : ""}
         </div>
@@ -2289,7 +2303,7 @@ function OtherPlayer({ p, phase, slot, targetable, onAttack, picked, onInspect, 
 
 // ---------- การ์ดคู่ต่อสู้แบบมือถือ (เรียงกริดด้านบน แตะเพื่อโจมตี/เลือกเป้า ANATA) ----------
 //  แตะตอนไม่ได้เลือกเป้า = เปิดหน้าต่างดูสถานะของคนนั้น (onInspect)
-function MobileOpponent({ p, phase, targetable, onAttack, picked, onInspect, hostRef }) {
+function MobileOpponent({ p, phase, targetable, onAttack, picked, onInspect, hostRef, alwaysScore = false }) {
   const summary = phase === "SUMMARY";
   return (
     <div
@@ -2324,7 +2338,7 @@ function MobileOpponent({ p, phase, targetable, onAttack, picked, onInspect, hos
         </span>
       )}
       {/* ใบโปรโมทสินค้า (Apple guy): แต้มการ์ดถูกเปิดเผยให้ทุกคนเห็นแม้ยังไม่เปิดไพ่ */}
-      {(summary || (p.statuses?.promo || 0) > 0 || p.connorScanned) && p.score !== null && (
+      {(summary || alwaysScore || (p.statuses?.promo || 0) > 0 || p.connorScanned) && p.score !== null && p.score !== undefined && (
         <div className={`score-pop shrink-0 text-xl font-black ${p.isWinner ? "text-echo-gold" : p.busted ? "text-echo-hp" : p.connorScanned && !summary ? "text-echo-cyan" : "text-white"}`}>
           {p.busted ? "แตก!" : p.score}{p.connorScanned && !summary ? " 🧠" : ""}
         </div>
@@ -2959,8 +2973,13 @@ function ContractRenewModal({ ask, points, onAnswer }) {
 // ช่องสกิลเป็นรูป (คลิกใช้ระหว่างเฟสไพ่) — cost = แต้มที่ใช้จริง (เวลาทองแกมเบลอร์ลดครึ่ง)
 //  เฟรมตัดมุมเฉียง + แถบสีบอกระดับสกิล (พื้นฐาน/รอง/ท่าไม้ตาย) แทนกรอบมนธรรมดา
 const SKILL_TIER_ACCENT = { basic: "var(--color-echo-cyan)", secondary: "var(--color-p-accent-bright)", ultimate: "var(--color-echo-gold)" };
-function SkillSlot({ label, tier, skill, points, disabled, onUse, ammo, cost, size, cooldown }) {
+// ORT สกิลติดตัว 1 (โหมด Type Mercury): ช่องสกิลของเราที่ "ข้อมูลสูญหาย" เทิร์นนี้ — ส่งผ่าน context
+//  แทนการไล่เติม prop ให้ทุกจุดที่วาง SkillSlot (server กันการกดอยู่แล้ว ฝั่งนี้แค่ปิดปุ่ม + ขึ้นป้าย)
+const OrtLostTierContext = createContext(null);
+function SkillSlot({ label, tier, skill, points, disabled: disabledProp, onUse, ammo, cost, size, cooldown }) {
   const [broken, setBroken] = useState(false);
+  const dataLost = useContext(OrtLostTierContext) === tier;
+  const disabled = disabledProp || dataLost;
   const hasAmmo = skill && skill.ammo != null;
   const ammoLeft = hasAmmo ? (ammo ?? skill.ammo) : null;
   const outOfAmmo = hasAmmo && ammoLeft <= 0;
@@ -2999,6 +3018,14 @@ function SkillSlot({ label, tier, skill, points, disabled, onUse, ammo, cost, si
           <span className="absolute inset-0 z-20 grid place-items-center bg-black/60">
             <span className="text-3xl sm:text-4xl font-black text-white leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,.9)]" style={{ fontFamily: P_DISPLAY }}>
               {cooldown}
+            </span>
+          </span>
+        )}
+        {dataLost && (
+          <span className="absolute inset-0 z-20 grid place-items-center text-center bg-black/70 leading-tight" style={{ fontFamily: P_DISPLAY }}>
+            <span>
+              <span className="block text-sm font-black text-[#ff8fab]">DATA LOST</span>
+              <span className="block text-xs font-bold text-white">ข้อมูลสูญหาย</span>
             </span>
           </span>
         )}
@@ -3584,7 +3611,16 @@ function FlyingCardsLayer({ flights, onDone }) {
   );
 }
 
-export default function Game({ state, lowQ, skillConfirmOn = true, muteScenes = false }) {
+// ห่อกระดานด้วย context ของ ORT (ช่องสกิลที่ "ข้อมูลสูญหาย") — ใช้ได้ทั้งแผงจอคอมและมือถือ
+export default function Game(props) {
+  const me = props.state?.players?.find((p) => p.id === props.state.youId);
+  return (
+    <OrtLostTierContext.Provider value={me?.ortLostTier || null}>
+      <GameBoard {...props} />
+    </OrtLostTierContext.Provider>
+  );
+}
+function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, roster = [] }) {
   const [skillOpen, setSkillOpen] = useState(false);
   const [showChar, setShowChar] = useState(false);
   const [flash, setFlash] = useState(null); // สกิลช่วงจั่วการ์ด เด้งทันทีบนกระดาน
@@ -3670,7 +3706,12 @@ export default function Game({ state, lowQ, skillConfirmOn = true, muteScenes = 
   }, [scene, sceneBlocked]);
   const me = state.players.find((p) => p.id === state.youId);
   const others = state.players.filter((p) => p.id !== state.youId);
-  const slots = SLOTS[Math.min(others.length, 6)] || [];
+  // Type Mercury: ORT เป็นบอสตัวใหญ่แยกจากที่นั่ง — ที่นั่งเหลือแค่เพื่อนร่วมทีม (อยู่ฝั่งเดียวกับเรา)
+  //  others ยังรวม ORT ไว้เพื่อให้ระบบเลือกเป้าหมาย (ANATA ฯลฯ) นับ ORT เป็นเป้าได้ตามปกติ
+  const raid = !!state.mercury;
+  const boss = raid ? state.players.find((p) => p.isBoss) : null;
+  const seatOthers = raid ? others.filter((p) => !p.isBoss) : others;
+  const slots = raid ? raidSlots(seatOthers.length) : (SLOTS[Math.min(others.length, 6)] || []);
   const iAmAttacker = phase === "ATTACK" && state.attackerId === state.youId;
   const attacker = state.players.find((p) => p.id === state.attackerId);
   const rankedTiers = rankTiers(state.players);
@@ -4487,10 +4528,26 @@ export default function Game({ state, lowQ, skillConfirmOn = true, muteScenes = 
           )}
         </div>
 
+        {/* Type Mercury: ORT อยู่บนสุด เต็มความกว้าง */}
+        {boss && (
+          <div className="shrink-0 px-2 pt-1" style={{ height: "30vh" }}>
+            <OrtBossPanel
+              compact
+              boss={boss}
+              phase={phase}
+              lowQ={lowQ}
+              targetable={isTargetable(boss, iAmAttacker, targetChain)}
+              onAttack={(id) => resolveAttackPick(id, targetChain)}
+              onInspect={setStatusViewId}
+              hostRef={(el) => registerOther(boss.id, el)}
+            />
+          </div>
+        )}
         {/* คู่ต่อสู้: การ์ดกริด (แตะการ์ดเพื่อโจมตีตอนเป็นผู้ชนะ) */}
-        <div className={`shrink-0 max-h-[36vh] overflow-y-auto grid gap-2 px-2 pt-2 ${others.length <= 1 ? "grid-cols-1 max-w-sm w-full mx-auto" : "grid-cols-2"}`}>
-          {others.map((p) => (
+        <div className={`shrink-0 max-h-[36vh] overflow-y-auto grid gap-2 px-2 pt-2 ${seatOthers.length <= 1 ? "grid-cols-1 max-w-sm w-full mx-auto" : "grid-cols-2"}`}>
+          {seatOthers.map((p) => (
             <MobileOpponent
+              alwaysScore={raid}
               key={p.id}
               p={p}
               phase={phase}
@@ -4952,14 +5009,21 @@ export default function Game({ state, lowQ, skillConfirmOn = true, muteScenes = 
         style={{ width: DESIGN_W, height: designH, transform: `scale(${scale})`, transformOrigin: "top left" }}
       >
       {/* กองการ์ดกลาง ทับตำแหน่งโลโก้กลางโต๊ะเดิม (โลโก้เป็นแค่วอเตอร์มาร์กจางๆ ด้านหลัง) — ใหญ่ขึ้นชัดเจน */}
-      <div className="absolute inset-x-0 top-[40%] flex justify-center pointer-events-none">
-        <div className="bd-deck relative grid place-items-center">
-          <img src="/image/logo_current.webp" alt="" className="relative h-16 sm:h-20 w-auto opacity-20" />
-          <div className="absolute inset-0 grid place-items-center">
-            <DeckPile hostRef={deckRef} size="lg" onClick={() => setDeckOpen(true)} />
+      {raid ? (
+        // Type Mercury: กองกลางย้ายเป็นลิ้นชักทางขวา (เปิด/ปิดได้) — เว้นกลางจอไว้ให้ ORT
+        <RaidDeckDrawer>
+          <DeckPile hostRef={deckRef} size="lg" onClick={() => setDeckOpen(true)} />
+        </RaidDeckDrawer>
+      ) : (
+        <div className="absolute inset-x-0 top-[40%] flex justify-center pointer-events-none">
+          <div className="bd-deck relative grid place-items-center">
+            <img src="/image/logo_current.webp" alt="" className="relative h-16 sm:h-20 w-auto opacity-20" />
+            <div className="absolute inset-0 grid place-items-center">
+              <DeckPile hostRef={deckRef} size="lg" onClick={() => setDeckOpen(true)} />
+            </div>
           </div>
         </div>
-      </div>
+      )}
       {deckOpen && <DeckLedgerModal ledger={state.deckLedger || []} onClose={() => setDeckOpen(false)} />}
 
       {/* QTE (ยุย) — ลอยกลางจอ ไม่บังกองการ์ด */}
@@ -4974,6 +5038,131 @@ export default function Game({ state, lowQ, skillConfirmOn = true, muteScenes = 
             <div className="av-title leading-none" style={{ fontSize: "2rem" }}>{state.roundNumber}</div>
           </div>
           <BoardTimer phaseKey={`${phase}-${state.roundNumber}`} />
+        </div>
+      )}
+      {/* Type Mercury: ORT ตัวใหญ่ฝั่งตรงข้ามผู้เล่นทุกคน (บนกลางจอ) */}
+      {boss && (
+        <div className="absolute z-10" style={{ top: "2%", left: "50%", transform: "translateX(-50%)", width: "48%", height: "40%" }}>
+          <OrtBossPanel
+            boss={boss}
+            phase={phase}
+            lowQ={lowQ}
+            targetable={isTargetable(boss, iAmAttacker, targetChain)}
+            onAttack={(id) => resolveAttackPick(id, targetChain)}
+            onInspect={setStatusViewId}
+            hostRef={(el) => registerOther(boss.id, el)}
+            statusNode={<StatusChips p={boss} left compact max={6} />}
+          />
+        </div>
+      )}
+      {raid && <RaidSurrender state={state} me={me} />}
+
+      {/* ผู้เล่นคนอื่น (โหมด Raid: เพื่อนร่วมทีมเรียงแถวใต้ ORT และเห็นแต้มกันตลอด) */}
+      {seatOthers.map((p, i) => (
+        <OtherPlayer
+          alwaysScore={raid}
+          key={p.id}
+          p={p}
+          phase={phase}
+          slot={slots[i] || [50, 50]}
+          targetable={isTargetable(p, iAmAttacker, targetChain)}
+          picked={!!anataSel && anataSel.includes(p.id)}
+          onAttack={(id) => resolveAttackPick(id, targetChain)}
+          onInspect={setStatusViewId}
+          hostRef={(el) => registerOther(p.id, el)}
+        />
+      ))}
+
+      {/* โหมดเลือกเป้าหมาย ANATA WAAAAAAAA (เทมาริ) */}
+      {anataSel && (
+        <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-40 text-center text-hard">
+          <span className="text-xl font-black text-echo-gold animate-pulse bg-black/60 rounded-full px-5 py-1.5">🎤 คลิกเลือกเป้าหมาย ANATA ({anataSel.length}/{anataNeed})</span>
+          <button onClick={() => { clickSound(); setAnataSel(null); }} className="ml-3 text-sm font-bold bg-black/60 rounded-full px-3 py-1 border border-white/30">ยกเลิก</button>
+        </div>
+      )}
+
+
+      {/* โหมดเลือกเป้าหมาย Absorb shield (บานาจ ลิงก์ patch 2.1.2) — เลือกตัวเองได้ */}
+      {bgSel && (
+        <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-40 text-center text-hard whitespace-nowrap">
+          <span className="text-xl font-black text-echo-gold animate-pulse bg-black/60 rounded-full px-5 py-1.5">🛡️ คลิกเลือกเป้าหมาย Absorb shield</span>
+          <button onClick={() => { clickSound(); pickBg(me.id); }} className="ml-3 text-sm font-bold bg-echo-gold text-gray-900 rounded-full px-3 py-1">เลือกตัวเอง</button>
+          <button onClick={() => { clickSound(); setBgSel(false); }} className="ml-2 text-sm font-bold bg-black/60 rounded-full px-3 py-1 border border-white/30">ยกเลิก</button>
+        </div>
+      )}
+
+
+      {/* โหมดเลือกเป้าหมายเอาไปสิ (Apple guy) — มอบของที่เลือกไว้ให้คนอื่น */}
+      {appleSel && (
+        <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-40 text-center text-hard whitespace-nowrap">
+          <span className="text-xl font-black text-echo-gold animate-pulse bg-black/60 rounded-full px-5 py-1.5">🎁 คลิกเลือกเป้าหมายเอาไปสิ — มอบ{APPLE_ITEM_NAME[me?.appleItem] || "ของ"}</span>
+          <button onClick={() => { clickSound(); setAppleSel(false); }} className="ml-2 text-sm font-bold bg-black/60 rounded-full px-3 py-1 border border-white/30">ยกเลิก</button>
+        </div>
+      )}
+
+      {/* โหมดเลือกเป้าหมายยื่นข้อเสนอสัญญา (เจ้าแห่งเน็ตบ้าน) — เลือกได้เฉพาะคนอื่น */}
+      {bbSel && (
+        <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-40 text-center text-hard whitespace-nowrap">
+          <span className="text-xl font-black text-echo-cyan animate-pulse bg-black/60 rounded-full px-5 py-1.5">📶 คลิกเลือกเป้าหมายยื่นข้อเสนอสัญญา</span>
+          <button onClick={() => { clickSound(); setBbSel(false); }} className="ml-2 text-sm font-bold bg-black/60 rounded-full px-3 py-1 border border-white/30">ยกเลิก</button>
+        </div>
+      )}
+
+      {/* โหมดเลือกเป้าหมายแสงจันทร์ส่องวิญญาณ (ชเรด เอลัน) — เลือกได้เฉพาะคนอื่น */}
+      {shSel && (
+        <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-40 text-center text-hard whitespace-nowrap">
+          <span className="text-xl font-black text-echo-cyan animate-pulse bg-black/60 rounded-full px-5 py-1.5">🌕 คลิกเลือกเป้าหมายแสงจันทร์ส่องวิญญาณ</span>
+          <button onClick={() => { clickSound(); setShSel(false); }} className="ml-2 text-sm font-bold bg-black/60 rounded-full px-3 py-1 border border-white/30">ยกเลิก</button>
+        </div>
+      )}
+
+      {/* โหมดเลือกเป้าหมาย นายมีฝีมือแค่ไหนหรอ? (ชิกิ) — เลือกได้เฉพาะคนอื่น */}
+      {skSel && (
+        <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-40 text-center text-hard whitespace-nowrap">
+          <span className="text-xl font-black text-echo-hp animate-pulse bg-black/60 rounded-full px-5 py-1.5">🔪 คลิกเลือกเป้าหมาย นายมีฝีมือแค่ไหนหรอ?</span>
+          <button onClick={() => { clickSound(); setSkSel(false); }} className="ml-2 text-sm font-bold bg-black/60 rounded-full px-3 py-1 border border-white/30">ยกเลิก</button>
+        </div>
+      )}
+
+      {/* โหมดเลือกเป้าหมาย อย่าทำอะไรไม่เข้าท่าเลย (เจ้าหญิงราก) — เลือกได้เฉพาะคนอื่น */}
+      {psSealSel && (
+        <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-40 text-center text-hard whitespace-nowrap">
+          <span className="text-xl font-black text-echo-hp animate-pulse bg-black/60 rounded-full px-5 py-1.5">🗡️ คลิกเลือกเป้าหมาย อย่าทำอะไรไม่เข้าท่าเลย</span>
+          <button onClick={() => { clickSound(); setPsSealSel(false); }} className="ml-2 text-sm font-bold bg-black/60 rounded-full px-3 py-1 border border-white/30">ยกเลิก</button>
+        </div>
+      )}
+
+      {/* โหมดเลือกเป้าหมายกระสุนปืนหน่วย GUTS Select — เลือกได้เฉพาะคนอื่น */}
+      {gunSel && (
+        <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-40 text-center text-hard whitespace-nowrap">
+          <span className="text-xl font-black text-echo-hp animate-pulse bg-black/60 rounded-full px-5 py-1.5">🔫 คลิกเลือกเป้าหมาย {shopInfoOf(gunSel).label(gunSel)}</span>
+          <button onClick={() => { clickSound(); setGunSel(null); }} className="ml-2 text-sm font-bold bg-black/60 rounded-full px-3 py-1 border border-white/30">ยกเลิก</button>
+        </div>
+      )}
+
+      {/* โหมดเลือกเป้าหมาย นายเป็นคนทำตัวเองนะ (เทเปา) — เลือกได้เฉพาะคนอื่น */}
+      {tpSel && (
+        <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-40 text-center text-hard whitespace-nowrap">
+          <span className="text-xl font-black text-echo-hp animate-pulse bg-black/60 rounded-full px-5 py-1.5">💀 คลิกเลือกเป้าหมาย นายเป็นคนทำตัวเองนะ</span>
+          <button onClick={() => { clickSound(); setTpSel(false); }} className="ml-2 text-sm font-bold bg-black/60 rounded-full px-3 py-1 border border-white/30">ยกเลิก</button>
+        </div>
+      )}
+
+      {/* โหมดเลือกเป้าหมาย Do Do Do, De Da Da Da (ซาโตรุ) — เลือกได้เฉพาะคนอื่น */}
+      {saObSel && (
+        <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-40 text-center text-hard whitespace-nowrap">
+          <span className="text-xl font-black text-echo-hp animate-pulse bg-black/60 rounded-full px-5 py-1.5">🎵 คลิกเลือกเป้าหมาย Do Do Do, De Da Da Da</span>
+          <button onClick={() => { clickSound(); setSaObSel(false); }} className="ml-2 text-sm font-bold bg-black/60 rounded-full px-3 py-1 border border-white/30">ยกเลิก</button>
+        </div>
+      )}
+
+      {/* โหมดเลือกเป้าหมายบทเพลง (Bard) — บทเพลงประพันธ์เสร็จแล้ว รอเป้าหมาย (ไม่เลือก = สุ่มตอนเปิดไพ่) */}
+      {bardPending && (
+        <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-40 text-center text-hard whitespace-nowrap">
+          <span className="text-xl font-black text-echo-gold animate-pulse bg-black/60 rounded-full px-5 py-1.5">🎼 คลิกเลือกเป้าหมาย {bardPending.name} ({bardSel.length}/{bardNeed})</span>
+          {bardPending.allowSelf && (
+            <button onClick={() => { clickSound(); pickBard(me.id); }} className="ml-3 text-sm font-bold bg-echo-gold text-gray-900 rounded-full px-3 py-1">เลือกตัวเอง</button>
+          )}
         </div>
       )}
 
@@ -5315,6 +5504,9 @@ export default function Game({ state, lowQ, skillConfirmOn = true, muteScenes = 
       {phase === "GAMEOVER" && (
         <VictoryScreen state={state} onBackToLobby={() => socket.emit("backToLobby")} />
       )}
+
+      {/* Type Mercury: ตายแล้วเลือกตัวใหม่ (หน้าเลือกตัวละครทั้งหน้า ซ่อนเพื่อดูสนามได้) */}
+      {raid && <RaidRespawn state={state} me={me} roster={roster} />}
 
       {/* ---------- modal รายละเอียดตัวละคร / ดูสถานะผู้เล่น ---------- */}
       <ModalMounts

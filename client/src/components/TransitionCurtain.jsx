@@ -1,6 +1,6 @@
 import { forwardRef, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-export const SCREEN_ORDER = { splash: 0, setup: 1, character: 2, connecting: 2.5, lobby: 3, gameintro: 3.5, game: 4 };
+export const SCREEN_ORDER = { splash: 0, raidPreview: 0.5, setup: 1, character: 2, connecting: 2.5, lobby: 3, gameintro: 3.5, ortarrival: 3.5, game: 4 };
 
 const TransitionCurtain = forwardRef(function TransitionCurtain({ screenKey }, ref) {
   const [state, setState] = useState({ visible: false, mode: "sweep", phase: null, direction: "forward", playId: 0 });

@@ -174,7 +174,7 @@ function addGold(p, n) {
     p.gold = Math.max(0, Math.min(goldCapOf(p), (p.gold || 0) + n));
     return p.gold;
   }
-  if (!p || !(n > 0)) return 0;
+  if (!p || !(n > 0) || isOrt(p)) return 0; // ORT ไม่มีเหรียญ
   const cap = goldCapOf(p);
   const before = p.gold || 0;
   if (before >= cap) return 0;
@@ -366,6 +366,7 @@ function bardPerform(p, pattern, targets, live) {
 
 // เลือดจริงสูงสุดของผู้เล่น — Locacaca fruit (ซาโตรุ patch 2.0.8.2) ลด Max HP ได้ (ต่ำสุด 1)
 function maxHpOf(p) {
+  if (isOrt(p)) return CHAR_HOOKS.ort.maxHp(); // ORT: เลือดต่อ 1 หลอด (จำนวนหลอดอยู่ที่ p.ortBars)
   // SE.RA.PH: ค่าพลังเดิมของทุกตัวละครถูกละทิ้ง — ใช้ความจุที่อัปที่โบสถ์เท่านั้น (§14 ข้อ 4)
   if (Seraph.active() && p) return Seraph.maxHp(p);
   if (p && p.characterId === "escanor") {
@@ -519,6 +520,7 @@ const BARD_SONGS = {
 };
 // พลังงานสูงสุดของผู้เล่น (Bard = 9)
 function maxSkillOf(p) {
+  if (isOrt(p)) return 0; // ORT ไม่มีแต้มสกิล
   if (Seraph.active() && p) return Seraph.maxSkill(p); // SE.RA.PH: ความจุแต้มสกิลเริ่ม 4 เพิ่มได้ถึง 8 ที่โบสถ์
   return (p && p.characterId === "bard") ? BARD_MAX_SKILL : MAX_SKILL;
 }
@@ -597,6 +599,8 @@ function appleGuyDodgesKill(attacker, target) {
 }
 // นั่นพี่จ๋าหรอ? (สกิลติดตัว): ลดโอกาสถูกสังหารทันทีของอาริมะ มิยาโกะ ตามจำนวนครั้งที่เคยรอด (สะสม 40%/ครั้ง)
 function miyakoKillChance(target, baseChance) {
+  // ORT (ต้านการสังหาร): สกิลสังหารที่โอกาสต่ำกว่า 40% ใช้กับ ORT ไม่ได้เลย — ทุกเนตรเรียกผ่านจุดนี้
+  if (isOrt(target)) return CHAR_HOOKS.ort.killChanceAgainst(target, baseChance);
   if (!target || target.characterId !== "miyako") return baseChance;
   const resist = target.miyakoKillResist || 0;
   return Math.max(0, baseChance * (1 - MIYAKO_KILL_REDUCE * resist));
@@ -778,11 +782,34 @@ const TRANSFORMS = require("./characters/_transforms")({
 // ---------- สถานะเกมส่วนกลาง ----------
 let players = {};
 let gameState = "LOBBY"; // LOBBY | TEAM_MODE | TEAM_SETUP | PLAYING | CUTSCENE | SUMMARY | ATTACK | TRANSITION | GAMEOVER
-let gameMode = "ffa"; // ffa | duo | trio | seraph | pending
+let gameMode = "ffa"; // ffa | duo | trio | seraph | mercury | pending
 let teamSize = 1;
 let teamCount = 0;
 let winningTeamId = null;
 let modeVotes = {};
+
+// ---------- โหมด Type Mercury (Raid Boss ORT) ----------
+//  ผู้เล่นจริงทุกคนเป็นทีมเดียวกันสู้กับบอส ORT (ผู้เล่นปลอม id ORT_ID ที่นั่ง 8 — ตรรกะอยู่ characters/ort.js)
+//  ตายแล้วกลับไปเลือกตัวละครใหม่ได้ เข้าสนามต้นเทิร์นถัดไป · ตัวละครที่ตายแล้ว "ข้อมูลสูญหาย" เลือกซ้ำไม่ได้ทั้งห้อง
+const ORT_ID = "__ort__";
+const ORT_POSITION = 8;
+// ฉากเปิดตัว ORT ฝั่ง client (OrtArrival) ยาว ~13 วิ + ม่าน · เทสต์ย่อได้ผ่าน env
+const MERCURY_ARRIVAL_SECONDS = Math.max(1, Number(process.env.MERCURY_ARRIVAL_SECONDS) || 14);
+const MERCURY_SURRENDER_SECONDS = 20;
+const ORT_ATTACK_DELAY = 2; // ORT ชนะรอบ: ค้างเฟสโจมตีไว้ให้เห็นเป้าหมายก่อนลงมือ (วินาที)
+let mercuryLost = new Set();   // characterId ที่ตายไปแล้วในรอบ Raid นี้
+let mercuryResult = null;      // "win" | "lose" | "surrender" — ผลของ Raid ที่จบแล้ว
+let mercuryHold = false;       // ผู้เล่นตายหมดและยังไม่มีใครเลือกตัวใหม่ -> เกมหยุดรอ เวลาไม่เดิน
+let mercurySurrender = null;   // { votes: { [playerId]: true|false }, endsAt, timer }
+let mercuryArrivalSeq = 0;     // เพิ่มทุกครั้งที่เริ่ม Raid -> client เล่นฉากเปิดตัว ORT
+let ortFxSeq = 0;
+function mercuryActive() { return gameMode === "mercury"; }
+function isOrt(p) { return !!p && p.id === ORT_ID; }
+function ortBoss() { const p = players[ORT_ID]; return p && p.alive ? p : null; }
+function humanPlayers() { return Object.values(players).filter((p) => !isOrt(p)); }
+function aliveHumans() { return humanPlayers().filter((p) => p.alive); }
+// อนิเมชันบนตัว ORT (ไม่หยุดเกม) — client เรียก ortStage.play(kind)
+function ortFx(kind) { io.emit("ortFx", { kind, seq: ++ortFxSeq }); }
 let effectSourceId = null;
 const TEAM_IDS = ["A", "B", "C"];
 let timeLeft = 0;
@@ -955,6 +982,8 @@ function reduceCardTimer(n) {
   return timeLeft;
 }
 function sameTeam(a, b) {
+  // Type Mercury: ผู้เล่นจริงทุกคนเป็นพวกเดียวกัน (ตีกันเองไม่ได้ · เอฟเฟกต์ลบใส่กันไม่ได้) — ศัตรูมีแค่ ORT
+  if (mercuryActive()) return !!(a && b && a.id !== b.id && !isOrt(a) && !isOrt(b));
   return !!(teamModeActive() && a && b && a.id !== b.id && a.teamId && b.teamId && a.teamId === b.teamId);
 }
 function friendlyEffectBlocked(target) {
@@ -1030,17 +1059,24 @@ function validGameMode(mode, count = Object.keys(players).length) {
   if (mode === "seraph") return count >= 2; // SE.RA.PH: รับผู้เล่นทุกจำนวน (ตั้งแต่ 2 คนขึ้นไป)
   if (mode === "duo") return count >= 4 && count % 2 === 0;
   if (mode === "trio") return count === 6;
+  if (mode === "mercury") return count >= 1 && count <= MAX_PLAYERS; // Raid Boss ORT: เล่นได้ 1-7 คน
   return false;
 }
 // โหมดที่ "พักใช้งาน" — โค้ดยังอยู่ครบ แต่ไม่โผล่ในหน้าโหวตโหมด และโหวตเข้าไม่ได้
 const SUSPENDED_MODES = new Set(["seraph"]); // Moon Cell (SE.RA.PH): พักใช้งานชั่วคราว
+// group: "normal" = สงครามทั่วไป · "special" = สงครามพิเศษ (หน้าโหวตแยกเป็น 2 ชั้น)
+//  โหมดที่พักใช้งานยังโผล่ในหมวดของมัน แต่เป็นปุ่มสีเทาพร้อมป้าย "พักใช้งาน" (suspended) และโหวตไม่ได้
 function modeOptionsFor(count = Object.keys(players).length) {
   return [
-    { mode: "ffa", label: "Free For All", size: 1, enabled: validGameMode("ffa", count) },
-    { mode: "seraph", label: "Moon Cell", size: 1, enabled: validGameMode("seraph", count) },
-    { mode: "duo", label: "Duo", size: 2, enabled: validGameMode("duo", count) },
-    { mode: "trio", label: "Trio", size: 3, enabled: validGameMode("trio", count) },
-  ].filter((opt) => !SUSPENDED_MODES.has(opt.mode));
+    { mode: "ffa", label: "Free For All", size: 1, group: "normal" },
+    { mode: "duo", label: "Duo", size: 2, group: "normal" },
+    { mode: "trio", label: "Trio", size: 3, group: "normal" },
+    { mode: "seraph", label: "Moon Cell", size: 1, group: "special" },
+    { mode: "mercury", label: "Type Mercury", size: 1, group: "special" },
+  ].map((opt) => {
+    const suspended = SUSPENDED_MODES.has(opt.mode);
+    return { ...opt, suspended, enabled: !suspended && validGameMode(opt.mode, count) };
+  });
 }
 function currentTeamOptions() {
   return TEAM_IDS.slice(0, teamCount).map((id) => ({ id, label: `Team ${id}`, size: teamSize }));
@@ -1055,7 +1091,7 @@ function modeVoteSummary() {
 function voteGameMode(playerId, mode) {
   if (gameState !== "TEAM_MODE") return;
   const p = players[playerId];
-  if (!p || !validGameMode(mode)) return;
+  if (!p || SUSPENDED_MODES.has(mode) || !validGameMode(mode)) return;
   modeVotes[playerId] = mode;
   p.modeVote = mode;
   const list = Object.values(players);
@@ -1073,7 +1109,8 @@ function voteGameMode(playerId, mode) {
 function enterModeSelect() {
   if (gameState !== "LOBBY") return;
   const list = Object.values(players);
-  if (list.length < 2 || !list.every((p) => p.ready)) return;
+  // เล่นคนเดียวก็เข้าหน้าเลือกโหมดได้ (Type Mercury รองรับ 1 คน — โหมดอื่นจะเป็นปุ่มสีเทาเอง)
+  if (list.length < 1 || !list.every((p) => p.ready)) return;
   resetTeamAssignments(false);
   resetModeVotes();
   gameMode = "pending";
@@ -1087,8 +1124,9 @@ function startTeamSetup(mode) {
   const count = Object.keys(players).length;
   if (!validGameMode(mode, count)) return;
   resetModeVotes();
-  if (mode === "ffa" || mode === "seraph") {
+  if (mode === "ffa" || mode === "seraph" || mode === "mercury") {
     // SE.RA.PH เป็นโหมดเดี่ยวเหมือน ffa — ไม่ผ่านหน้าเลือกทีม
+    // Type Mercury: ทุกคนอยู่ฝั่งเดียวกันโดยอัตโนมัติ (sameTeam) — ไม่ต้องเลือกทีม
     gameMode = mode;
     teamSize = 1;
     teamCount = 0;
@@ -1314,6 +1352,7 @@ const DEBUFF_KEYS = ["discord", "sleep", "stun", "nodraw", "noskill",
   "oblada", "hburn", "phenexBanUlt", "nanayaSeal", "miyakoSeal", "invert", "manaSeal", "manaRupture", "manaLeech", "mageslayerMark"];
 // เกราะสูงสุดของผู้เล่น: ปกติ 2 — ระหว่าง Lie Like Vortigern (โอเบรอน) เป้าหมายได้เพดานเกราะ +1
 function maxArmorOf(p) {
+  if (isOrt(p)) return CHAR_HOOKS.ort.maxArmor();
   if (Seraph.active() && p) return Seraph.maxArmor(p); // SE.RA.PH: ความจุจากโบสถ์เท่านั้น
   // แบทแมน: ระหว่างอยู่บนรถแบทโมบิล เพดานเกราะ = พลังชีวิตของรถ (7)
   const batCarArmor = CHAR_HOOKS.bat_ben.maxArmor(p);
@@ -1363,6 +1402,8 @@ function maybeBeatSave(p) {
 //  "ตายทันทีไม่สนเงื่อนไขอื่นๆ") — ยังผ่านการเก็บกวาดท้ายฟังก์ชันตามปกติทุกอย่าง
 function instantDeath(p, force) {
   if (friendlyEffectBlocked(p)) return;
+  // ORT: หลอดเลือดแตก (ทั้งเลือดหมดและโดนสังหารทันที) -> หลอดถัดไปเริ่มเต็ม · หลอดสุดท้ายเท่านั้นที่ตายจริง
+  if (isOrt(p) && CHAR_HOOKS.ort.tryBarBreak(engine, p)) return;
   if (!force && p.characterId === "escanor" && CHAR_HOOKS.escanor.tryNoonRevive(engine, p)) return;
   if (!force && p.characterId === "hisakawa_sister" && resolveHisakawaTwinDeath(p)) return;
   // Ultraman Trigger: ตายในร่างพิเศษถือว่าตายจริง ไม่คืนร่างแทน
@@ -1393,6 +1434,8 @@ function instantDeath(p, force) {
   //  อ่านจาก effectSourceId (ต้นตอของเอฟเฟกต์ที่กำลังทำงาน) เพราะ instantDeath ไม่มีพารามิเตอร์ผู้สังหาร
   const killer = players[effectSourceId];
   if (killer && killer.id !== p.id) killer.hasKilled = true;
+  CHAR_HOOKS.ort.onKill(engine, p); // ORT สกิลติดตัว 3 การวิวัฒนาการ: สังหารผู้เล่นจริง -> หลอด +1 / พลังโจมตี +1
+  if (mercuryActive() && !isOrt(p)) mercuryOnDeath(p);
   CHAR_HOOKS.kai.pruneOverhaulSlots(engine); // ไค ชิซากิ: ผู้ถือรังสรรค์/ลงทัณฑ์ตกรอบ -> ลบออกจาก Overhaul tracker
   // ยูนะ: เป้าหมายที่ได้รับพร (Delete/Smile for You/Longing) ตาย/หมดสภาพ -> เพลง+บัฟยูนะปิดลงทันที
   //  ยกเว้น Break Beat Bark เพราะมีผลทั้งสนาม ไม่ผูกกับผู้เล่นคนใดคนหนึ่งโดยเฉพาะ
@@ -1855,6 +1898,7 @@ function dealMixed(p, n, isNormalAttack) { // เกราะก่อนแล�
 // src = แหล่งที่มาของการฟื้นพลังงาน ("item" / "passive" / "card") — ใส่เฉพาะช่องทาง "ฟื้นฟู" จริงๆ
 //  ที่ [ดูดซับเวท] (ผู้สังหารเมจ) ต้องตอบสนอง ไม่ใส่ให้แต้มพื้นฐานจบเทิร์น/ค่าชดเชยการแพ้/การโอนแต้มระหว่างผู้เล่น
 function addSkill(p, n, src) {
+  if (isOrt(p)) return;
   // ชะงัก (โอกูริ Rework): ฟื้นฟูแต้มสกิลไม่ได้ทุกช่องทาง ระหว่างติดสถานะนี้
   if (((p.statuses && p.statuses.stagger) || 0) > 0) return;
   if (((p.statuses && p.statuses.manaSeal) || 0) > 0) return; // ผนึกพลังงาน (Universal): ฟื้นฟูแต้มสกิลไม่ได้ทุกช่องทาง
@@ -2113,6 +2157,8 @@ function resetCombat(p) {
   p.batNightSaveUsedAt = null; // อัศวินรัตติกาล: กันตายใช้ไปแล้วในคืนที่เท่าไหร่ (null = ยังไม่ใช้เลย)
   p.batKarmaAsk = null;        // นายลืมของน่ะ: รอเลือกเป้าหมายส่งต่อความเสียหาย { dmg, from, options: [id] }
   p.cutsceneShown = {}; // เล่นวีดีโอครั้งเดียวต่อเกม (per match)
+  CHAR_HOOKS.ort.resetCombat(p); // ORT สกิลติดตัว 1: ช่องสกิลที่ "ข้อมูลสูญหาย" ของผู้เล่นคนนี้
+  p.mercuryPick = null;          // Type Mercury: ตัวละครที่เลือกไว้รอลงสนามเทิร์นถัดไป
   // เลือด/เกราะเริ่มเกม: คำนวณหลังรีเซ็ต statuses/maxHpPenalty แล้วเท่านั้น
   // (maxHpOf/maxArmorOf อ่านค่าพวกนี้ — คำนวณก่อนหน้านั้นจะติดค่าเก่าจากแมตช์ที่แล้ว)
   p.hp = maxHpOf(p);
@@ -2248,6 +2294,8 @@ function buildStateFor(viewerId) {
     cycle: nightNow ? "night" : "day", // กลางวัน/กลางคืน (สลับทุก 3 เทิร์น)
     // SE.RA.PH Moon Cell — ก้อนข้อมูลของโหมด (per-viewer ทั้งก้อน ดู SERAPH_SCENES.md §8)
     seraph: Seraph.stateFor(engine, viewerId),
+    // Type Mercury (Raid Boss ORT): ข้อมูลโหมด + บอส + โหวตยอมแพ้ + ตัวที่เลือกลงสนามได้ (per-viewer)
+    mercury: mercuryStateFor(viewer),
     clockUpFrozen,   // Clock Up: ผู้ชมคนนี้ถูกแช่อยู่ไหม (ไรเดอร์ที่เปิด Clock Up เองจะเป็น false เสมอ)
     fullForce,       // มีไรเดอร์ Clock Up พร้อมกันมากกว่า 1 คน
     hisakawaBg, // ฝันของเหล่าฝาแฝด: ฉากหลัง O-KU-RI-MO-NO-Sunday
@@ -2284,6 +2332,8 @@ function buildStateFor(viewerId) {
     players: Object.values(players).map((p) => {
       const mine = p.id === viewerId;
       const show = mine || revealAll;
+      // Type Mercury: เพื่อนร่วมทีม (ผู้เล่นจริงด้วยกัน) เห็นแต้มการ์ดกันตลอดเวลา — ORT ยังถูกซ่อนตามปกติ
+      const teamReveal = mercuryActive() && !!viewer && !isOrt(viewer) && !isOrt(p);
       // ทาคุมิ ฟุจิวาระ: ถึงจะมองไม่เห็น แต่ฉันยังอยู่ ทำงานอยู่ — บังตากระดานทั้งหมด (score/cards/hp/armor/shield ของทุกคนรวมตัวเอง, แต้มสกิลของทุกคนยกเว้นตัวเอง)
       const takumiBlackout = takumiBlackoutActive();
       // "ตาบอด" (สถานะ Universal patch 3.4 / ผลพ่วงของ "ลงทัณฑ์"): ผู้ที่ติดสถานะมองไม่เห็นอะไรเลย
@@ -2429,9 +2479,13 @@ function buildStateFor(viewerId) {
         color: colorOf(p),
         teamId: p.teamId || null,
         teamConfirmed: !!p.teamConfirmed,
+        isBoss: isOrt(p),                                   // ORT: client วาดเป็นบอสตัวใหญ่ฝั่งตรงข้าม
+        ort: isOrt(p) ? CHAR_HOOKS.ort.publicState(p) : undefined,
+        // ORT สกิลติดตัว 1: ช่องสกิลของเราที่ "ข้อมูลสูญหาย" เทิร์นนี้ (เห็นเฉพาะเจ้าของ)
+        ortLostTier: mine && ortBoss() ? (p.ortLostTier || null) : null,
         modeVote: p.modeVote || null,
         locked: p.locked,
-        busted: (show || promoShow || connorReads) ? bustedOf(p) : false,
+        busted: (show || promoShow || connorReads || teamReveal) ? bustedOf(p) : false,
         result: p.result,
         // SE.RA.PH วันดวล: จำนวนไพ่ในมือของ "คู่ต่อสู้" เป็นความลับ — เห็นได้ต่อเมื่อ
         //  ลง Matrix ไว้บนเขาอย่างน้อย 1 แต้ม (นี่คือผลของ Matrix ระดับ 1 ตาม §6)
@@ -2442,7 +2496,7 @@ function buildStateFor(viewerId) {
         cards: blackout ? null : (mine ? p.cards : null),
         // SE.RA.PH Matrix ระดับ 3: ผู้ชมที่ลงครบ 3 แต้มบนคนนี้ เห็นแต้มของเขาตลอดเวลา (§6)
         //  (ระดับ 1 "เห็นจำนวนไพ่" ใช้ cardCount ที่ส่งให้ทุกคนอยู่แล้ว — client เป็นคนเลือกโชว์ตามระดับ)
-        score: blackout ? null : ((show || promoShow || connorReads
+        score: blackout ? null : ((show || promoShow || connorReads || teamReveal
           || (Seraph.active() && viewer && Seraph.matrixLevelOn(viewer, p) >= 3)) ? scoreOf(p) : null),
         // Locacaca (ซาโตรุ): Max HP ลดถาวรได้ / ทาคุมิ: บังตาระหว่างท่าไม้ตายทำงาน (null = ซ่อนทั้งแถบ)
         // แบทแมนร่างรถแบทโมบิล: ส่ง 0/0 เพื่อให้ "ไม่มีพลังชีวิต เหลือแต่เกราะ" ตามสเปค
@@ -2718,6 +2772,7 @@ function pausePlayingForCutscene(after) {
   clearPhaseTimer();
   runCutsceneQueue(() => {
     if (after) after();
+    flushOrtCounters(); // ดาเมจที่ลงหลังวีดีโอจบ (ท่าที่ "วีดีโอก่อน แล้วค่อยเกิดความเสียหาย") ก็ทำให้ ORT สวนกลับได้
     gameState = "PLAYING";
     startPhaseTimer(remain, resolveRound);
     broadcastState();
@@ -2736,11 +2791,11 @@ function runCutsceneQueue(onDone) {
 // ============================================================
 //  วงจรรอบ
 // ============================================================
-// ห้องรอ: ทุกคนกดพร้อมครบ (อย่างน้อย 2 คน) -> เริ่มเกมทันที ไม่ต้องกดปุ่มเริ่มเกมเอง
+// ห้องรอ: ทุกคนกดพร้อมครบ -> เข้าหน้าเลือกรูปแบบสนาม (1 คนก็ได้ — โหมดที่คนไม่พอจะเป็นปุ่มสีเทา) ไม่ต้องกดปุ่มเริ่มเกมเอง
 function checkLobbyReady() {
   if (gameState !== "LOBBY") return;
   const list = Object.values(players);
-  if (list.length >= 2 && list.every((p) => p.ready)) enterModeSelect();
+  if (list.length >= 1 && list.every((p) => p.ready)) enterModeSelect(); // เล่นคนเดียวได้ (Type Mercury)
 }
 // ฉากเปิดตัวผู้เล่น (GameIntro ฝั่ง client) กินเวลาเท่านี้ — สูตรเดียวกันกับ client/src/components/GameIntro.jsx
 //  วีดีโอเปิดตัวของตัวละครต้องรอให้มันจบก่อน ไม่งั้นคลิปจะเล่นอยู่ใต้ม่านแล้วโดนตัดกลางคัน
@@ -2750,7 +2805,173 @@ function gameIntroHoldSeconds() {
   const perMs = Math.max(620, Math.min(1000, Math.round(4200 / n)));
   return Math.ceil((n * perMs + 2900 + 1000) / 1000) + 1; // +1 เผื่อม่านปิด-เปิด
 }
+// ============================================================
+//  Type Mercury (Raid Boss ORT)
+// ============================================================
+function createOrt(bars) {
+  const ch = CHAR_BY_ID.ort;
+  const p = newPlayerRecord({ playerId: ORT_ID, sessionToken: null, socketId: null, name: ch.name, color: null, pos: ORT_POSITION, ch });
+  p.isBoss = true;
+  players[ORT_ID] = p;
+  resetCombat(p);
+  p.ready = true;
+  p.connected = true;
+  p.teamConfirmed = true;
+  p.locked = true;
+  CHAR_HOOKS.ort.initBoss(p, bars);
+  return p;
+}
+function resetMercury() {
+  if (mercurySurrender && mercurySurrender.timer) clearTimeout(mercurySurrender.timer);
+  mercurySurrender = null;
+  mercuryLost = new Set();
+  mercuryResult = null;
+  mercuryHold = false;
+  CHAR_HOOKS.ort.resetMatch();
+}
+// ผู้เล่นจริงตายในโหมด Raid -> ตัวละครนั้น "ข้อมูลสูญหาย" ทั้งห้อง และเจ้าของต้องเลือกตัวใหม่
+function mercuryOnDeath(p) {
+  if (p.alive) return;
+  mercuryLost.add(p.characterId);
+  p.mercuryPick = null;
+}
+// ตัวละครที่ยังเลือกลงสนามได้ (ไม่ใช่บอต/ไม่ล็อก/ไม่สูญหาย/ตัว unique ที่คนอื่นยังใช้อยู่)
+function mercuryPickable(forPlayer) {
+  const held = new Set(humanPlayers().filter((o) => o !== forPlayer && (o.alive || o.mercuryPick))
+    .map((o) => (o.alive ? o.characterId : o.mercuryPick)));
+  return CHARACTERS.filter((c) => !c.locked && !c.hidden && !c.botOnly && !mercuryLost.has(c.id)
+    && !(c.unique && held.has(c.id)));
+}
+function mercuryPick(playerId, characterId, extra = {}) {
+  const p = players[playerId];
+  if (!mercuryActive() || mercuryResult || !p || isOrt(p) || p.alive) return;
+  if (!["PLAYING", "CUTSCENE", "SUMMARY", "ATTACK", "ATTACKING", "TRANSITION"].includes(gameState)) return;
+  if (characterId === "") { p.mercuryPick = null; broadcastState(); return; } // ยกเลิกเพื่อเลือกตัวใหม่
+  if (!mercuryPickable(p).some((c) => c.id === characterId)) return;
+  p.mercuryPick = characterId;
+  p.mercuryPickShikiUlt = extra.shikiUlt === "wither" ? "wither" : "deatheye";
+  // ผู้เล่นตายหมดแล้วเกมหยุดรอ -> มีคนเลือกตัวแล้ว เดินต่อได้
+  if (mercuryHold) {
+    mercuryHold = false;
+    gameState = "TRANSITION";
+    startPhaseTimer(TRANSITION_TIME, dealRound);
+  }
+  broadcastState();
+}
+// ต้นเทิร์น: คนที่เลือกตัวไว้แล้วลงสนามด้วยเลือด/เกราะเต็ม — เหรียญและไอเทมติดตัวไปด้วย แต้มสกิลเริ่มใหม่
+function mercuryRespawnPicked() {
+  if (!mercuryActive()) return;
+  for (const p of humanPlayers()) {
+    if (p.alive) {
+      // ถูกชุบชีวิตกลับมาในร่างเดิม (เช่น เพลง Longing ของยูนะ) -> ตัวละครนี้ไม่ได้ "สูญหาย" แล้ว
+      mercuryLost.delete(p.characterId);
+      p.mercuryPick = null;
+      continue;
+    }
+    const ch = p.mercuryPick && CHAR_BY_ID[p.mercuryPick];
+    if (!ch || mercuryLost.has(ch.id)) { p.mercuryPick = null; continue; }
+    const keep = {
+      id: p.id, sessionToken: p.sessionToken, socketId: p.socketId, connected: p.connected,
+      name: p.name, customColor: p.customColor, position: p.position,
+      gold: p.gold || 0, inventory: p.inventory || [],
+    };
+    const fresh = newPlayerRecord({ playerId: p.id, sessionToken: p.sessionToken, socketId: p.socketId, name: p.name, color: p.customColor, pos: p.position, ch, shikiUlt: p.mercuryPickShikiUlt });
+    for (const k of Object.keys(p)) delete p[k];
+    Object.assign(p, fresh);
+    resetCombat(p);
+    Object.assign(p, { connected: keep.connected, customColor: keep.customColor, gold: keep.gold, inventory: keep.inventory, ready: true, teamConfirmed: true });
+    lastLog.push(`🔁 ${p.name} กลับเข้าสนามในร่าง ${ch.name}`);
+  }
+}
+function mercuryFinish(result) {
+  if (mercuryResult) return;
+  mercuryResult = result;
+  if (mercurySurrender && mercurySurrender.timer) clearTimeout(mercurySurrender.timer);
+  mercurySurrender = null;
+  mercuryHold = false;
+  winningTeamId = null;
+  if (result === "win") lastLog.push("🏆 ORT ถูกโค่นแล้ว — ผู้เล่นทุกคนชนะ Raid!");
+  else if (result === "surrender") lastLog.push("🏳️ ทีมโหวตยอมแพ้ — Raid จบลง");
+  else lastLog.push("💀 ไม่เหลือตัวละครให้ลงสนามแล้ว — ORT ชนะ");
+  clearPhaseTimer();
+  gameState = "GAMEOVER";
+  timeLeft = 0;
+  broadcastState();
+}
+// เช็คผล Raid ตอนจบเทิร์น — คืน true = จัดการเฟสถัดไปเองแล้ว (ผู้เรียกต้อง return)
+function mercuryAdvance() {
+  if (!mercuryActive()) return false;
+  if (!players[ORT_ID] || !players[ORT_ID].alive) { mercuryFinish("win"); return true; }
+  if (aliveHumans().length === 0) {
+    const waiting = humanPlayers().some((p) => p.mercuryPick);
+    if (!waiting && humanPlayers().every((p) => mercuryPickable(p).length === 0)) { mercuryFinish("lose"); return true; }
+    if (!waiting) {
+      // ตายหมดและยังไม่มีใครเลือกตัว -> หยุดเกมไว้ เวลาไม่เดิน จนกว่าจะมีคนเลือก (mercuryPick สั่งเดินต่อ)
+      mercuryHold = true;
+      clearPhaseTimer();
+      gameState = "TRANSITION";
+      timeLeft = 0;
+      broadcastState();
+      return true;
+    }
+  }
+  return false;
+}
+// ---------- โหวตยอมแพ้ (เสียงข้างมาก + นับถอยหลัง) ----------
+function mercurySurrenderVote(playerId, yes) {
+  const p = players[playerId];
+  if (!mercuryActive() || mercuryResult || !p || isOrt(p) || gameState === "GAMEOVER") return;
+  if (!mercurySurrender) {
+    if (!yes) return; // เปิดโหวตได้ด้วยการกด "ยอมแพ้" เท่านั้น
+    mercurySurrender = { votes: {}, endsAt: Date.now() + MERCURY_SURRENDER_SECONDS * 1000, timer: null };
+    mercurySurrender.timer = setTimeout(() => settleSurrender(true), MERCURY_SURRENDER_SECONDS * 1000);
+  }
+  mercurySurrender.votes[playerId] = !!yes;
+  settleSurrender(false);
+  broadcastState();
+}
+function settleSurrender(deadline) {
+  const v = mercurySurrender;
+  if (!v) return;
+  const humans = humanPlayers();
+  const yes = humans.filter((p) => v.votes[p.id] === true).length;
+  const no = humans.filter((p) => v.votes[p.id] === false).length;
+  const half = humans.length / 2;
+  // ชนะขาดแล้ว (เกินครึ่งของทั้งห้อง) ไม่ต้องรอหมดเวลา · หมดเวลา = นับเฉพาะคนที่กด เสมอ = ไม่ยอมแพ้
+  if (yes > half) { mercuryFinish("surrender"); return; }
+  const decided = no >= half || yes + no === humans.length;
+  if (!deadline && !decided) return;
+  if (v.timer) clearTimeout(v.timer);
+  mercurySurrender = null;
+  if (yes > no) { mercuryFinish("surrender"); return; }
+  lastLog.push("🛡️ โหวตยอมแพ้ไม่ผ่าน — สู้ต่อ!");
+  broadcastState();
+}
+function mercuryStateFor(viewer) {
+  if (!mercuryActive()) return null;
+  const boss = players[ORT_ID];
+  const v = mercurySurrender;
+  return {
+    arrivalSeq: mercuryArrivalSeq,
+    result: mercuryResult,
+    hold: mercuryHold,
+    lost: [...mercuryLost],
+    pickable: viewer && !isOrt(viewer) && !viewer.alive ? mercuryPickable(viewer).map((c) => c.id) : [],
+    myPick: viewer ? viewer.mercuryPick || null : null,
+    ort: boss ? { id: boss.id, alive: boss.alive, ...CHAR_HOOKS.ort.publicState(boss) } : null,
+    surrender: v ? {
+      endsAt: v.endsAt,
+      yes: Object.values(v.votes).filter((x) => x === true).length,
+      no: Object.values(v.votes).filter((x) => x === false).length,
+      total: humanPlayers().length,
+      mine: viewer && v.votes[viewer.id] !== undefined ? v.votes[viewer.id] : null,
+    } : null,
+  };
+}
+
 function startMatch() {
+  delete players[ORT_ID]; // บอสของแมตช์ก่อน (ถ้ามี) — สร้างใหม่ด้านล่างเฉพาะโหมด Raid
+  resetMercury();
   if (!teamModeActive()) {
     resetTeamAssignments(false);
     teamSize = 1;
@@ -2785,6 +3006,17 @@ function startMatch() {
   const yagurumaIntro = CHAR_HOOKS.yaguruma.maybeQueueIntro(engine);
   const kagamiIntro = CHAR_HOOKS.kagami.maybeQueueIntro(engine);
   const tsurugiIntro = CHAR_HOOKS.tsurugi.maybeQueueIntro(engine);
+  // Type Mercury: ไม่มีฉากเปิดตัวผู้เล่น — ใช้ฉากเปิดตัว ORT (OrtArrival ฝั่ง client) แทน
+  //  server พักเกมไว้ในเฟส CUTSCENE (ไม่มีคลิป) ให้ฉากเล่นจบก่อน แล้วค่อยเล่นวีดีโอเปิดตัวตัวละครที่คิวไว้ (ถ้ามี)
+  if (mercuryActive()) {
+    createOrt(CHAR_HOOKS.ort.RAID_BARS);
+    mercuryArrivalSeq++;
+    cutsceneInfo = null;
+    gameState = "CUTSCENE";
+    startPhaseTimer(MERCURY_ARRIVAL_SECONDS, () => runCutsceneQueue(dealRound));
+    broadcastState();
+    return;
+  }
   if (connerIntro || miyakoIntro || daisukeIntro || yagurumaIntro || kagamiIntro || tsurugiIntro) {
     // พักคิวไว้ก่อนจนกว่าฉากเปิดตัวผู้เล่นจะจบ — อยู่ในเฟส CUTSCENE แต่ยังไม่มีคลิป
     //  (cutsceneInfo = null -> client วาดกระดานปกติไว้ใต้ม่าน GameIntro ซึ่งบังอยู่แล้ว)
@@ -2916,6 +3148,11 @@ function cardLabel(c) {
   return String(c.value);
 }
 function useInventoryItem(id, uid, opts = {}) {
+  const res = useInventoryItemCore(id, uid, opts);
+  if (gameState !== "CUTSCENE") flushOrtCounters();
+  return res;
+}
+function useInventoryItemCore(id, uid, opts = {}) {
   const p = players[id];
   if (!p || !p.alive) return;
   if (asleep(p)) return; // หลับไหล: ใช้ไอเทมไม่ได้เลย (ยาโชคลาภ/ต้านสถานะ/แต้มสกิล/เกราะ เดิมไม่เช็ค p.locked จึงรั่ว)
@@ -2986,6 +3223,7 @@ function useInventoryItem(id, uid, opts = {}) {
     }
     const target = gutsFireTargetOf(p, item, opts.targetId);
     if (!target) return; // ยิงไม่ได้ = ไม่เสียกระสุน
+    if (isOrt(target)) CHAR_HOOKS.ort.queueCounter(engine, p.id); // ORT สกิลติดตัว 2: ถูกยิงด้วยปืน -> สวนกลับ
     p.gutsShotTurn = roundNumber; // 1 นัดต่อเทิร์น — จองไว้ตั้งแต่ตอนกด กันยิงซ้ำระหว่างวีดีโอเล่นอยู่
     lastLog.push(`🔫 ${p.name} ยิง ${GUTS_AMMO[item.ammo].name} ใส่ ${target.name}!`);
     // วีดีโอเต็มจอของกระสุนแต่ละแบบเล่นครั้งเดียวต่อเกม "ต่อผู้ยิงแต่ละคน" (เก็บใน p.cutsceneShown เหมือน
@@ -3104,6 +3342,10 @@ function dealRound() {
     nightResetPending = false;
     cycleShift = roundNumber - (CYCLE_TURNS + 1); // ให้เทิร์นนี้ตรงกับคืนแรกของวงจร
   }
+  // Type Mercury: คนที่เลือกตัวละครใหม่ไว้แล้วลงสนามตอนนี้ (ก่อนลูปแจกไพ่ใบแรก จึงได้ไพ่ทันทีในเทิร์นนี้)
+  mercuryRespawnPicked();
+  // ORT สกิลติดตัว 1: สกิลแรกของเทิร์นที่แล้ว "ข้อมูลสูญหาย" ในเทิร์นนี้ (อยู่หลังล้าง cutsceneQueue แล้ว)
+  CHAR_HOOKS.ort.onRoundStart(engine);
 
   for (const p of Object.values(players)) {
     resetRoundDisplay(p);
@@ -3342,6 +3584,8 @@ function dealRound() {
   //  ต้องแปะ "หลัง" ลูปต้นเทิร์นจบทั้งวง เพราะ tickBurn ของแต่ละคนอยู่ในลูปด้านบน — ถ้าแปะในลูป
   //  คนที่ยังวนไม่ถึงจะถูกกินหน่วยที่เพิ่งได้ทิ้งในเทิร์นเดียวกัน (ผลไม่เท่ากันตามลำดับที่นั่ง)
   CHAR_HOOKS.escanor.flushPendingBurn(engine);
+  // ORT: ไม่ต้องกดเปิดไพ่ — จั่วเองผ่าน characters/ort.js (checkAllLocked ไม่รอ ORT อยู่แล้ว)
+  if (ortBoss()) ortBoss().locked = true;
 
   // ---------- คอนเนอร์ RK800 (characters/conner.js): การไล่ล่ายังดำเนินอยู่ -> แช่ผู้เล่นนอกวงใหม่ทุกเทิร์น ----------
   //  ต้องอยู่หลังลูปต้นเทิร์น เพราะในลูปเพิ่งตั้ง p.locked = false และแจกไพ่ใบแรกให้ทุกคนไปแล้ว
@@ -3439,6 +3683,8 @@ function hit(id) {
   CHAR_HOOKS.daichi.onDrawCheck(engine, p);
   p.busted = bustedOf(p);
   if (p.busted) { voidUltimateOnBust(p); CHAR_HOOKS.mageslayer.onBustOrLoseRoll(engine, p); }
+  // ORT: ผู้เล่นจริงจั่ว 1 ครั้ง -> บอสจั่วตามได้ 1 ใบ (ถ้ายังไม่ถึงเป้าแต้ม)
+  if (drawn) CHAR_HOOKS.ort.onHumanDraw(engine, p);
   // ไพ่แตก: ไม่ล็อกอัตโนมัติ — ยังกดสกิล/ใช้ไอเทมได้ต่อไป จนกว่าจะกดเปิดไพ่เอง หรือทุกคนเปิดไพ่ครบ
   broadcastState();
   checkAllLocked();
@@ -3483,12 +3729,24 @@ function eijiOrdinalScale(id) {
   });
   broadcastState();
 }
+// ORT สกิลติดตัว 2: สวนกลับทุกคนที่จองไว้ระหว่างการกระทำที่เพิ่งจบ (สกิล/ปืน/เอฟเฟกต์หลังเปิดไพ่)
+function flushOrtCounters() {
+  if (CHAR_HOOKS.ort.flushCounters(engine)) broadcastState();
+}
+//  ท่าที่ "เล่นวีดีโอก่อน แล้วค่อยลงผล" (เข้าเฟส CUTSCENE) ยังไม่สวนตอนนี้ — pausePlayingForCutscene สวนให้หลังผลลงจริง
 function useSkill(id, tier, targets, item) {
+  const res = useSkillCore(id, tier, targets, item);
+  if (gameState !== "CUTSCENE") flushOrtCounters();
+  return res;
+}
+function useSkillCore(id, tier, targets, item) {
   const p = players[id];
   if (!effectSourceId && p) return withEffectSource(p, () => useSkill(id, tier, targets, item));
   if (!p || !p.alive) return;
   if (gameState !== "PLAYING") return;
   if (!["basic", "secondary", "ultimate"].includes(tier)) return;
+  // ORT สกิลติดตัว 1: ช่องสกิลนี้ "ข้อมูลสูญหาย" ในเทิร์นนี้ — กดไม่ได้
+  if (CHAR_HOOKS.ort.skillErased(engine, p, tier)) return;
   // ---------- SE.RA.PH (SERAPH_MOONCELL.md §5 + §3) ----------
   //  วันที่ 1-6: ไม่มีสกิลเลย · วันที่ 7: ต้องปลดล็อก tier นั้นด้วยระดับทักษะก่อน
   if (Seraph.active()) {
@@ -3972,6 +4230,10 @@ function useSkill(id, tier, targets, item) {
   }
 
   p.skillPoints -= cost;
+  // ORT สกิลติดตัว 1: สกิลแรกที่กดในเทิร์นนี้จะ "ข้อมูลสูญหาย" ในเทิร์นถัดไป
+  CHAR_HOOKS.ort.onSkillUsed(engine, p, tier);
+  // ORT สกิลติดตัว 2: ถูกเลือกเป็นเป้าของสกิล (แม้เป็นบัฟ/ดีบัฟ) -> สวนกลับผู้ใช้ (ลงท้าย useSkill)
+  if (Array.isArray(targets) && targets.includes(ORT_ID)) CHAR_HOOKS.ort.queueCounter(engine, p.id);
   if (blessFree) {
     p.statuses.freecast--;
     if (p.statuses.freecast <= 0) delete p.statuses.freecast;
@@ -4356,7 +4618,8 @@ function checkAllLocked() {
     // QTE ที่ยังเล่นไม่จบ (ยุย: ทำนองเพลงร็อก) — คนอื่นจั่ว/เปิดไพ่ได้ตามปกติ แค่ยังไม่สรุปรอบให้
     qtePending();
   // ถ้าไม่เหลือใครรอดเลย (เช่น ทาคุโตะระเบิดใส่ทุกคนตายหมดรวมถึงตัวเอง) ก็ต้องสรุปผลด้วยเช่นกัน ไม่งั้นเกมค้าง
-  if (c.every((p) => p.locked) && !pendingAnswer) resolveRound();
+  // ORT ไม่ต้องกดเปิดไพ่ — รอเฉพาะผู้เล่นจริง (บอสจั่วรอบสุดท้ายใน resolveRound)
+  if (c.filter((p) => !isOrt(p)).every((p) => p.locked) && !pendingAnswer) resolveRound();
 }
 
 // ---------- ย้อนเทิร์น (Overload Force) ----------
@@ -4639,6 +4902,10 @@ function resolveRound() {
     return;
   }
 
+  // ORT: ทุกคนเปิดไพ่แล้ว -> จั่วแก้มืออีกได้ไม่เกิน 2 ใบ แล้วคิดทริกเกอร์สีเหมือนกดเปิดไพ่
+  //  (อยู่หลัง ANATA/ท่าที่บังคับจั่ว ORT จึงเห็นแต้มสุดท้ายของทุกคนก่อนตัดสิน)
+  { const boss = CHAR_HOOKS.ort.finalDraw(engine); if (boss) applyLockColorTriggers(boss); }
+
   // SE.RA.PH: วันที่ 1-6 = ทุกคน · วันที่ 7 = เฉพาะคู่ที่กำลังดวล (คนอื่นเป็นผู้ชม)
   const combatants = Seraph.active() ? Seraph.combatants(engine) : alivePlayers();
   roundWinnerId = null;
@@ -4855,6 +5122,7 @@ function afterResolve() {
 }
 
 function goSummary() {
+  flushOrtCounters(); // เอฟเฟกต์หลังเปิดไพ่ (afterResolve) ที่ลงใส่ ORT
   gameState = "SUMMARY";
   startPhaseTimer(SUMMARY_TIME, afterSummary);
   broadcastState();
@@ -4952,6 +5220,21 @@ function afterSummary() {
   }
   // DoomGuy (characters/doomguy.js) สกิลติดตัว: ปกติเสมอแต้มจะไม่มีเทิร์นโจมตี — โรลไปแล้วตอนตัดสิน
   //  ผู้ชนะใน resolveRound() (ห้ามโรลซ้ำที่นี่ ไม่งั้นโอกาสจริงจะถูกคูณซ้ำ)
+  // ORT ชนะรอบ: เลือกเป้าเอง (คนที่เลือด+เกราะเหลือน้อยสุด) — เปิดเฟสโจมตีสั้นๆ ให้ทุกคนเห็นว่าใครโดนเล็ง
+  if (winner && winner.alive && isOrt(winner) && !roundTiedWin) {
+    const t = CHAR_HOOKS.ort.pickTarget(engine, winner);
+    if (t) {
+      attackerId = winner.id;
+      gameState = "ATTACK";
+      startPhaseTimer(ORT_ATTACK_DELAY, () => {
+        const tt = players[t.id];
+        if (tt && tt.alive) doAttack(winner.id, tt.id);
+        if (gameState === "ATTACK") endTurn(); // doAttack ปฏิเสธเป้า (เช่น เป้าได้อมตะกลางทาง) — อย่าให้เฟสค้าง
+      });
+      broadcastState();
+      return;
+    }
+  }
   const doomTieOverride = doomTieAttack && !!winner && winner.alive && winner.characterId === "doomguy";
   if (winner && winner.alive && (!roundTiedWin || doomTieOverride)) {
     const targets = attackableTargets(winner.id);
@@ -5210,6 +5493,11 @@ function doAttack(byId, targetId) {
     if (CHAR_HOOKS.princess_shiki.onAttackDeathline(engine, attacker, target)) return;
   }
 
+  // ---------- ORT (characters/ort.js): โจมตีปกติมีโอกาสสังหารทันที 20% ----------
+  if (attacker.characterId === "ort") {
+    if (CHAR_HOOKS.ort.onAttackKill(engine, attacker, target)) return;
+  }
+
   // ---------- "เนตรมณะ" (สถานะ Universal patch 2.2.7 — เจ้าหญิงราก "ทุกอย่างจะต้องราบรื่น") ----------
   //  ใครก็ตามที่ติดบัฟนี้ โจมตีปกติแล้วมีโอกาสสังหารเป้าหมายทันที 20% (คิดแยกจาก/หลังเนตรของแต่ละตัวละคร)
   //  วีดีโอสังหารขึ้นเฉพาะตอนเจ้าหญิงรากเป็นผู้ลงมือเอง — ตัวละครอื่นที่ได้บัฟไปสังหารเงียบๆ
@@ -5374,6 +5662,9 @@ function doAttack(byId, targetId) {
   // เอจิ (characters/eiji.js): ดาบแห่งความทรงจำ — โอกาสคูณดาเมจ 2 เท่า (คิดท้ายสุดเพื่อให้คูณยอดสุทธิจริง)
   const eijiSwordFx = {};
   dmg = CHAR_HOOKS.eiji.applySwordDouble(engine, attacker, dmg, eijiSwordFx);
+  // ORT: คริติคอล 75% คูณยอดสุทธิ ×2 (คิดท้ายสุดเหมือนดาบของเอจิ)
+  const ortCritFx = {};
+  dmg = CHAR_HOOKS.ort.applyCrit(engine, attacker, dmg, ortCritFx);
   // ฮารุกะ (characters/haruka.js): จงไปสู่สุขติ — จุดชนวน "เลือดไหล" ของเป้าหมายให้ระเบิดรวมกับหมัดนี้
   //  ต้องอ่านค่าเลือดไหล "ก่อน" ความเสียหายลง และก่อนที่โอเมก้าจะแปะเลือดไหลก้อนใหม่ (onAttackLanded ด้านล่าง)
   const harukaPunishFx = {};
@@ -5585,6 +5876,8 @@ function doAttack(byId, targetId) {
   const fxSkills = [];
   const addFx = (x, side) => { if (x) fxSkills.push({ ...x, side }); };
   for (const fx of hisakawaAttackFx || []) addFx(fx, fx.side || "atk");
+  if (isOrt(target) && dmg > 0) ortFx("hit");
+  if (ortCritFx.crit) addFx({ name: "คริติคอล ×2", img: CHAR_HOOKS.ort.IMG.base, by: attacker.name, color: colorOf(attacker) }, "atk");
   for (const fx of ignisAttackFx || []) addFx(fx, fx.side || "atk");
   if (ginga) addFx(skillByStatus(attacker, "ginga"), "atk");
   if (gingastriumAtk) addFx({ name: `Ginga Strium${lastStanding ? " +1 (คู่ต่อสู้คนเดียว)" : ""}`, img: HIKARU_STRIUM_IMG, by: attacker.name, color: colorOf(attacker) }, "atk");
@@ -5731,6 +6024,7 @@ function seraphAdvance() {
 }
 
 function endTurn() {
+  flushOrtCounters();
   // คาเยนน์ "แน่จริงก็หลบสิ": ชุดกระสุนยังยิงไม่ครบ -> เปิดเฟสโจมตีครั้งถัดไปแทนการจบเทิร์น
   //  วางไว้บนสุดเพราะทุกทางจบหมัด (โดน/ถูกหลบ/ถูกสะท้อน/ถูกลบล้าง) ไหลมาจบที่ endTurn เหมือนกันหมด
   if (CHAR_HOOKS.cayenne.continueBarrage(engine)) return;
@@ -5995,6 +6289,15 @@ function endTurn() {
     if (Seraph.active()) {
       if (seraphAdvance()) return;
     }
+    // ---------- Type Mercury: ORT ตาย = ชนะ · ตัวละครหมดและไม่มีใครในสนาม = แพ้ · ตายหมดแต่ยังเลือกตัวได้ = หยุดรอ ----------
+    //  ไม่ใช้เงื่อนไข "เหลือคนสุดท้าย" ของโหมดปกติ (ORT นับเป็นผู้เล่น 1 คนใน alivePlayers)
+    if (mercuryActive() && !shidoRewound) {
+      if (mercuryAdvance()) return;
+      gameState = "TRANSITION";
+      startPhaseTimer(TRANSITION_TIME, dealRound);
+      broadcastState();
+      return;
+    }
 
     const teamWin = remainingTeamWinInfo(stillAlive, total);
     if (!shidoRewound && teamWin.over) {
@@ -6024,6 +6327,8 @@ function endTurn() {
 }
 
 function backToLobby() {
+  delete players[ORT_ID];
+  resetMercury();
   gameState = "LOBBY";
   resetTeamAssignments(true);
   clearPhaseTimer();
@@ -6147,6 +6452,52 @@ function onPlayerEvent(socket, event, handler, limit = 20) {
   });
 }
 
+// ระเบียนผู้เล่นใหม่ (ค่าเริ่มต้นของทุกฟิลด์) — ใช้ร่วมกันระหว่าง join, ORT และการเลือกตัวใหม่ในโหมด Type Mercury
+function newPlayerRecord({ playerId, sessionToken, socketId, name, color, pos, ch, shikiUlt }) {
+  return {
+    id: playerId,
+    sessionToken,
+    socketId,
+    connected: true,
+    ready: false, // ห้องรอ: ต้องกดพร้อมก่อนเกมถึงจะเริ่มได้ (ครบทุกคน = เริ่มอัตโนมัติ)
+    teamId: null, teamConfirmed: false, modeVote: null,
+    name: (name || "ผู้เล่น").toString().slice(0, 12),
+    customColor: normalizeColor(color),
+    position: pos, characterId: ch.id, avatar: ch.avatar, img: ch.img,
+    cards: [], locked: false, busted: false, result: null,
+    hp: MAX_HP, armor: MAX_ARMOR, skillPoints: 0, alive: true, shield: 0,
+    statuses: {}, statusAmt: {},
+    seen: {}, transformAt: 0, cutsceneShown: {},
+    armorLocked: false, beatSaved: false, skillUsedRound: false,
+    gold: 0, inventory: [], triggerDarkWail: 0, blackSparklenceReadyRound: 0,
+    doomWeapon: ch.id === "doomguy" ? DOOM_STARTING_WEAPON : null, doomQuickSwapUsed: false, doomCharge: 0,
+    doomChaingunShieldUsed: false,
+    takumiGear: 1, takumiSkillUsesRound: 0, takumiBlackoutFired: false,
+    takutoComboReady: false, takutoUlt2VideoPending: false, takutoAwakenAt: 0,
+    tonkatsu: 0, songAtk: 0, noDrawNext: 0, anataTargets: null,
+    tempHp: 0, tempHpTurns: 0, noSkillNext: 0,
+    sleepFresh: false,
+    appleItem: "drink", appleAtkBuffs: [], chillDodge: 100, appleGiveUses: CHAR_HOOKS.appleguy.GIVE_USES,
+    muimiEmergencyUses: CHAR_HOOKS.muimi.EMERGENCY_USES, muimiEmergencyUsedRound: 0,
+    muimiLoseStreak: 0, muimiHeartRound: 0, muimiForcedBustRound: 0, muimiUltCasts: 0, muimiUltCastRound: 0, muimiUltLock: 0,
+    tepeuCookTurns: 0, tepeuPonderTurns: 0, tepeuEyeTurns: 0, tepeuLoseStreak: 0, tepeuKillTargetId: null,
+    cayAmmo: 0, cayMorale: 0, cayBarrage: false, cayBarrageShot: 0, cayPistolRound: 0, cayPending: [],
+    daichiCard: "gomora", daichiArmor: null, daichiBasicUses: 0, daichiStored: [], daichiStunPending: 0,
+    piggy: 0, senaNext: false, kotoneExtraAtk: false,
+    bardNotes: [], bardNotesUsed: 0, bardPending: null,
+    bloodSection: 0, soulSection: 0, bardLinks: {},
+    kaiLinkWith: null, kaiRivalId: null, kaiMarksBy: {},
+    mageslayerMarkedId: null, mageslayerMarks: {}, mageslayerHasMarked: false, mageslayerWitchMarkReadyRound: 0, mageslayerBurdenReadyRound: 0, mageslayerMarkTick: 0,
+    shikiUlt: shikiUlt === "wither" ? "wither" : "deatheye", witherAddedBy: {},
+    oguriEnergy: OGURI_ENERGY_START, stamina: 0, oguriChargeCapBonus: 0, oguriZoneTurns: 0, staggerNext: 0,
+    maxHpPenalty: 0, wouGuardCd: 0, calamityDraw: 0, locaOffer: null,
+    dmgHp: 0, dmgArmor: 0, gainedSkill: 0,
+    wasAttacked: false, isWinner: false, isLoser: false,
+    phenexPain: 0, phenexReborn: false, phenexNtdPermanent: false, phenexLastHitBy: null,
+    tohnoLevel: 1,
+  };
+}
+
 io.on('connection', (socket) => {
   socket.emit("roster", publicRoster());
   socket.emit("positions", positionsFor(socket.id));
@@ -6185,7 +6536,8 @@ io.on('connection', (socket) => {
     if (!pos || pos < 1 || pos > MAX_PLAYERS || positionUsedByOther(pos, socket.id)) { socket.emit("positionTaken"); return; }
     releaseReservation(socket.id);
     let ch = CHAR_BY_ID[characterId];
-    if (!ch || ch.locked) ch = CHARACTERS.find((c) => !c.locked) || CHARACTERS[0];
+    // ORT (botOnly) เลือกเล่นไม่ได้ — ตกไปใช้ตัวแรกที่เล่นได้เหมือนตัวที่ยังล็อกอยู่
+    if (!ch || ch.locked || ch.botOnly) ch = CHARACTERS.find((c) => !c.locked && !c.botOnly) || CHARACTERS[0];
     // ตัวละคร unique (คอนเนอร์ RK800): เลือกได้แค่ 1 คนต่อเกม — ปฏิเสธการเข้าร่วมแทนการสลับตัวให้เงียบๆ
     //  (ฝั่ง client ปิดการ์ดไว้ตั้งแต่หน้าเลือกตัวละครผ่าน event "takenChars" — ด่านนี้กันเคสกดพร้อมกันเป๊ะ)
     if (ch.unique && Object.values(players).some((o) => o.characterId === ch.id)) {
@@ -6195,48 +6547,7 @@ io.on('connection', (socket) => {
 
     const playerId = crypto.randomUUID();
     const sessionToken = crypto.randomBytes(32).toString('base64url');
-    players[playerId] = {
-      id: playerId,
-      sessionToken,
-      socketId: socket.id,
-      connected: true,
-      ready: false, // ห้องรอ: ต้องกดพร้อมก่อนเกมถึงจะเริ่มได้ (ครบทุกคน = เริ่มอัตโนมัติ)
-      teamId: null, teamConfirmed: false, modeVote: null,
-      name: (name || "ผู้เล่น").toString().slice(0, 12),
-      customColor: normalizeColor(color),
-      position: pos, characterId: ch.id, avatar: ch.avatar, img: ch.img,
-      cards: [], locked: false, busted: false, result: null,
-      hp: MAX_HP, armor: MAX_ARMOR, skillPoints: 0, alive: true, shield: 0,
-      statuses: {}, statusAmt: {},
-      seen: {}, transformAt: 0, cutsceneShown: {},
-      armorLocked: false, beatSaved: false, skillUsedRound: false,
-      gold: 0, inventory: [], triggerDarkWail: 0, blackSparklenceReadyRound: 0,
-      doomWeapon: ch.id === "doomguy" ? DOOM_STARTING_WEAPON : null, doomQuickSwapUsed: false, doomCharge: 0,
-      doomChaingunShieldUsed: false,
-      takumiGear: 1, takumiSkillUsesRound: 0, takumiBlackoutFired: false,
-      takutoComboReady: false, takutoUlt2VideoPending: false, takutoAwakenAt: 0,
-      tonkatsu: 0, songAtk: 0, noDrawNext: 0, anataTargets: null,
-      tempHp: 0, tempHpTurns: 0, noSkillNext: 0,
-      sleepFresh: false,
-      appleItem: "drink", appleAtkBuffs: [], chillDodge: 100, appleGiveUses: CHAR_HOOKS.appleguy.GIVE_USES,
-      muimiEmergencyUses: CHAR_HOOKS.muimi.EMERGENCY_USES, muimiEmergencyUsedRound: 0,
-      muimiLoseStreak: 0, muimiHeartRound: 0, muimiForcedBustRound: 0, muimiUltCasts: 0, muimiUltCastRound: 0, muimiUltLock: 0,
-      tepeuCookTurns: 0, tepeuPonderTurns: 0, tepeuEyeTurns: 0, tepeuLoseStreak: 0, tepeuKillTargetId: null,
-      cayAmmo: 0, cayMorale: 0, cayBarrage: false, cayBarrageShot: 0, cayPistolRound: 0, cayPending: [],
-      daichiCard: "gomora", daichiArmor: null, daichiBasicUses: 0, daichiStored: [], daichiStunPending: 0,
-      piggy: 0, senaNext: false, kotoneExtraAtk: false,
-      bardNotes: [], bardNotesUsed: 0, bardPending: null,
-      bloodSection: 0, soulSection: 0, bardLinks: {},
-      kaiLinkWith: null, kaiRivalId: null, kaiMarksBy: {},
-      mageslayerMarkedId: null, mageslayerMarks: {}, mageslayerHasMarked: false, mageslayerWitchMarkReadyRound: 0, mageslayerBurdenReadyRound: 0, mageslayerMarkTick: 0,
-      shikiUlt: shikiUlt === "wither" ? "wither" : "deatheye", witherAddedBy: {},
-      oguriEnergy: OGURI_ENERGY_START, stamina: 0, oguriChargeCapBonus: 0, oguriZoneTurns: 0, staggerNext: 0,
-      maxHpPenalty: 0, wouGuardCd: 0, calamityDraw: 0, locaOffer: null,
-      dmgHp: 0, dmgArmor: 0, gainedSkill: 0,
-      wasAttacked: false, isWinner: false, isLoser: false,
-      phenexPain: 0, phenexReborn: false, phenexNtdPermanent: false, phenexLastHitBy: null,
-      tohnoLevel: 1,
-    };
+    players[playerId] = newPlayerRecord({ playerId, sessionToken, socketId: socket.id, name, color, pos, ch, shikiUlt });
     sessions.set(sessionToken, playerId);
     bindPlayerSocket(socket, playerId);
     socket.emit('joined', { sessionToken });
@@ -6248,6 +6559,12 @@ io.on('connection', (socket) => {
     // This button is for solo testing; multiplayer starts only after everyone is ready.
     if (gameState === 'LOBBY' && Object.keys(players).length === 1) startMatch();
   }, 2);
+  // Type Mercury: ตายแล้วเลือกตัวละครใหม่ลงสนามเทิร์นถัดไป / โหวตยอมแพ้
+  onPlayerEvent(socket, 'mercuryPick', (id, { characterId, shikiUlt } = {}) => {
+    if (typeof characterId !== 'string') return;
+    mercuryPick(id, characterId, { shikiUlt });
+  }, 6);
+  onPlayerEvent(socket, 'mercurySurrender', (id, { yes } = {}) => mercurySurrenderVote(id, !!yes), 6);
   onPlayerEvent(socket, 'selectGameMode', (id, { mode } = {}) => {
     if (gameState !== 'TEAM_MODE') return;
     voteGameMode(id, mode);
@@ -6399,6 +6716,11 @@ io.on('connection', (socket) => {
 //   ส่งค่า primitive ตรงๆ ออกไปจะไม่ live-update เวลาไฟล์นี้ reassign ตัวแปรนั้นทีหลัง)
 // ============================================================
 const engine = {
+  // Type Mercury / ORT (characters/ort.js)
+  ortFx,
+  fortuneTargetList,
+  mercuryActive,
+  isOrt,
   players,
   CHAR_BY_ID,
   CHAR_HOOKS,

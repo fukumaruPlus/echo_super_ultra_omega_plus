@@ -24,7 +24,8 @@ module.exports = {
   //  พลาด/ไม่มีเส้นชีวิต -> ล้างเส้นชีวิตของเป้าหมายทั้งหมด — วีดีโอเล่นไปแล้วตอนกด (useSkill) จุดนี้แค่ตัดสินผล
   resolveKill(engine, p, t) {
     const lines = t.statuses.deathline || 0;
-    const chance = lines * TEPEU_KILL_CHANCE_PER_LINE;
+    // ORT (ต้านการสังหาร): ท่านี้ไม่ได้ผ่าน miyakoKillChance จึงต้องเรียกด่านของ ORT เอง
+    const chance = engine.CHAR_HOOKS.ort.killChanceAgainst(t, lines * TEPEU_KILL_CHANCE_PER_LINE);
     p.transformAt = engine.nextTransformCounter(); // เพลง/ฉากหลังใช้ลำดับล่าสุด (กรณีมีเทเปาหลายคน)
     p.tepeuEyeTurns = TEPEU_EYE_TURNS;
     if (lines > 0 && Math.random() < chance) {

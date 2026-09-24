@@ -7,8 +7,13 @@ import { AvScene, AvButton, SealButton, Crest, AvRule } from "../components/aval
 const LEVEL = 4;
 
 const TEAM_COLORS = { A: "#b95fc4", B: "#e8bf5a", C: "#5fc4a0" };
-const MODE_TITLES = { ffa: "อิสระ", duo: "คู่หู", trio: "สหายทั้ง 3 เอ๋ย" };
-const MODE_SUBTITLES = { ffa: "ทุกคนสู้กันเอง", duo: "ทีมละ 2 คน", trio: "ทีมละ 3 คน" };
+const MODE_TITLES = { ffa: "อิสระ", duo: "คู่หู", trio: "สหายทั้ง 3 เอ๋ย", seraph: "Moon Cell", mercury: "Type Mercury" };
+const MODE_SUBTITLES = { ffa: "ทุกคนสู้กันเอง", duo: "ทีมละ 2 คน", trio: "ทีมละ 3 คน", seraph: "SE.RA.PH", mercury: "เรดบอส ORT · ทุกคนร่วมทีม" };
+// หน้าเลือกรูปแบบสนามแบ่ง 2 ชั้น: เลือกหมวดก่อน แล้วค่อยโหวตโหมดในหมวดนั้น
+const MODE_GROUPS = [
+  { key: "normal", title: "สงครามทั่วไป", sub: "อิสระ · คู่หู · สหายทั้ง 3 เอ๋ย" },
+  { key: "special", title: "สงครามพิเศษ", sub: "Moon Cell · Type Mercury" },
+];
 
 const modeTitle = (mode) => MODE_TITLES[mode] || mode;
 const teamColor = (id) => TEAM_COLORS[id] || "var(--av-orchid)";
@@ -26,21 +31,54 @@ function ScreenTitle({ label, title }) {
 function TeamModeView({ state, onBack }) {
   const count = state.players.length;
   const me = state.players.find((p) => p.id === state.youId);
-  const options = state.modeVotes?.length ? state.modeVotes : (state.modeOptions?.length ? state.modeOptions : [
-    { mode: "ffa", label: "Free For All", enabled: count >= 2, voters: [], voteCount: 0 },
-    { mode: "duo", label: "Duo", enabled: count >= 4 && count % 2 === 0, voters: [], voteCount: 0 },
-    { mode: "trio", label: "Trio", enabled: count === 6, voters: [], voteCount: 0 },
+  const allOptions = state.modeVotes?.length ? state.modeVotes : (state.modeOptions?.length ? state.modeOptions : [
+    { mode: "ffa", label: "Free For All", group: "normal", enabled: count >= 2, voters: [], voteCount: 0 },
+    { mode: "duo", label: "Duo", group: "normal", enabled: count >= 4 && count % 2 === 0, voters: [], voteCount: 0 },
+    { mode: "trio", label: "Trio", group: "normal", enabled: count === 6, voters: [], voteCount: 0 },
   ]);
+  // หมวดที่เปิดดูอยู่ (เป็นแค่ฝั่งหน้าจอของเรา — ไม่ใช่การโหวต) · เริ่มจากหมวดที่เราโหวตไว้ถ้ามี
+  const myGroup = allOptions.find((o) => o.mode === me?.modeVote)?.group || null;
+  const [group, setGroup] = useState(myGroup);
+  const options = group ? allOptions.filter((o) => (o.group || "normal") === group) : [];
   const votedCount = state.players.filter((p) => p.modeVote).length;
-  const hint = (mode) => mode === "duo" ? "ต้องมี 4 หรือ 6 คน" : mode === "trio" ? "ต้องมี 6 คน" : "ใช้ได้ตั้งแต่ 2 คน";
+  const hint = (opt) => opt.suspended ? "พักใช้งาน"
+    : opt.mode === "duo" ? "ต้องมี 4 หรือ 6 คน" : opt.mode === "trio" ? "ต้องมี 6 คน"
+    : opt.mode === "mercury" ? "เล่นได้ 1-7 คน" : "ใช้ได้ตั้งแต่ 2 คน";
+  const groupVotes = (key) => allOptions.filter((o) => (o.group || "normal") === key).reduce((n, o) => n + (o.voteCount || 0), 0);
 
   return (
     <AvScene level={LEVEL} seed={53} className="h-screen w-screen overflow-hidden">
       <div className="av-content absolute top-10 left-12 z-30">
-        <ScreenTitle label={`โหวตแล้ว ${votedCount} จาก ${count} คน`} title="เลือกโหมดการเล่น" />
+        <ScreenTitle label={`โหวตแล้ว ${votedCount} จาก ${count} คน`} title={group ? MODE_GROUPS.find((g) => g.key === group)?.title : "เลือกรูปแบบสนาม"} />
       </div>
 
       <div className="av-content absolute z-10" style={{ left: "8vw", right: "8vw", top: "32vh", bottom: "17vh" }}>
+        {!group ? (
+          <div className="h-full flex gap-6">
+            {MODE_GROUPS.map((g, i) => (
+              <div key={g.key} className="av-rise av-seq flex-1 flex min-w-0" style={{ "--i": i + 1 }}>
+                <button
+                  onClick={() => { clickSound(); setGroup(g.key); }}
+                  data-on={myGroup === g.key ? "true" : "false"}
+                  className="av-wedge flex-1 min-w-0"
+                  style={{ transform: "skewX(-7deg)" }}
+                >
+                  <span className="av-wedge-fill" />
+                  <div className="relative h-full flex flex-col justify-between text-left px-[2.4vw] py-7 min-w-0" style={{ transform: "skewX(7deg)" }}>
+                    <div className="min-w-0">
+                      <div className={`${myGroup === g.key ? "av-title" : "av-title-purple"} av-title-thai text-5xl whitespace-nowrap`}>{g.title}</div>
+                      <div className="av-heading text-sm mt-2 truncate" style={{ color: "rgba(239,230,245,.55)" }}>{g.sub}</div>
+                    </div>
+                    <div className="min-w-0">
+                      <span className="av-numeral block" style={{ fontSize: "3.6rem", WebkitTextStroke: "2px rgba(185,95,196,.35)" }}>{groupVotes(g.key)}</span>
+                      <div className="av-label mt-1 truncate" style={{ fontSize: "0.74rem" }}>แตะเพื่อดูโหมดในหมวดนี้</div>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
         <div className="h-full flex gap-4">
           {options.map((opt, i) => {
             const selected = me?.modeVote === opt.mode;
@@ -87,7 +125,7 @@ function TeamModeView({ state, onBack }) {
                         {opt.voteCount || 0}
                       </span>
                       <div className="av-label mt-1 truncate" style={{ fontSize: "0.74rem" }}>
-                        {opt.enabled ? (selected ? "คุณโหวตแล้ว" : "แตะเพื่อโหวต") : hint(opt.mode)}
+                        {opt.enabled ? (selected ? "คุณโหวตแล้ว" : "แตะเพื่อโหวต") : hint(opt)}
                       </div>
                     </div>
                   </div>
@@ -96,6 +134,7 @@ function TeamModeView({ state, onBack }) {
             );
           })}
         </div>
+        )}
       </div>
 
       <div className="av-content absolute inset-x-12 bottom-6 flex flex-wrap justify-center gap-3 z-20">
@@ -107,8 +146,8 @@ function TeamModeView({ state, onBack }) {
         ))}
       </div>
 
-      <AvButton variant="ghost" className="fixed z-30 bottom-6 left-8 py-2 px-6 text-sm" onClick={onBack}>
-        ← ย้อนกลับ
+      <AvButton variant="ghost" className="fixed z-30 bottom-6 left-8 py-2 px-6 text-sm" onClick={group ? () => { clickSound(); setGroup(null); } : onBack}>
+        {group ? "← เลือกหมวดใหม่" : "← ย้อนกลับ"}
       </AvButton>
     </AvScene>
   );
@@ -247,7 +286,7 @@ export default function Lobby({ state, onBack, lowQ, onToggleLowQ, skillConfirmO
   const count = state.players.length;
   const me = state.players.find((p) => p.id === state.youId);
   const readyCount = state.players.filter((p) => p.ready).length;
-  const allReady = count >= 2 && state.players.every((p) => p.ready);
+  const allReady = count >= 1 && state.players.every((p) => p.ready); // เล่นคนเดียวได้ (Type Mercury)
   const byPos = Object.fromEntries(state.players.map((p) => [p.position, p]));
   const mid = (POSITIONS.length - 1) / 2;
 

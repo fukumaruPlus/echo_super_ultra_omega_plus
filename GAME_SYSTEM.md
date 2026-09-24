@@ -624,7 +624,7 @@ qtePending() / sweepQte()                กันสรุปรอบ + กว
 
 ---
 
-## 11. Overload Force + บอสยูกิ
+## 11. Overload Force
 
 - แต้มสูงสุด **เสมอกัน** → โรล 30% (`OVERLOAD_FORCE_CHANCE`) → `triggerOverloadForce()`
   - แจกไพ่ใหม่ **ในเทิร์นเดิม**, ปลดเพดาน 21 (ไม่มีการแตก), Joker = +12 ตายตัว
@@ -632,13 +632,39 @@ qtePending() / sweepQte()                กันสรุปรอบ + กว
 - **ย้อนทั้งเทิร์นก่อนแจกไพ่ใหม่**: `captureTurnSnapshot()` ถ่ายสภาพผู้เล่นทั้งหมด (+ `roundSkills`/ร้านค้า/ตัวแปรวงจรวัน-คืน/ยูนะ) ไว้ตอนปลาย `dealRound()` ก่อนเข้าเฟสจั่วไพ่ · `restoreTurnSnapshot()` เรียกเป็นอย่างแรกใน `triggerOverloadForce()`
   - คืนให้ครบ: แต้มสกิล, โควตา `skillUsedRound`/`kaiSkillUsesRound`/`bardNotesUsed`, ไอเทม+เหรียญ, ดาเมจ/ดีบัฟที่ก่อในเทิร์นนั้น, แม้แต่คนที่ตายไปแล้วก็ฟื้น (บั๊กเดิม: สกิลที่ทำงาน "หลังเปิดไพ่" ถูกล้างทิ้งพร้อมมือไพ่ = เสียแต้มกับสกิลฟรี)
   - **ไม่ย้อน** ข้อมูลการเชื่อมต่อ (`socketId`/`connected`/`sessionToken`/`ready`) และไม่ปลุกผู้เล่นที่ออกจากเกมกลางเทิร์น · สแนปช็อตใช้ได้ครั้งเดียว (ล้างทิ้งหลัง restore / ตอน `startMatch()` / กลับล็อบบี้)
-- **บอสยูกิเกิดได้เฉพาะโหมด `overload`** — `triggerOverloadForce()` เช็ค `gameMode === "overload"` ก่อนเรียก `createYuukiBoss()` ดังนั้น ffa/duo/trio ไม่มีทางเจอยูกิ (Overload Force ยังเกิดได้ตามปกติ ครั้งที่ 3+ ก็เป็นแค่ Overload Force ธรรมดา)
-- **โหมด `overload`**: เรียกบอสตั้งแต่ `startMatch()` — โค่นบอส = ผู้เล่นทุกคนชนะร่วมกัน (`yuukiDefeated`)
-- ยูกิเป็น player ปลอม id `__yuuki_boss__` — HP/เกราะสเกลตามจำนวนผู้เล่น (`YUUKI_SCALE` 1–6 คน = 7/3 … 30/5), เล่นเองผ่าน `autoPlayYuuki()` `:1235`
-  - จั่วตอบโต้ ≤1 ใบต่อไพ่ที่มนุษย์จั่ว (`yuukiReactiveDrawCredits`) + จั่วแก้มือช่วงสรุปอีก ≤2 ใบ
-  - ชนะ = โจมตี 2 เป้าไม่ซ้ำ (`yuukiAttackTargets`) · Star of Fall ทุก 5 เทิร์น · ยูกิไม่มีแต้มสกิล (`maxSkillOf` = 0)
+- **บอสยูกิและโหมด `overload` ถูกถอดออกแล้ว** (commit `2fe9e63`) — Overload Force ยังเกิดได้ตามปกติทุกโหมด
+  โครงผู้เล่นปลอมของยูกิเป็นต้นแบบของ ORT ในโหมด Type Mercury (ข้อ 11.1)
 
----
+### 11.1 โหมด Type Mercury (Raid Boss ORT)
+
+- `gameMode = "mercury"` · เล่นได้ 1-7 คน (`validGameMode`) · ห้องรอคนเดียวกดพร้อมก็เข้าหน้าเลือกรูปแบบสนามได้
+- หน้าโหวตแบ่ง 2 ชั้นด้วย `group` ใน `modeOptionsFor()`: `normal` (ffa/duo/trio) · `special` (seraph/mercury)
+  โหมดใน `SUSPENDED_MODES` ยังโผล่เป็นปุ่มเทา (`suspended: true`) และ `voteGameMode` ปฏิเสธ
+- **ORT = ผู้เล่นปลอม id `ORT_ID` ("__ort__") ที่นั่ง 8** สร้างใน `startMatch()` ผ่าน `createOrt()` ซึ่งใช้
+  `newPlayerRecord()` ตัวเดียวกับ handler `join` (ฟิลด์ครบทุกตัวที่ฮุคอื่นคาดหวัง) · ลบทิ้งที่ `startMatch`/`backToLobby`
+  ตรรกะทั้งหมดอยู่ `characters/ort.js` (ลงทะเบียนใน CHAR_HOOKS) · `characters.js` ติด `botOnly: true` = ดูได้ เลือกไม่ได้
+- จุดที่ engine กัน/เรียก ORT: `maxHpOf`/`maxArmorOf` (7/3 ต่อหลอด) · `maxSkillOf`/`addSkill`/`addGold` (ไม่มีแต้ม/เหรียญ) ·
+  `checkAllLocked` (ไม่รอ ORT) · `hit` (จั่วตามผู้เล่น 1 ใบ) · `resolveRound` (จั่วแก้มือ ≤2 ใบ + ทริกเกอร์สี) ·
+  `afterSummary` (ชนะรอบ = เลือกเป้าเลือด+เกราะน้อยสุด ค้างเฟส ATTACK `ORT_ATTACK_DELAY` วิ) ·
+  `doAttack` (สังหาร 20% + คริติคอล 75% ×2 หลังดาบเอจิ) · `instantDeath` (หลอดแตก / วิวัฒนาการ / ตัวละครสูญหาย)
+- **หลอดเลือด** = `p.ortBars` · ดักที่หัว `instantDeath()` จุดเดียว → ครอบทั้งเลือดหมดและสกิลสังหารทันที
+- **ต้านการสังหาร 40%** ดักที่ `miyakoKillChance()` (เนตรทุกตัวผ่านจุดนี้) + เทเปาที่ไม่ผ่านจุดนั้นเรียก `ort.killChanceAgainst` เอง
+- **ข้อมูลสูญหาย (สกิลติดตัว 1)**: `p.ortPendingLost` (สกิลแรกของเทิร์นนี้ จองที่จุดหักแต้มใน `useSkillCore`) →
+  `dealRound` แปลงเป็น `p.ortLostTier` · ส่งให้เจ้าของคนเดียวใน `buildStateFor` · client ปิดปุ่มผ่าน context ใน `SkillSlot`
+- **สวนกลับ (สกิลติดตัว 2)**: จองใน `ort.queueCounter` จาก 3 ทาง (ดาเมจที่ไม่ใช่โจมตีปกติผ่าน `adjustIncomingDamage` /
+  เป้าของ `useSkill` / ปืนใน `useInventoryItem`) แล้วลงดาเมจที่ `flushOrtCounters()` — ท้าย `useSkill`/`useInventoryItem`
+  (ยกเว้นเข้าเฟส CUTSCENE) · หลังคลิปใน `pausePlayingForCutscene` · `goSummary` · `endTurn` · ธง `flushing` กันสวนกันไปมา
+- **ตายแล้วเลือกตัวใหม่**: `instantDeath` → `mercuryOnDeath` (`mercuryLost` ทั้งห้อง) · socket `mercuryPick` →
+  `dealRound` เรียก `mercuryRespawnPicked()` ก่อนลูปแจกไพ่ (สร้างระเบียนใหม่ เก็บเหรียญ/ไอเทม รีเซ็ตแต้มสกิล)
+  · ถูกชุบชีวิตในร่างเดิม (Longing ของยูนะ) = ปลดล็อกตัวนั้นคืน
+- **ผลของ Raid** (`mercuryAdvance` ใน callback ของ `endTurn`): ORT ตาย = ชนะ · ไม่มีใครในสนามและเลือกตัวไม่ได้แล้ว = แพ้ ·
+  ตายหมดแต่ยังเลือกได้ = `mercuryHold` (เกมหยุด เวลาไม่เดิน จน `mercuryPick` สั่งเดินต่อ) · โหวตยอมแพ้ = `mercurySurrenderVote`
+  (เกินครึ่งห้องจบทันที / หมดเวลา `MERCURY_SURRENDER_SECONDS` นับเฉพาะคนที่กด เสมอ = สู้ต่อ)
+- `sameTeam()` คืน true ระหว่างผู้เล่นจริงทุกคนในโหมดนี้ (ตีกันเอง/เอฟเฟกต์ลบใส่กันไม่ได้) · เพื่อนร่วมทีมเห็นแต้มกันตลอด (`teamReveal`)
+- ฉากเปิดตัว: server พักเฟส CUTSCENE (ไม่มีคลิป) `MERCURY_ARRIVAL_SECONDS` (env ย่อได้ในเทสต์) · client เล่น `OrtArrival`
+  แทน `GameIntro` · อนิเมชันบนตัวบอสยิงผ่าน event `ortFx` (ไม่หยุดเกม) → `OrtBossPanel` เรียก `ortStage.play(kind)`
+- เทสต์: [tests/characters/ort.test.js](tests/characters/ort.test.js) · [tests/mercury.integration.test.js](tests/mercury.integration.test.js)
+
 
 ## 12. โหมดทีม
 

@@ -1,0 +1,92 @@
+/* โหมด Type Mercury — หน้าตัวอย่างอนิเมชันบอส ORT */
+.raid-preview {
+  --raid-abyss: #050817;
+  --raid-deep: #0b1230;
+  --raid-line: #1d2a5c;
+  --raid-cyan: #3ee6ff;
+  --raid-ice: #d4f7ff;
+  --raid-crit: #ff3d6e;
+  --raid-muted: #8a9bc9;
+  min-height: 100vh;
+  background: var(--raid-abyss);
+  color: var(--raid-ice);
+  font-family: var(--font-display);
+  padding: 16px 16px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+.raid-head { width: 100%; max-width: 1200px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.raid-back, .raid-controls button {
+  font-family: var(--font-p-display);
+  font-size: 14px;
+  color: var(--raid-ice);
+  background: var(--raid-deep);
+  border: 1px solid var(--raid-line);
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.raid-back:hover, .raid-controls button:hover { border-color: var(--raid-cyan); background: #101a44; }
+.raid-back:focus-visible, .raid-controls button:focus-visible { outline: 2px solid var(--raid-cyan); outline-offset: 2px; }
+.raid-title { display: flex; flex-direction: column; line-height: 1.2; }
+.raid-mode { font-family: var(--font-p-display); font-weight: 700; font-size: 22px; letter-spacing: .08em; color: var(--raid-cyan); }
+.raid-sub { font-size: 12px; color: var(--raid-muted); }
+
+.raid-stage {
+  position: relative;
+  width: 100%;
+  max-width: 1200px;
+  aspect-ratio: 16 / 9;
+  max-height: calc(100vh - 170px);
+  border: 1px solid var(--raid-line);
+  background: #02040c;
+  overflow: hidden;
+}
+.raid-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+.raid-hud {
+  position: absolute; left: 0; right: 0; top: 0;
+  padding: 12px 16px 20px;
+  display: grid; gap: 6px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(3,6,20,.85), rgba(3,6,20,0));
+}
+.raid-hud-top { display: flex; align-items: center; gap: 10px; }
+.raid-boss { font-family: var(--font-p-display); font-weight: 700; font-size: clamp(20px, 3vw, 30px); letter-spacing: .18em; line-height: 1; text-shadow: 0 0 14px rgba(62,230,255,.6); }
+.raid-tag { font-size: 12px; padding: 2px 8px; border: 1px solid var(--raid-crit); color: #ffc2d1; background: rgba(255,61,110,.12); }
+.raid-atk { margin-left: auto; font-size: 13px; color: var(--raid-muted); font-variant-numeric: tabular-nums; }
+.raid-atk b { color: var(--raid-ice); font-size: 16px; }
+.raid-pips { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.raid-pip { width: 18px; height: 6px; background: var(--raid-cyan); box-shadow: 0 0 8px rgba(62,230,255,.7); transform: skewX(-20deg); }
+.raid-pip.gone { background: #26325e; box-shadow: none; }
+.raid-pips small { margin-left: 6px; font-size: 12px; color: var(--raid-muted); font-variant-numeric: tabular-nums; }
+.raid-cells { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 3px; max-width: 460px; }
+.raid-cell { height: 10px; background: #e8475f; box-shadow: 0 0 6px rgba(232,71,95,.5); }
+.raid-cell.armor { background: #9fb4d8; box-shadow: 0 0 6px rgba(159,180,216,.45); }
+.raid-cell.empty { background: #1a2246; box-shadow: none; }
+
+.raid-controls { width: 100%; max-width: 1200px; display: flex; flex-wrap: wrap; gap: 8px; }
+.raid-controls button.hot { border-color: var(--raid-crit); }
+.raid-controls button[aria-pressed="true"] { border-color: var(--raid-cyan); color: var(--raid-cyan); }
+
+/* ปุ่มลัดหน้าแรก */
+.raid-shortcut {
+  position: absolute;
+  left: 2.2rem;
+  bottom: 2rem;
+  z-index: 12;
+  font-family: var(--font-p-display);
+  font-size: 13px;
+  letter-spacing: .06em;
+  color: #d4f7ff;
+  background: rgba(8,14,40,.72);
+  border: 1px solid rgba(62,230,255,.55);
+  padding: 8px 14px;
+  cursor: pointer;
+  box-shadow: 0 0 14px rgba(62,230,255,.25);
+  transition: background .15s, box-shadow .15s;
+}
+.raid-shortcut:hover { background: rgba(16,26,68,.9); box-shadow: 0 0 20px rgba(62,230,255,.45); }
+.raid-shortcut:focus-visible { outline: 2px solid #3ee6ff; outline-offset: 2px; }

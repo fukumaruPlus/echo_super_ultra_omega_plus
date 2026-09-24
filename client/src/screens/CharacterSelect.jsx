@@ -16,6 +16,8 @@ const DIFFICULTY_GROUPS = [
   { key: "special", label: "พิเศษ", color: "#0e7490", order: ["ultraman_trigger", "yui", "shido", "brian", "producer_lumi"] },
   // หมวดตามสังกัด ไม่ใช่ระดับความยาก — ไรเดอร์ทุกคนที่มี Clock Up (แกนร่วม characters/_zect.js)
   { key: "zect", label: "องค์กรZectz", color: "#3B5BA5", order: ["daisuke", "yaguruma", "kagami", "tsurugi"] },
+  // มหันตภัย: บอส (บอตเท่านั้น) — ดูข้อมูลได้แต่เลือกเล่นไม่ได้
+  { key: "calamity", label: "มหันตภัย", color: "#7f1d1d", order: ["ort"] },
 ];
 
 function charsInGroup(roster, g) {
@@ -52,7 +54,9 @@ function SkillCard({ label, skill, i }) {
   );
 }
 
-export default function CharacterSelect({ roster, position, color: myColor, name, takenChars = [], onConfirm, onBack }) {
+// lostChars / blockedChars / confirmLabel / backLabel / title: ใช้ตอนเลือกตัวใหม่กลางโหมด Type Mercury
+//  lostChars = ตัวที่ตายไปแล้วใน Raid ("ข้อมูลสูญหาย") · blockedChars = ตัวที่ใช้ไม่ได้ด้วยเหตุผลอื่น (เช่น unique ที่เพื่อนใช้อยู่)
+export default function CharacterSelect({ roster, position, color: myColor, name, takenChars = [], lostChars = [], blockedChars = [], confirmLabel = "เรียกขาน", backLabel = "← กลับ", title, onConfirm, onBack }) {
   const [picked, setPicked] = useState(null);
   const [tab, setTab] = useState("all");
   const [shikiUlt, setShikiUlt] = useState("deatheye");
@@ -78,6 +82,15 @@ export default function CharacterSelect({ roster, position, color: myColor, name
   const selGroup = sel ? DIFFICULTY_GROUPS.find((g) => g.key === (sel.difficulty || "easy")) : null;
 
   const isTaken = (c) => !!c && !!c.unique && takenChars.includes(c.id);
+  // เหตุผลที่เลือกตัวนี้ไม่ได้ (null = เลือกได้) — ตัวที่เลือกไม่ได้ยังกดดูข้อมูลได้ ยกเว้นตัว unique ที่ถูกจองไปแล้ว
+  const blockReason = (c) => {
+    if (!c) return null;
+    if (c.botOnly) return "บอสเท่านั้น";
+    if (lostChars.includes(c.id)) return "ข้อมูลสูญหาย";
+    if (isTaken(c)) return "ถูกเลือกไปแล้ว";
+    if (blockedChars.includes(c.id)) return "ใช้ไม่ได้";
+    return null;
+  };
 
   const pickChar = (id) => {
     setPicked(id);
@@ -99,7 +112,7 @@ export default function CharacterSelect({ roster, position, color: myColor, name
     el.scrollLeft += delta;
   }, []);
 
-  const confirm = () => { if (picked && !sel?.locked && !isTaken(sel)) onConfirm(picked, picked === "shiki" ? { shikiUlt } : undefined); };
+  const confirm = () => { if (picked && !sel?.locked && !blockReason(sel)) onConfirm(picked, picked === "shiki" ? { shikiUlt } : undefined); };
 
   const skills = [];
   if (sel) {
@@ -109,6 +122,7 @@ export default function CharacterSelect({ roster, position, color: myColor, name
     if (sel.id === "nanaya") { push("สกิลติดตัว 2", sel.passive2); push("สกิลติดตัว 3", sel.passive3); }
     if (sel.id === "conner") { push("สกิลติดตัว 2", sel.passive2); push("สกิลติดตัว 3", sel.passive3); push("สกิลติดตัว 4", sel.passive4); }
     if (sel.id === "cayenne") push("สกิลติดตัว 2", sel.passive2);
+    if (sel.id === "ort") { push("สกิลติดตัว 2", sel.passive2); push("สกิลติดตัว 3", sel.passive3); }
     push(sel.basicNight ? "สกิลพื้นฐาน (กลางวัน)" : "สกิลพื้นฐาน", sel.basic);
     if (sel.basicNight) push("สกิลพื้นฐาน (กลางคืน)", sel.basicNight);
     if (sel.id === "hisakawa_sister") push("สกิลพื้นฐาน 2 (เมื่อแฝดล้ม)", sel.basic2);
@@ -140,9 +154,9 @@ export default function CharacterSelect({ roster, position, color: myColor, name
         <span className="av-logo-seal">
           <img src="/image/logo_current.webp" alt="ECHO" className="h-7 w-auto" />
         </span>
-        <div className="av-label">เลือกตัวละคร</div>
+        <div className="av-label">{title || "เลือกตัวละคร"}</div>
         <AvButton variant="ghost" className="py-1.5 px-5 text-sm ml-2" onClick={onBack}>
-          ← กลับ
+          {backLabel}
         </AvButton>
       </div>
 
@@ -177,7 +191,7 @@ export default function CharacterSelect({ roster, position, color: myColor, name
                   {selGroup.label}
                 </span>
               )}
-              {isTaken(sel) && <span className="av-chip av-chip-gold">ถูกเลือกไปแล้ว</span>}
+              {blockReason(sel) && <span className="av-chip av-chip-gold">{blockReason(sel)}</span>}
             </div>
             <div className="av-title av-title-thai text-[4rem] av-ink">{sel.name}</div>
             <span className="av-crack block mt-1" style={{ position: "relative", width: "24vw", height: 2 }} />
@@ -240,6 +254,7 @@ export default function CharacterSelect({ roster, position, color: myColor, name
             const g = DIFFICULTY_GROUPS.find((gr) => gr.key === (c.difficulty || "easy"));
             const active = c.id === picked;
             const taken = isTaken(c);
+            const reason = blockReason(c);
             return (
               <div key={c.id} className="shrink-0 flex flex-col items-center gap-2 av-rise av-seq" style={{ "--i": Math.min(i, 18) }}>
                 <Medallion
@@ -247,7 +262,7 @@ export default function CharacterSelect({ roster, position, color: myColor, name
                   disabled={taken}
                   size={active ? 102 : 86}
                   onClick={() => pickChar(c.id)}
-                  title={c.locked ? "ยังไม่ปลดล็อก" : taken ? `${c.name} — มีผู้เล่นอื่นเลือกไปแล้ว` : c.name}
+                  title={c.locked ? "ยังไม่ปลดล็อก" : reason ? `${c.name} — ${reason}` : c.name}
                 >
                   <span className="absolute inset-[3px] rounded-full overflow-hidden">
                     <CharArt c={c} className="w-full h-full object-cover" emojiSize="2rem" />
@@ -257,6 +272,12 @@ export default function CharacterSelect({ roster, position, color: myColor, name
                     style={{ background: g?.color || "var(--av-purple)", boxShadow: `0 0 10px 2px ${g?.color || "#6d2f83"}` }}
                   />
                   {active && <Crystals level={5} seed={i + 1} />}
+                  {reason && reason !== "ถูกเลือกไปแล้ว" && (
+                    <span className="absolute inset-0 rounded-full grid place-items-center text-[10px] font-bold text-center leading-tight"
+                      style={{ background: "rgba(10,4,12,.62)", color: reason === "ข้อมูลสูญหาย" ? "#ff8fab" : "#f5e6b8" }}>
+                      {reason === "ข้อมูลสูญหาย" ? <>DATA LOST<br />ข้อมูลสูญหาย</> : reason}
+                    </span>
+                  )}
                 </Medallion>
                 <span
                   className="av-heading text-xs max-w-[6.5rem] truncate text-center"
@@ -280,7 +301,7 @@ export default function CharacterSelect({ roster, position, color: myColor, name
             transition: "opacity .4s ease",
           }}
         >
-          <SealButton ready={!!sel && !sel.locked && !isTaken(sel)} label="เรียกขาน" onClick={confirm} />
+          <SealButton ready={!!sel && !sel.locked && !blockReason(sel)} label={confirmLabel} onClick={confirm} />
         </div>
       )}
     </AvScene>

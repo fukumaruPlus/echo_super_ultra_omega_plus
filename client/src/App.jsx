@@ -12,6 +12,8 @@ import SeraphGame from "./seraph/SeraphGame";
 import VolumeControl from "./components/VolumeControl";
 import TransitionCurtain from "./components/TransitionCurtain";
 import GameIntro from "./components/GameIntro";
+import RaidPreview from "./raid/RaidPreview";
+import OrtArrival from "./raid/OrtArrival";
 
 const SESSION_KEY = 'echo_session';
 
@@ -27,7 +29,7 @@ function saveSessionToken(token) {
 }
 
 export default function App() {
-  const [stage, setStage] = useState("splash"); // splash | setup | character | connected
+  const [stage, setStage] = useState("splash"); // splash | raidPreview | setup | character | connected
   const [state, setState] = useState(null);
 
   // เสียงที่ดังบ่อยที่สุดในเกม: โหลดไว้ตั้งแต่เปิดหน้า ไม่ให้ไปสะดุดกลางแมตช์
@@ -38,6 +40,8 @@ export default function App() {
   // ฉากเปิดตัวผู้เล่นตอนแมตช์เริ่ม (LOBBY -> เกม) — เล่นก่อนเข้าฉากสนามจริงเสมอ
   const [showIntro, setShowIntro] = useState(false);
   const [introPlayers, setIntroPlayers] = useState([]);
+  // Type Mercury: ฉากเปิดตัว ORT แทนฉากเปิดตัวผู้เล่น
+  const [showArrival, setShowArrival] = useState(false);
   const prevGameStateRef = useRef(null);
   const [roster, setRoster] = useState([]);
   const [takenChars, setTakenChars] = useState([]); // ตัวละคร unique ที่มีคนเลือกไปแล้ว (คอนเนอร์ RK800)
@@ -90,7 +94,11 @@ export default function App() {
       // SE.RA.PH: **ห้ามเล่นฉากเปิดตัวผู้เล่นเด็ดขาด** — GameIntro เผยหน้า+ชื่อตัวละครของทุกคน
       //  ซึ่งทำลายแก่นของโหมด (ตัวตนต้องถูกซ่อนจนกว่าจะลงดวล) โหมดนี้มีฉากเปิดของตัวเอง
       //  คือ "บูตระบบ SE.RA.PH" ที่โชว์ทุกคนเป็นเงาดำ ??? แทน (seraph/scenes.jsx)
-      if (!wasInMatch && nowInMatch && !s.seraph) {
+      //  Type Mercury: ไม่มีฉากเปิดตัวผู้เล่น — เล่นฉากเปิดตัว ORT (ม่านเตือนภัย + "หายนะกำลังมาเยือน") แทน
+      if (!wasInMatch && nowInMatch && s.mercury) {
+        curtainRef.current?.skip("ortarrival");
+        setShowArrival(true);
+      } else if (!wasInMatch && nowInMatch && !s.seraph) {
         curtainRef.current?.skip("gameintro");
         setIntroPlayers(s.players);
         setShowIntro(true);
@@ -229,8 +237,11 @@ export default function App() {
     if (!seraphMode) {
       // โหมดประหยัด (patch 2.0.6): ข้ามวีดีโอคัตซีน — ระหว่างรอคนอื่นดูวีดีโอ เพลงเล่นต่อตามปกติ
       // หน้าไตเติล: ยังไม่เล่นเพลง — เพลงหน้าหลักเริ่มหลังกดเข้าเกมเท่านั้น
+      // หน้าตัวอย่าง Type Mercury: เพลงประจำตัว ORT
       const track = stage === "splash"
         ? { name: null }
+        : stage === "raidPreview"
+        ? { name: "ort_theme" }
         : musicForState(stage === "connected" ? state : null, { lowQ, cycleSeq: cycleSeq.current, attackSeq: attackSeq.current });
       if (track.name) playMusic(track.name, track.seq);
       else stopMusic();
@@ -284,6 +295,10 @@ export default function App() {
   };
   // ฉากเปิดตัวผู้เล่นจบแล้ว -> ปิดจอ (local, ควบคุมได้แน่นอน) แล้วค่อยสลับเป็นสนามเกมจริง
   // ฉากเปิดตัวมีอนิเมชันปิดฉากของตัวเอง (เผยสนามที่วางรออยู่ข้างหลัง) จึงไม่ใช้ม่านละอองคั่น
+  const finishArrival = () => {
+    curtainRef.current?.skip("game");
+    setShowArrival(false);
+  };
   const finishIntro = () => {
     curtainRef.current?.skip("game");
     setShowIntro(false);
@@ -292,8 +307,16 @@ export default function App() {
   let screen;
   let screenKey;
   if (stage === "splash") {
-    screen = <Splash onEnter={() => navigate("setup", () => setStage("setup"))} />;
+    screen = (
+      <Splash
+        onEnter={() => navigate("setup", () => setStage("setup"))}
+        onRaidPreview={() => navigate("raidPreview", () => setStage("raidPreview"))}
+      />
+    );
     screenKey = "splash";
+  } else if (stage === "raidPreview") {
+    screen = <RaidPreview lowQ={lowQ} onBack={() => navigate("splash", () => setStage("splash"))} />;
+    screenKey = "raidPreview";
   } else if (stage === "setup") {
     screen = (
       <Setup
@@ -339,11 +362,19 @@ export default function App() {
       />
     );
     screenKey = "lobby";
+  } else if (showArrival) {
+    screen = (
+      <>
+        <Game state={state} lowQ={lowQ} skillConfirmOn={skillConfirmOn} roster={roster} muteScenes />
+        <OrtArrival lowQ={lowQ} onDone={finishArrival} />
+      </>
+    );
+    screenKey = "ortarrival";
   } else if (showIntro) {
     // แมตช์เพิ่งเริ่ม -> เผยผู้เล่นทีละคนก่อนเสมอ (ควบคุมด้วย navigate เอง ไม่ผูกกับ state ของเกมที่เดินต่อไปเรื่อยๆ)
     screen = (
       <>
-        <Game state={state} lowQ={lowQ} skillConfirmOn={skillConfirmOn} muteScenes />
+        <Game state={state} lowQ={lowQ} skillConfirmOn={skillConfirmOn} roster={roster} muteScenes />
         <GameIntro players={introPlayers} onDone={finishIntro} />
       </>
     );
@@ -353,7 +384,7 @@ export default function App() {
     screen = <SeraphGame state={state} lowQ={lowQ} skillConfirmOn={skillConfirmOn} />;
     screenKey = "game";
   } else {
-    screen = <Game state={state} lowQ={lowQ} skillConfirmOn={skillConfirmOn} />;
+    screen = <Game state={state} lowQ={lowQ} skillConfirmOn={skillConfirmOn} roster={roster} />;
     screenKey = "game";
   }
 

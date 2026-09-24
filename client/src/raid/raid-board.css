@@ -1,0 +1,277 @@
+/* ============================================================
+   บอส ORT บนกระดานจริง (OrtBossPanel)
+   ============================================================ */
+.ort-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(62, 230, 255, 0.45);
+  background: #02040c;
+  box-shadow: 0 0 28px rgba(62, 230, 255, 0.18), inset 0 0 40px rgba(0, 0, 0, 0.6);
+  clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 22px 100%, 0 calc(100% - 22px));
+  cursor: pointer;
+  font-family: var(--font-display);
+  color: #d4f7ff;
+}
+.ort-panel:focus-visible { outline: 2px solid #3ee6ff; outline-offset: 3px; }
+.ort-panel-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.ort-panel-hud {
+  position: absolute; left: 0; right: 0; top: 0;
+  padding: 10px 14px 18px;
+  display: grid; gap: 5px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(3, 6, 20, .88), rgba(3, 6, 20, 0));
+}
+.ort-panel-hud .raid-hud-top { display: flex; align-items: center; gap: 10px; }
+.ort-panel-hud .raid-boss { font-family: var(--font-p-display); font-weight: 700; font-size: 26px; letter-spacing: .18em; line-height: 1; text-shadow: 0 0 14px rgba(62, 230, 255, .6); }
+.ort-panel-hud .raid-tag { font-size: 11px; padding: 2px 8px; border: 1px solid #ff3d6e; color: #ffc2d1; background: rgba(255, 61, 110, .12); }
+.ort-panel-hud .raid-atk { margin-left: auto; font-size: 12px; color: #8a9bc9; font-variant-numeric: tabular-nums; }
+.ort-panel-hud .raid-atk b { color: #d4f7ff; font-size: 15px; }
+.ort-panel-hud .raid-pips { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.ort-panel-hud .raid-pip { width: 16px; height: 6px; background: #3ee6ff; box-shadow: 0 0 8px rgba(62, 230, 255, .7); transform: skewX(-20deg); }
+.ort-panel-hud .raid-pip.gone { background: #26325e; box-shadow: none; }
+.ort-panel-hud .raid-pips small { margin-left: 6px; font-size: 11px; color: #8a9bc9; font-variant-numeric: tabular-nums; }
+.ort-panel-hud .raid-cells { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 3px; max-width: 360px; }
+.ort-panel-hud .raid-cell { height: 9px; background: #e8475f; box-shadow: 0 0 6px rgba(232, 71, 95, .5); }
+.ort-panel-hud .raid-cell.armor { background: #9fb4d8; box-shadow: 0 0 6px rgba(159, 180, 216, .45); }
+.ort-panel-hud .raid-cell.empty { background: #1a2246; box-shadow: none; }
+.ort-panel-status { pointer-events: auto; max-width: 70%; }
+.ort-panel-foot {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: flex; align-items: baseline; gap: 12px; justify-content: center;
+  padding: 8px 12px 10px;
+  font-size: 13px; color: #a9b8e0;
+  background: linear-gradient(to top, rgba(3, 6, 20, .85), rgba(3, 6, 20, 0));
+  pointer-events: none;
+}
+.ort-panel-foot b { font-family: var(--font-p-display); font-size: 22px; color: #eafcff; }
+.ort-panel-foot b.ort-bust { color: #ff6b8a; }
+.ort-panel-foot b.ort-win { font-size: 15px; color: #ffd66b; }
+.ort-targetable { border-color: #ff3d6e; box-shadow: 0 0 34px rgba(255, 61, 110, 0.55); cursor: crosshair; animation: ortTargetPulse 1.1s ease-in-out infinite; }
+@keyframes ortTargetPulse { 50% { box-shadow: 0 0 52px rgba(255, 61, 110, 0.85); } }
+.ort-target-badge {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  font-family: var(--font-p-display); font-weight: 700; font-size: 20px;
+  padding: 6px 16px; color: #fff; background: rgba(255, 61, 110, 0.82);
+  pointer-events: none; white-space: nowrap;
+}
+.ort-dead { filter: grayscale(1) brightness(.5); }
+.ort-panel-compact .ort-panel-hud .raid-boss { font-size: 20px; }
+.ort-panel-compact .ort-panel-hud { padding: 8px 10px 12px; }
+
+/* ============================================================
+   ฉากเปิดตัว ORT (OrtArrival) — ม่านเหล็กเตือนภัย -> ORT ปรากฏ -> "หายนะกำลังมาเยือน"
+   ============================================================ */
+.ort-arrival {
+  position: fixed; inset: 0; z-index: 90;
+  background: #000;
+  overflow: hidden;
+  color: #eafcff;
+  font-family: var(--font-p-display);
+}
+.ort-arrival-canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .6s ease; }
+.ort-arrival-ort .ort-arrival-canvas,
+.ort-arrival-doom .ort-arrival-canvas,
+.ort-arrival-fade .ort-arrival-canvas { opacity: 1; }
+.ort-arrival-shut { animation: ortQuake .5s steps(8) .35s 1; }
+.ort-arrival-doom { animation: ortQuake .9s steps(10) 1; }
+@keyframes ortQuake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-9px, 5px); }
+  40% { transform: translate(8px, -6px); }
+  60% { transform: translate(-6px, -4px); }
+  80% { transform: translate(5px, 7px); }
+}
+
+/* ม่าน 2 บาน */
+.ort-shutter {
+  position: absolute; left: 0; right: 0; height: 50.5%;
+  background: linear-gradient(180deg, #16141a, #0b0a0e);
+  z-index: 5;
+}
+.ort-shutter-top { top: 0; transform: translateY(-101%); animation: ortShutTop .42s cubic-bezier(.2, .9, .3, 1.15) forwards; }
+.ort-shutter-bottom { bottom: 0; transform: translateY(101%); animation: ortShutBottom .42s cubic-bezier(.2, .9, .3, 1.15) forwards; }
+@keyframes ortShutTop { to { transform: translateY(0); } }
+@keyframes ortShutBottom { to { transform: translateY(0); } }
+.ort-arrival:not(.ort-arrival-shut) .ort-shutter-top { animation: ortRipTop .5s cubic-bezier(.7, 0, .9, .3) forwards; }
+.ort-arrival:not(.ort-arrival-shut) .ort-shutter-bottom { animation: ortRipBottom .5s cubic-bezier(.7, 0, .9, .3) forwards; }
+@keyframes ortRipTop { from { transform: translateY(0); } to { transform: translateY(-104%); } }
+@keyframes ortRipBottom { from { transform: translateY(0); } to { transform: translateY(104%); } }
+.ort-shutter-stripes {
+  position: absolute; left: 0; right: 0; height: 34px;
+  background: repeating-linear-gradient(-45deg, #f5c518 0 22px, #111 22px 44px);
+  box-shadow: 0 0 24px rgba(245, 197, 24, .35);
+}
+.ort-shutter-top .ort-shutter-stripes { bottom: 0; }
+.ort-shutter-bottom .ort-shutter-stripes { top: 0; }
+.ort-shutter-warn {
+  position: absolute; left: 0; right: 0; bottom: 64px;
+  display: grid; gap: 10px; justify-items: center; text-align: center;
+  padding: 0 16px;
+}
+.ort-warn-head {
+  font-size: clamp(26px, 5vw, 58px); font-weight: 700; letter-spacing: .06em;
+  color: #ff3d6e; text-shadow: 0 0 22px rgba(255, 61, 110, .8);
+  animation: ortType .35s steps(12) both, ortBlink .5s steps(2) .35s 4;
+}
+.ort-warn-line { font-size: clamp(15px, 2.2vw, 24px); color: #f5d9a0; letter-spacing: .04em; animation: ortType .4s steps(14) both; }
+@keyframes ortType { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes ortBlink { 50% { opacity: .15; } }
+.ort-siren {
+  position: absolute; left: 50%; top: 60px; width: 120vmax; height: 120vmax; margin-left: -60vmax;
+  background: conic-gradient(from 0deg, rgba(255, 30, 60, .38), transparent 18%, transparent 50%, rgba(255, 30, 60, .38) 68%, transparent 86%);
+  animation: ortSiren 1.1s linear infinite;
+  mix-blend-mode: screen;
+}
+@keyframes ortSiren { to { transform: rotate(360deg); } }
+
+/* ชื่อโหมด */
+.ort-arrival-mode {
+  position: absolute; inset: 0; z-index: 4;
+  display: grid; place-content: center; justify-items: center; gap: 6px;
+  opacity: 0; pointer-events: none;
+}
+.ort-arrival-open .ort-arrival-mode { animation: ortModeFlash 1.5s ease both; }
+@keyframes ortModeFlash {
+  0% { opacity: 0; transform: scale(1.3); filter: blur(8px); }
+  15% { opacity: 1; transform: scale(1); filter: blur(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: scale(.94); }
+}
+.ort-arrival-mode-label { font-size: clamp(14px, 2vw, 20px); letter-spacing: .5em; color: #ff8fab; }
+.ort-arrival-mode-name {
+  position: relative;
+  font-size: clamp(44px, 10vw, 140px); font-weight: 700; letter-spacing: .12em; line-height: 1;
+  color: #eafcff; text-shadow: 0 0 30px rgba(62, 230, 255, .8);
+}
+.ort-arrival-mode-name::before,
+.ort-arrival-mode-name::after { content: attr(data-text); position: absolute; inset: 0; mix-blend-mode: screen; }
+.ort-arrival-mode-name::before { color: #ff3d6e; animation: ortGlitchA .25s steps(2) infinite; }
+.ort-arrival-mode-name::after { color: #3ee6ff; animation: ortGlitchB .3s steps(2) infinite; }
+@keyframes ortGlitchA {
+  0% { transform: translate(4px, -2px); clip-path: inset(10% 0 55% 0); }
+  100% { transform: translate(-3px, 2px); clip-path: inset(60% 0 8% 0); }
+}
+@keyframes ortGlitchB {
+  0% { transform: translate(-4px, 2px); clip-path: inset(45% 0 20% 0); }
+  100% { transform: translate(3px, -1px); clip-path: inset(5% 0 70% 0); }
+}
+
+/* "หายนะกำลังมาเยือน" */
+.ort-arrival-doom {
+  position: absolute; inset: 0; z-index: 6;
+  display: grid; place-content: center; justify-items: center; gap: 14px;
+  background: radial-gradient(ellipse at center, rgba(40, 0, 10, .55), rgba(0, 0, 0, .85) 70%);
+  animation: ortDoomBg .5s ease both;
+}
+@keyframes ortDoomBg { from { opacity: 0; } to { opacity: 1; } }
+.ort-arrival-doom-text { display: flex; flex-wrap: wrap; justify-content: center; padding: 0 16px; }
+.ort-arrival-doom-text span {
+  display: inline-block;
+  font-family: "Kanit", var(--font-p-display), sans-serif;
+  font-weight: 800; font-size: clamp(40px, 9vw, 128px); line-height: 1.15;
+  color: #fff;
+  text-shadow: 0 0 18px rgba(255, 61, 110, .9), 0 0 60px rgba(255, 30, 60, .6);
+  animation: ortSlam .38s cubic-bezier(.2, 1.4, .4, 1) both;
+  animation-delay: calc(var(--i) * 70ms);
+}
+@keyframes ortSlam {
+  from { opacity: 0; transform: scale(3.2) translateY(-20px); filter: blur(10px); }
+  to { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+.ort-arrival-doom-sub { font-size: clamp(14px, 2vw, 22px); letter-spacing: .14em; color: #a9b8e0; animation: ortDoomSub .6s ease 1.4s both; }
+@keyframes ortDoomSub { from { opacity: 0; letter-spacing: .5em; } to { opacity: 1; } }
+.ort-arrival-crack {
+  position: absolute; left: -5%; right: -5%; top: 50%; height: 3px;
+  background: linear-gradient(90deg, transparent, #ffd0d8 20%, #fff 50%, #ffd0d8 80%, transparent);
+  box-shadow: 0 0 20px 3px rgba(255, 61, 110, .8);
+  transform: rotate(-4deg) scaleX(0);
+  animation: ortCrack .35s ease 1.2s forwards;
+}
+@keyframes ortCrack { to { transform: rotate(-4deg) scaleX(1); } }
+.ort-arrival-vignette { position: absolute; inset: 0; z-index: 7; pointer-events: none; box-shadow: inset 0 0 180px rgba(120, 0, 20, .55); }
+.ort-arrival-fade { animation: ortFadeOut .7s ease forwards; }
+@keyframes ortFadeOut { to { opacity: 0; } }
+/* โหมดประหยัด / ลดการเคลื่อนไหว: ไม่สั่นจอ ไม่กะพริบ (ลำดับฉากยังเหมือนเดิม) */
+.ort-arrival-calm.ort-arrival-shut,
+.ort-arrival-calm.ort-arrival-doom,
+.ort-arrival-calm .ort-siren,
+.ort-arrival-calm .ort-arrival-mode-name::before,
+.ort-arrival-calm .ort-arrival-mode-name::after { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .ort-arrival-shut, .ort-arrival-doom, .ort-siren,
+  .ort-arrival-mode-name::before, .ort-arrival-mode-name::after { animation: none; }
+}
+
+/* ============================================================
+   Raid บนกระดาน: ลิ้นชักกองกลาง / โหวตยอมแพ้ / เลือกตัวใหม่
+   ============================================================ */
+.raid-deck-drawer {
+  position: absolute; top: 18%; right: 0; z-index: 25;
+  display: flex; align-items: stretch;
+  transform: translateX(calc(100% - 44px));
+  transition: transform .35s cubic-bezier(.16, 1, .3, 1);
+}
+.raid-deck-drawer[data-open="true"] { transform: translateX(0); }
+.raid-deck-tab {
+  width: 44px; writing-mode: vertical-rl;
+  font-family: var(--font-display); font-size: 14px; letter-spacing: .12em;
+  color: #f5e6b8; background: linear-gradient(180deg, rgba(46, 17, 69, .95), rgba(10, 6, 17, .95));
+  border: 1px solid rgba(232, 191, 90, .55); border-right: 0;
+  cursor: pointer; padding: 14px 0;
+}
+.raid-deck-tab:focus-visible { outline: 2px solid #e8bf5a; outline-offset: 2px; }
+.raid-deck-body {
+  padding: 18px 22px;
+  background: linear-gradient(180deg, rgba(20, 10, 32, .96), rgba(8, 5, 14, .96));
+  border: 1px solid rgba(232, 191, 90, .4);
+  display: grid; justify-items: center; gap: 8px;
+}
+.raid-deck-body small { font-size: 12px; color: rgba(239, 230, 245, .6); }
+
+.raid-surrender {
+  position: absolute; left: 0.9rem; top: 5.2rem; z-index: 30;
+  display: grid; gap: 6px; max-width: 260px;
+  font-family: var(--font-display);
+}
+.raid-surrender-btn {
+  font-size: 13px; color: #ffd0d8; background: rgba(40, 6, 14, .82);
+  border: 1px solid rgba(255, 61, 110, .55); padding: 6px 12px; cursor: pointer; text-align: left;
+}
+.raid-surrender-btn:hover { background: rgba(70, 10, 24, .92); }
+.raid-surrender-btn:focus-visible, .raid-surrender-row button:focus-visible { outline: 2px solid #ff8fab; outline-offset: 2px; }
+.raid-surrender-vote {
+  padding: 10px 12px; background: rgba(12, 6, 20, .92); border: 1px solid rgba(255, 61, 110, .6);
+  color: #efe6f5; font-size: 13px; display: grid; gap: 8px;
+}
+.raid-surrender-vote b { color: #ff8fab; font-variant-numeric: tabular-nums; }
+.raid-surrender-row { display: flex; gap: 8px; }
+.raid-surrender-row button {
+  flex: 1; font-size: 13px; padding: 6px 8px; cursor: pointer; color: #fff;
+  border: 1px solid rgba(255, 255, 255, .25); background: rgba(255, 255, 255, .06);
+}
+.raid-surrender-row button[data-on="true"] { border-color: #ff3d6e; background: rgba(255, 61, 110, .35); }
+
+.raid-respawn { position: fixed; inset: 0; z-index: 80; }
+.raid-respawn-banner {
+  position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 85;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center;
+  padding: 10px 18px; margin-top: 8px;
+  font-family: var(--font-display); font-size: 15px; color: #ffe0e7;
+  background: rgba(40, 6, 14, .9); border: 1px solid rgba(255, 61, 110, .6);
+  max-width: calc(100vw - 32px);
+}
+.raid-respawn-banner button {
+  font-size: 13px; padding: 4px 12px; cursor: pointer; color: #fff;
+  background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .3);
+}
+.raid-waiting {
+  position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); z-index: 40;
+  padding: 14px 24px; text-align: center;
+  font-family: var(--font-display); font-size: 18px; color: #ffe0e7;
+  background: rgba(20, 6, 12, .88); border: 1px solid rgba(255, 61, 110, .55);
+}
+.raid-mate-score {
+  font-family: var(--font-p-display); font-weight: 700; font-size: 18px;
+  color: #eafcff; text-shadow: 0 0 10px rgba(62, 230, 255, .6);
+}
+.raid-mate-score.bust { color: #ff6b8a; }

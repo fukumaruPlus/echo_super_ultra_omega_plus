@@ -45,6 +45,7 @@ const daisuke = require("./daisuke");
 const yaguruma = require("./yaguruma");
 const kagami = require("./kagami");
 const tsurugi = require("./tsurugi");
+const ort = require("./ort"); // บอสมหันตภัย (บอตเท่านั้น — โหมด Type Mercury)
 
 const CHARACTER_MODULES = [
   tohno,
@@ -88,6 +89,7 @@ const CHARACTER_MODULES = [
   yaguruma,
   kagami,
   tsurugi,
+  ort,
 ];
 
 const CHAR_HOOKS = {};

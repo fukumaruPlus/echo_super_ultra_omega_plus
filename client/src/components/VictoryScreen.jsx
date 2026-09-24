@@ -40,6 +40,16 @@ export default function VictoryScreen({ state, onBackToLobby }) {
   );
 
   const { heading, winners } = useMemo(() => {
+    // Type Mercury: ผลของ Raid — ชนะ = ผู้เล่นทุกคน · แพ้/ยอมแพ้ = ORT
+    const raid = state.mercury?.result;
+    if (raid === "win") {
+      const ws = state.players.filter((p) => !p.isBoss);
+      return { heading: "โค่น ORT สำเร็จ", winners: ws };
+    }
+    if (raid === "lose" || raid === "surrender") {
+      const boss = state.players.filter((p) => p.isBoss);
+      return { heading: raid === "surrender" ? "ยอมแพ้ต่อ ORT" : "ORT ลบข้อมูลทั้งหมด", winners: boss };
+    }
     if (state.gameMode !== "ffa" && state.winningTeamId) {
       const ws = state.players.filter((p) => p.alive && p.teamId === state.winningTeamId);
       return { heading: `ทีม ${state.winningTeamId}`, winners: ws };
@@ -50,7 +60,7 @@ export default function VictoryScreen({ state, onBackToLobby }) {
     }
     const c = state.players.find((p) => p.alive);
     return { heading: c ? c.name : "จบเกม", winners: c ? [c] : [] };
-  }, [state.gameMode, state.winningTeamId, state.allyWin, state.players]);
+  }, [state.gameMode, state.winningTeamId, state.allyWin, state.players, state.mercury?.result]);
 
   const names = winners.map((w) => w.name).join(" และ ");
 
