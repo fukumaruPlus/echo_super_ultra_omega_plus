@@ -2,14 +2,10 @@ import { clickSound } from "../audio";
 import { AvScene, Sigil } from "../components/avalon";
 import { PATCH_NAME, PATCH_VERSION, AUTHOR } from "../data/patch";
 
-export default function Splash({ onEnter, onRaidPreview }) {
+export default function Splash({ onEnter }) {
   const start = () => {
     clickSound();
     onEnter();
-  };
-  const raidPreview = () => {
-    clickSound();
-    onRaidPreview?.();
   };
 
   return (
@@ -44,13 +40,6 @@ export default function Splash({ onEnter, onRaidPreview }) {
 
         <div className="av-press av-label">กดเพื่อเริ่มต้น</div>
       </button>
-
-      {/* ปุ่มลัดดูอนิเมชันบอส ORT ของโหมด Type Mercury (ยังไม่ใช่ระบบเล่นจริง) */}
-      {onRaidPreview && (
-        <button type="button" onClick={raidPreview} className="raid-shortcut">
-          Type Mercury · ดูตัวอย่าง
-        </button>
-      )}
 
       <div className="av-splash-meta">
         <div className="av-label av-label-en">{AUTHOR}</div>

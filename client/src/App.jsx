@@ -12,7 +12,6 @@ import SeraphGame from "./seraph/SeraphGame";
 import VolumeControl from "./components/VolumeControl";
 import TransitionCurtain from "./components/TransitionCurtain";
 import GameIntro from "./components/GameIntro";
-import RaidPreview from "./raid/RaidPreview";
 import OrtArrival from "./raid/OrtArrival";
 
 const SESSION_KEY = 'echo_session';
@@ -29,7 +28,7 @@ function saveSessionToken(token) {
 }
 
 export default function App() {
-  const [stage, setStage] = useState("splash"); // splash | raidPreview | setup | character | connected
+  const [stage, setStage] = useState("splash"); // splash | setup | character | connected
   const [state, setState] = useState(null);
 
   // เสียงที่ดังบ่อยที่สุดในเกม: โหลดไว้ตั้งแต่เปิดหน้า ไม่ให้ไปสะดุดกลางแมตช์
@@ -237,11 +236,8 @@ export default function App() {
     if (!seraphMode) {
       // โหมดประหยัด (patch 2.0.6): ข้ามวีดีโอคัตซีน — ระหว่างรอคนอื่นดูวีดีโอ เพลงเล่นต่อตามปกติ
       // หน้าไตเติล: ยังไม่เล่นเพลง — เพลงหน้าหลักเริ่มหลังกดเข้าเกมเท่านั้น
-      // หน้าตัวอย่าง Type Mercury: เพลงประจำตัว ORT
       const track = stage === "splash"
         ? { name: null }
-        : stage === "raidPreview"
-        ? { name: "ort_theme" }
         : musicForState(stage === "connected" ? state : null, { lowQ, cycleSeq: cycleSeq.current, attackSeq: attackSeq.current });
       if (track.name) playMusic(track.name, track.seq);
       else stopMusic();
@@ -307,16 +303,8 @@ export default function App() {
   let screen;
   let screenKey;
   if (stage === "splash") {
-    screen = (
-      <Splash
-        onEnter={() => navigate("setup", () => setStage("setup"))}
-        onRaidPreview={() => navigate("raidPreview", () => setStage("raidPreview"))}
-      />
-    );
+    screen = <Splash onEnter={() => navigate("setup", () => setStage("setup"))} />;
     screenKey = "splash";
-  } else if (stage === "raidPreview") {
-    screen = <RaidPreview lowQ={lowQ} onBack={() => navigate("splash", () => setStage("splash"))} />;
-    screenKey = "raidPreview";
   } else if (stage === "setup") {
     screen = (
       <Setup

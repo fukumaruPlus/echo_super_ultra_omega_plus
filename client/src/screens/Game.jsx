@@ -59,7 +59,10 @@ function useViewport() {
 function isTargetable(p, iAmAttacker, c) {
   const friendly = c.teamModeActive && c.myTeamId && p.teamId === c.myTeamId;
   const self = p.id === c.myId;
-  const normalAttackTarget = iAmAttacker && !friendly && !p.statuses?.seal && (!c.kaiRivalId || p.id === c.kaiRivalId);
+  // Type Mercury: โจมตีปกติเล็งได้แค่ ORT — แต่สกิล/ไอเทมยังเลือกเพื่อนร่วมทีมได้ตามปกติ
+  //  (หลายตัวละครต้องเลือกเพื่อน เช่น มอบบัฟ/รับศิษย์ · ผลที่เป็นโทษต่อเพื่อน server กันที่ friendlyEffectBlocked เอง)
+  const raidMate = c.raid && !p.isBoss;
+  const normalAttackTarget = iAmAttacker && !friendly && !raidMate && !p.statuses?.seal && (!c.kaiRivalId || p.id === c.kaiRivalId);
   const gunTarget = !!c.gunSel && !self && !friendly;
   const escanorSkillTarget = c.escanorSel && !self && !friendly;
   // ดาบต้องสาป (ไบเลธ แบบฟาดทันที): เลือกตัวเอง/เพื่อนร่วมทีมไม่ได้ — เดิมกดเพื่อนได้ ดาเมจถูกเกตทีมกันทิ้ง
@@ -4504,6 +4507,7 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
     myId: me?.id,
     myTeamId: me?.teamId,
     teamModeActive: state.gameMode === "duo" || state.gameMode === "trio",
+    raid: !!state.mercury, // Type Mercury: ผู้เล่นจริงทุกคนเป็นพวกเดียวกัน (server กันที่ sameTeam อยู่แล้ว — ตรงนี้กันกดพลาด)
   };
 
   // ============================================================
@@ -5002,19 +5006,7 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
       {/* Type Mercury: ไม่ใช้ฉากหลังกลางวัน/กลางคืน (ระบบกลางวัน/กลางคืนยังทำงานตามปกติ) — ORT เป็นฉากหลังแทน */}
       {!raid && <GameBackground cycle={state.cycle} round={state.roundNumber} bardBg={state.bardBg} shikiBg={state.shikiBg} hisakawaBg={state.hisakawaBg} overloadForce={state.overloadForce} lowQ={lowQ} seraph={!!state.seraph} />}
       {/* Type Mercury: ORT เป็นฉากหลังเต็มจอ อยู่หลังทุกอย่างบนกระดาน (ที่นั่ง/แผงเรา/ปุ่ม ทับอยู่ด้านหน้า) */}
-      {boss && (
-        <OrtBossPanel
-          backdrop
-          boss={boss}
-          phase={phase}
-          lowQ={lowQ}
-          targetable={isTargetable(boss, iAmAttacker, targetChain)}
-          onAttack={(id) => resolveAttackPick(id, targetChain)}
-          onInspect={setStatusViewId}
-          hostRef={(el) => registerOther(boss.id, el)}
-          statusNode={<StatusChips p={boss} left compact max={6} />}
-        />
-      )}
+      {boss && <OrtBossPanel layer="canvas" boss={boss} phase={phase} lowQ={lowQ} targetable={isTargetable(boss, iAmAttacker, targetChain)} />}
         {state.fullForce && <div className="full-force-speed" />}
         {frozenByClockUp && (
           <div className="clockup-freeze"><span>⏱️ CLOCK UP — เวลาหยุดนิ่ง</span></div>
@@ -5054,6 +5046,20 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
           </div>
           <BoardTimer phaseKey={`${phase}-${state.roundNumber}`} />
         </div>
+      )}
+      {/* ORT ชั้นที่กดได้ (แถบข้อมูล + พื้นที่คลิกโจมตี) — ต้องอยู่ในกรอบกระดานนี้ ไม่งั้นกรอบกินคลิกไปหมด */}
+      {boss && (
+        <OrtBossPanel
+          layer="ui"
+          boss={boss}
+          phase={phase}
+          lowQ={lowQ}
+          targetable={isTargetable(boss, iAmAttacker, targetChain)}
+          onAttack={(id) => resolveAttackPick(id, targetChain)}
+          onInspect={setStatusViewId}
+          hostRef={(el) => registerOther(boss.id, el)}
+          statusNode={<StatusChips p={boss} left compact max={6} />}
+        />
       )}
       {raid && <RaidSurrender state={state} me={me} />}
 

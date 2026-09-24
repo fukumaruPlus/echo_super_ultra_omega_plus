@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { playSfx } from "../audio";
 import { createOrtStage } from "./ortStage";
-import "./raid.css";
 import "./raid-board.css";
 
 // ฉากเปิดตัว ORT ตอนเข้าโหมด Type Mercury — "หายนะกำลังมาเยือน"

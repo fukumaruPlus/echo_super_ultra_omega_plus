@@ -58,35 +58,46 @@
   pointer-events: none; white-space: nowrap;
 }
 .ort-dead { filter: grayscale(1) brightness(.5); }
-/* ---------- ฉากหลังเต็มจอ (โหมด Raid บนจอคอม) ----------
-   อยู่ก่อนกรอบกระดานใน DOM จึงถูกวาดไว้ข้างหลังที่นั่ง/แผงเรา/ปุ่มทั้งหมด
-   ปกติคลิกทะลุไปที่สนาม (pointer-events: none) — เปิดให้กดเฉพาะแถบข้อมูลด้านบน (ดูสถานะ ORT)
-   และทั้งจอตอนที่เรากำลังเลือก ORT เป็นเป้า */
-.ort-backdrop {
-  position: fixed; inset: 0;
-  width: auto; height: auto;
-  border: 0; clip-path: none; box-shadow: none;
-  background: transparent;
-  pointer-events: none;
+/* ---------- จอคอม: ORT แยกเป็น 2 ชั้น ----------
+   .ort-backdrop = ภาพเต็มจอ วางก่อนกรอบกระดาน (ฉากหลัง — ไม่รับคลิก)
+   .ort-ui       = แถบข้อมูล + พื้นที่คลิกโจมตี วางใน "กรอบกระดาน" ซึ่งเป็นชั้นโปร่งใสที่คลุมทั้งจอ
+                   ถ้าให้ชั้นภาพรับคลิกเอง กรอบกระดานจะกินคลิกไปก่อนทุกครั้ง (บั๊กที่เจอ: กดโจมตี ORT ไม่ได้) */
+.ort-backdrop { position: fixed; inset: 0; pointer-events: none; background: #02040c; }
+.ort-backdrop-target::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 160px rgba(255, 61, 110, .55);
+  animation: ortTargetGlow 1.1s ease-in-out infinite;
 }
-.ort-backdrop.ort-targetable { pointer-events: auto; animation: none; box-shadow: inset 0 0 160px rgba(255, 61, 110, .55); }
-.ort-backdrop .ort-panel-hud {
+@keyframes ortTargetGlow { 50% { opacity: .55; } }
+.ort-ui { position: absolute; inset: 0; z-index: 15; pointer-events: none; font-family: var(--font-display); color: #d4f7ff; }
+.ort-ui .ort-panel-hud {
   left: 50%; right: auto; top: 10px;
   transform: translateX(-50%);
-  width: min(520px, 42vw);
+  width: min(520px, 46%);
   padding: 10px 16px 12px;
   background: linear-gradient(180deg, rgba(3, 6, 20, .88), rgba(3, 6, 20, .7));
   border: 1px solid rgba(62, 230, 255, .35);
   clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 14px 100%);
   pointer-events: auto; cursor: pointer;
 }
-.ort-backdrop .ort-panel-foot {
+.ort-ui .ort-panel-hud:focus-visible { outline: 2px solid #3ee6ff; outline-offset: 2px; }
+.ort-ui-target .ort-panel-hud { border-color: #ff3d6e; cursor: crosshair; }
+.ort-ui .ort-panel-foot {
   top: 30%; bottom: auto; left: 50%; right: auto;
   transform: translateX(-50%);
   background: rgba(3, 6, 20, .6);
   padding: 4px 14px;
 }
-.ort-backdrop .ort-target-badge { top: 26%; }
+/* พื้นที่คลิกโจมตี: ช่วงบนของตัว ORT ระหว่างแถบข้อมูลกับแถวเพื่อนร่วมทีม (top 45%) */
+.ort-hitzone {
+  position: absolute; top: 15%; left: 28%; width: 44%; height: 28%;
+  pointer-events: auto; cursor: crosshair;
+  border: 0; padding: 0;
+  background: radial-gradient(ellipse at center, rgba(255, 61, 110, .22), rgba(255, 61, 110, 0) 70%);
+}
+.ort-hitzone:focus-visible { outline: 2px solid #ff3d6e; outline-offset: 2px; }
+.ort-hitzone .ort-target-badge { top: 50%; }
+.ort-hitzone-anchor { position: absolute; top: 28%; left: 50%; width: 1px; height: 1px; }
 .ort-panel-compact .ort-panel-hud .raid-boss { font-size: 20px; }
 .ort-panel-compact .ort-panel-hud { padding: 8px 10px 12px; }
 
