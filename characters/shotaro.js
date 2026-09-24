@@ -33,6 +33,7 @@ const IMG = {
   skill1: "/characters/shotaro/shotaro_skill1.webp",
   skill2: "/characters/shotaro/shotaro_skill2.jpg",
   skill3: "/characters/shotaro/shotaro_skill3.jpg",
+  joker: "/characters/shotaro/joker.webp", // ภาพบนกระดานระหว่างร่างโจ๊กเกอร์
 };
 const VIDEO = { drive: "/characters/shotaro/shotaru_skill2.mp4", joker: "/characters/shotaro/shotaru_skill3.mp4" };
 
@@ -49,6 +50,8 @@ module.exports = {
     p.shotaroDrive = false; // Maximum Drive ติดตัวรอหมัดถัดไป
   },
   jokerOn,
+  // ภาพบนกระดาน: ร่างโจ๊กเกอร์ใช้ joker.webp (null = ใช้ภาพปกติ)
+  displayImg(p) { return isShotaro(p) && jokerOn(p) ? IMG.joker : null; },
 
   // ร่างโจ๊กเกอร์หมด -> Maximum Drive ที่ยังไม่ได้ใช้หายไปด้วย
   onRoundStartTick(engine, p) {

@@ -1532,6 +1532,7 @@ function displayImg(p, unmasked) {
   if (p.characterId === "escanor" && CHAR_HOOKS.escanor.displayImg) return CHAR_HOOKS.escanor.displayImg(p);
   if (p.characterId === "ultraman_trigger") return "/characters/ultraman_trigger/trigger.webp";
   if (p.characterId === "hisakawa_sister") return CHAR_HOOKS.hisakawa_sister.displayImg(p);
+  if (p.characterId === "shotaro") { const simg = CHAR_HOOKS.shotaro.displayImg(p); if (simg) return simg; } // ร่างโจ๊กเกอร์
   if (p.characterId === "ignis" && CHAR_HOOKS.ignis.displayImg) return CHAR_HOOKS.ignis.displayImg(p);
   // ฟุจิตะ โคโตเนะ: ระหว่างร่าง [พร้อมลุย] = ภาพ Kotone.png (null = ใช้ภาพปกติ)
   if (p.characterId === "kotone") { const kimg = CHAR_HOOKS.kotone.displayImg(p); if (kimg) return kimg; }

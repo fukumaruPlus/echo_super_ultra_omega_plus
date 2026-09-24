@@ -137,7 +137,7 @@ module.exports = function buildTransforms(img) {
     yuiSong:     { img: yuiImg.skill3, video: "/characters/yui/skill3/yui_skill3.mp4",       title: "ทำนองเพลงร็อก",  label: "บรรเลงสำเร็จ",    seconds: 4, music: null, afterReveal: false },
     // อุซากิ: เล่นทุกครั้ง (queueCutscene) — ท่าไม้ตายตอนกด / สกิลรองตอนกด "เอา" แล้วค่อยสลับไพ่
     // ฮิดาริ โชว์ทาโร่: Lost Driver เต็มครั้งแรกครั้งเดียว (triggerCutscene) · Maximum Drive เล่นทุกครั้งก่อนฉากความเสียหาย (queueCutscene)
-    shotaroJoker: { img: shotaroChar.IMG.skill3, video: shotaroChar.VIDEO.joker, title: "Lost Driver", label: "ร่างโจ๊กเกอร์ 10 เทิร์น", seconds: 18, music: null, afterReveal: false },
+    shotaroJoker: { img: shotaroChar.IMG.joker, video: shotaroChar.VIDEO.joker, title: "Lost Driver", label: "ร่างโจ๊กเกอร์ 10 เทิร์น", seconds: 18, music: null, afterReveal: false },
     shotaroDrive: { img: shotaroChar.IMG.skill2, video: shotaroChar.VIDEO.drive, title: "Maximum Drive", label: "โจ๊กเกอร์ Extreme", seconds: 16, music: null, afterReveal: false },
     usagiUlt:    { img: usagiChar.IMG.skill3, video: usagiChar.VIDEO.ult,  title: "ฮัยย๊ะ ฮ๊ะ ปรุๆ อิอิ อิยะ ฮ๊ะ", label: "โจทย์คณิต 3 เทิร์น", seconds: 3, music: null, afterReveal: false },
     usagiSwap:   { img: usagiChar.IMG.skill2, video: usagiChar.VIDEO.swap, title: "ปรุ้ต.....", label: "สลับไพ่ทั้งมือ", seconds: 5, music: null, afterReveal: false },
