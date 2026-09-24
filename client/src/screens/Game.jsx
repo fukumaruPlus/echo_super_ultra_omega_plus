@@ -4999,7 +4999,22 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
 
   return (
     <div className="fixed inset-0 overflow-hidden">
-      <GameBackground cycle={state.cycle} round={state.roundNumber} bardBg={state.bardBg} shikiBg={state.shikiBg} hisakawaBg={state.hisakawaBg} overloadForce={state.overloadForce} lowQ={lowQ} seraph={!!state.seraph} />
+      {/* Type Mercury: ไม่ใช้ฉากหลังกลางวัน/กลางคืน (ระบบกลางวัน/กลางคืนยังทำงานตามปกติ) — ORT เป็นฉากหลังแทน */}
+      {!raid && <GameBackground cycle={state.cycle} round={state.roundNumber} bardBg={state.bardBg} shikiBg={state.shikiBg} hisakawaBg={state.hisakawaBg} overloadForce={state.overloadForce} lowQ={lowQ} seraph={!!state.seraph} />}
+      {/* Type Mercury: ORT เป็นฉากหลังเต็มจอ อยู่หลังทุกอย่างบนกระดาน (ที่นั่ง/แผงเรา/ปุ่ม ทับอยู่ด้านหน้า) */}
+      {boss && (
+        <OrtBossPanel
+          backdrop
+          boss={boss}
+          phase={phase}
+          lowQ={lowQ}
+          targetable={isTargetable(boss, iAmAttacker, targetChain)}
+          onAttack={(id) => resolveAttackPick(id, targetChain)}
+          onInspect={setStatusViewId}
+          hostRef={(el) => registerOther(boss.id, el)}
+          statusNode={<StatusChips p={boss} left compact max={6} />}
+        />
+      )}
         {state.fullForce && <div className="full-force-speed" />}
         {frozenByClockUp && (
           <div className="clockup-freeze"><span>⏱️ CLOCK UP — เวลาหยุดนิ่ง</span></div>
@@ -5038,21 +5053,6 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
             <div className="av-title leading-none" style={{ fontSize: "2rem" }}>{state.roundNumber}</div>
           </div>
           <BoardTimer phaseKey={`${phase}-${state.roundNumber}`} />
-        </div>
-      )}
-      {/* Type Mercury: ORT ตัวใหญ่ฝั่งตรงข้ามผู้เล่นทุกคน (บนกลางจอ) */}
-      {boss && (
-        <div className="absolute z-10" style={{ top: "2%", left: "50%", transform: "translateX(-50%)", width: "48%", height: "40%" }}>
-          <OrtBossPanel
-            boss={boss}
-            phase={phase}
-            lowQ={lowQ}
-            targetable={isTargetable(boss, iAmAttacker, targetChain)}
-            onAttack={(id) => resolveAttackPick(id, targetChain)}
-            onInspect={setStatusViewId}
-            hostRef={(el) => registerOther(boss.id, el)}
-            statusNode={<StatusChips p={boss} left compact max={6} />}
-          />
         </div>
       )}
       {raid && <RaidSurrender state={state} me={me} />}

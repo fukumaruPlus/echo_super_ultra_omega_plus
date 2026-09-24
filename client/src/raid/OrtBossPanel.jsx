@@ -9,7 +9,8 @@ import "./raid-board.css";
 //  ตัวเลขทั้งหมด (หลอด/เลือด/เกราะ/พลังโจมตี) มาจาก server · canvas เป็นแค่ภาพ (demo: false)
 //  ท่าทางถูกสั่งจาก event "ortFx" ของ server (ตี/คริติคอล/โดนตี/สวนกลับ/หลอดแตก/วิวัฒนาการ/ข้อมูลสูญหาย)
 // statusNode: ป้ายสถานะของบอส (Game.jsx ส่ง <StatusChips> มาให้ — ชื่อสถานะภาษาไทยอยู่ที่นั่น)
-export default function OrtBossPanel({ boss, phase, targetable, onAttack, onInspect, lowQ, compact = false, hostRef, statusNode }) {
+// backdrop: ORT เป็นฉากหลังเต็มจอของโหมด Raid (จอคอม) — กดได้เฉพาะตอนเลือก ORT เป็นเป้า ไม่งั้นคลิกทะลุไปที่สนาม
+export default function OrtBossPanel({ boss, phase, targetable, onAttack, onInspect, lowQ, compact = false, backdrop = false, hostRef, statusNode }) {
   const canvasRef = useRef(null);
   const stageRef = useRef(null);
 
@@ -40,7 +41,7 @@ export default function OrtBossPanel({ boss, phase, targetable, onAttack, onInsp
   return (
     <div
       ref={hostRef}
-      className={`ort-panel ${compact ? "ort-panel-compact" : ""} ${targetable ? "ort-targetable" : ""} ${boss.alive ? "" : "ort-dead"}`}
+      className={`ort-panel ${backdrop ? "ort-backdrop" : ""} ${compact ? "ort-panel-compact" : ""} ${targetable ? "ort-targetable" : ""} ${boss.alive ? "" : "ort-dead"}`}
       onClick={click}
       role="button"
       tabIndex={0}
