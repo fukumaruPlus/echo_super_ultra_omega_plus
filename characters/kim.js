@@ -405,7 +405,11 @@ module.exports = {
     if (!isKim(p) || !p.alive || !(n > 0)) return n;
     this.addScabbard(engine, p, rnd(SCABBARD_HIT_TAKEN), "ได้รับความเสียหาย");
     const src = engine.effectSourceId;
-    if (!isNormalAttack && !p._statusDamage && !p._itemDamage && src && src !== p.id && this.hasCounter(p)) {
+    // สวนกลับเฉพาะ "ดาเมจจากสกิล": ไม่นับสถานะ/ไอเทม · ไม่นับดาเมจที่เป็นการสวนกลับ (_counterDamage — กันสวนกันไปมากับ ORT)
+    //  · ไม่นับดาเมจที่เกิดระหว่างเฟสโจมตี (ท่าสวนของคนอื่น เช่นเยอรมันซูเพล็ก — หมัดปกติของเขาสวนผ่าน onAttackedNormally อยู่แล้ว)
+    const inAttackPhase = engine.gameState === "ATTACK" || engine.gameState === "ATTACKING";
+    if (!isNormalAttack && !p._statusDamage && !p._itemDamage && !p._counterDamage && !inAttackPhase
+        && src && src !== p.id && this.hasCounter(p)) {
       const q = p.kim.counterQueue || (p.kim.counterQueue = []);
       if (!q.includes(src)) q.push(src); // สกิลเดียวโดนหลายก้อน = สวนครั้งเดียว
     }
@@ -436,20 +440,22 @@ module.exports = {
 
   // Kim ถูกโจมตีปกติ (หมัดลงแล้ว) — ร่าง Awake ฟื้นแต้มสกิล + สวนกลับ · คืน { name, dmg } เมื่อสวน
   //  (ฝักดาบจากการโดนตีได้ไปแล้วที่ adjustIncomingDamage)
-  onAttackedNormally(engine, attacker, target) {
+  //  dmg = ความเสียหายของหมัดนั้น — ถูกกันจนเหลือ 0 = ไม่ได้ "ถูกความเสียหาย" จึงไม่สวน (บัพรวมร่างก็ไม่หาย)
+  onAttackedNormally(engine, attacker, target, dmg) {
     if (!isKim(target) || !target.alive || !attacker || attacker.id === target.id) return null;
     const k = target.kim;
     if (awake(target)) {
       engine.addSkill(target, 1, "passive");
       engine.log(`🗡️ ${target.name} ร่าง Awake — ถูกโจมตี ฟื้นแต้มสกิล +1`);
     }
-    if (!attacker.alive || engine.sameTeam(target, attacker)) return null;
+    if (!attacker.alive || engine.sameTeam(target, attacker) || !(dmg > 0)) return null;
     if (k.bones) return this.counterBones(engine, target, attacker);
     if ((target.statuses.kimCounter || 0) > 0) return this.counterStance(engine, target, attacker);
     return null;
   },
   hitBack(engine, kim, t, n) {
-    engine.dealMixed(t, n);
+    t._counterDamage = true; // ดาเมจจากการสวนกลับ — ORT/Kim จะไม่สวนตอบ (กันสวนกันไปมาไม่รู้จบ)
+    try { engine.dealMixed(t, n); } finally { t._counterDamage = false; }
     t.wasAttacked = true;
     engine.maybeBeatSave(t); engine.maybeBeatMode(t); engine.maybeWakeKotone(t);
     if (t.alive && t.hp <= 0) {

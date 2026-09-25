@@ -6208,7 +6208,7 @@ function doAttack(byId, targetId) {
   const yuiCounterFx = CHAR_HOOKS.yui.onAttackedNormally(engine, attacker, target);
   // Bamboo-Hatted Kim: หมัดของ Kim ลง (ฝักดาบ/ชักดาบ/Yield My Flesh/ฟื้นเลือด) · Kim ถูกตี (ฝักดาบ + สวนกลับ)
   const kimAtkFx = CHAR_HOOKS.kim.onAttackLanded(engine, attacker, target, dmg);
-  const kimCounterFx = CHAR_HOOKS.kim.onAttackedNormally(engine, attacker, target);
+  const kimCounterFx = CHAR_HOOKS.kim.onAttackedNormally(engine, attacker, target, dmg);
   // สไตรเกอร์ ยูเรก้า: มือมีดมอบเลือดไหล · เตาปฏิกรณ์ 15% แทงสวน (วีดีโอเล่นก่อนสรุปความเสียหาย)
   const strikerBleed = CHAR_HOOKS.striker.onAttackLanded(engine, attacker, target);
   const strikerCounterFx = CHAR_HOOKS.striker.onAttackedNormally(engine, attacker, target);

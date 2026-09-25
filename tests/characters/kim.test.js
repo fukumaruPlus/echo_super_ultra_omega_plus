@@ -209,6 +209,39 @@ test('Counter Stance / บัพรวมร่าง: โดนดาเมจ�
   assert.equal(T.hp, 4, 'สวน 1 + 1');
 });
 
+test('สวนกลับไม่วน: ดาเมจสวนกลับของ ORT ไม่ทำให้ Kim สวน · สวนของ Kim ไม่ทำให้ ORT สวน', () => {
+  const ort = require('../../characters/ort.js');
+  const { K, T } = setup();
+  K.statuses.kimCounter = 2;
+  const boss = { ...T, id: '__ort__', characterId: 'ort', isBoss: true, name: 'ORT', statuses: {}, statusAmt: {}, hp: 7, armor: 0, alive: true, ortAtk: 1 };
+  engine.players.__ort__ = boss;
+  // Kim สวนดาเมจจากสกิลของ ORT (ต้นตอ = สกิล) ได้ตามปกติ
+  withRandom(0.99, () => engine.withEffectSource(boss, () => engine.dealMixed(K, 1)));
+  withRandom(0.99, () => kim.flushCounters(engine));
+  assert.equal(boss.hp, 6, 'Kim สวน ORT 1 ครั้ง');
+  assert.equal(ort.flushCounters(engine), 0, 'ORT ไม่สวนตอบการสวนกลับของ Kim');
+  // ORT สวน (ดาเมจสวนกลับ) -> Kim ไม่จองสวนตอบ
+  ort.queueCounter(engine, 'K');
+  withRandom(0.99, () => ort.flushCounters(engine));
+  assert.equal(kim.flushCounters(engine), false, 'Kim ไม่สวนตอบการสวนกลับของ ORT');
+  delete engine.players.__ort__;
+});
+
+test('Counter Stance ไม่สวน: หมัดที่ถูกกันจนดาเมจ 0 · ดาเมจที่เกิดระหว่างเฟสโจมตี (ท่าสวนของคนอื่น)', () => {
+  const { K, T } = setup();
+  K.statuses.kimCounter = 2;
+  assert.equal(kim.onAttackedNormally(engine, T, K, 0), null, 'ดาเมจ 0 = ไม่ได้ถูกความเสียหาย');
+  K.kim.bones = true;
+  assert.equal(kim.onAttackedNormally(engine, T, K, 0), null);
+  assert.equal(K.kim.bones, true, 'บัพรวมร่างไม่หายเมื่อดาเมจ 0');
+  K.kim.bones = false;
+  engine.setGameState('ATTACK'); // เช่นยุยทุ่มสวน Kim ระหว่างเฟสโจมตี
+  withRandom(0.99, () => engine.withEffectSource(T, () => engine.dealMixed(K, 2)));
+  engine.setGameState('PLAYING');
+  assert.equal(kim.flushCounters(engine), false);
+  assert.equal(T.hp, 7);
+});
+
 test('โจมตีปกติได้ Poise +1-4 (โดนหรือถูกหลบ) · Poise ลดทุก 3 เทิร์น', () => {
   const { K } = setup();
   withRandom(0.99, () => attack('K', 'T'));

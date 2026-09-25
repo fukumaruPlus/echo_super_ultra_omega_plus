@@ -245,7 +245,8 @@ module.exports = {
   },
   // ฮุคดาเมจขาเข้า — ดาเมจที่ไม่ใช่โจมตีปกติจากผู้เล่นจริง = ถูกสกิล/ปืนทำดาเมจ
   adjustIncomingDamage(engine, p, n, isNormalAttack) {
-    if (isOrt(p) && !isNormalAttack && n > 0 && engine.effectSourceId && engine.effectSourceId !== p.id) {
+    // ดาเมจที่เป็น "การสวนกลับ" (_counterDamage เช่น Counter Stance ของ Kim) ไม่ใช่สกิล — ไม่สวนตอบ ไม่งั้นสวนกันไปมาทุกครั้งที่ flush
+    if (isOrt(p) && !isNormalAttack && !p._counterDamage && n > 0 && engine.effectSourceId && engine.effectSourceId !== p.id) {
       this.queueCounter(engine, engine.effectSourceId);
     }
     return n;
@@ -265,7 +266,8 @@ module.exports = {
         const crit = Math.random() < CRIT_CHANCE;
         const dmg = (boss.ortAtk || ATK_BASE) * (crit ? 2 : 1);
         engine.withEffectSource(boss, () => {
-          engine.dealMixed(t, dmg);
+          t._counterDamage = true; // ดาเมจสวนกลับ — Kim จะไม่สวนตอบ
+          try { engine.dealMixed(t, dmg); } finally { t._counterDamage = false; }
           t.wasAttacked = true;
           engine.resolveDamageAftermath(t);
         });
