@@ -9,6 +9,8 @@ const SHOP_ITEM_INFO = {
   wineBarrel: { icon: "🍷", img: "/characters/escanor/สกิลพื้นฐาน/Barrel.png", label: (it) => `WineBarrel Lv.${it.level || 1}`, desc: "ใช้แล้วฟื้น HP ตามระดับ; ระดับ IV ฟื้น HP 3 หน่วย และมอบมึนเมา 2 หน่วยกับเย็นชื่นใจ 2 หน่วย; อยู่ในกระเป๋าครบ 4 เทิร์นจะอัปเกรด 1 ระดับ สูงสุด IV" },
   // ---------- ปืนหน่วย GUTS Select + กระสุน (ขายในร้านค้ามายา — ใช้รูปจริงแทน emoji) ----------
   gutsGun: { icon: "🔫", img: "/item/guts_select_gun/guts_gun.webp", label: () => "ปืนหน่วย GUTS Select", desc: "ไอเทมถาวร มีได้กระบอกเดียว — กดที่ปืนเพื่อเลือกกระสุนแล้วเลือกเป้าหมาย ยิงได้ 1 นัด/เทิร์น (เฉพาะช่วงจั่วไพ่)" },
+  // เกราะ Mark 42 (ใครก็ใส่ได้ ยกเว้น ORT) — ตรงกับ characters/_mark42.js
+  mark42: { icon: "🦾", img: "/characters/Mark42/mark42_item.jpg", label: (it) => `เกราะ Mark 42${it.armor && it.armor < 7 ? ` (${it.armor}/7)` : ""}`, desc: "ใช้ช่วงจั่วการ์ด: ใส่ให้ตัวเอง / ใส่ให้ผู้เล่นอื่น / ใส่ให้ผู้เล่นอื่นแล้วระเบิดทันที (ความเสียหาย 4) — ใส่แล้วพลังชีวิตกลายเป็นเกราะชุด 7 หน่วย พลังโจมตี +1 ชุดพัง = กลับร่างเดิม · เจ้าของเรียกคืน/ถอด/สั่งระเบิดได้ตลอด · ชุดพังจากการต่อสู้ ซื้อใหม่ไม่ได้ 10 เทิร์น" },
   blackSparklence: { icon: "BS", img: "/characters/ignis/Black Sparklence.webp", label: () => "Black Sparklence", desc: "ปืนถาวรของอิกนิส ใช้กระสุนจากร้านค้ามายาได้ ยิงได้ 1 นัดต่อเทิร์นในช่วงจั่วไพ่ — หลังยิง Nursedessei Cannon จะใช้ปืนไม่ได้ 3 เทิร์น" },
   gutsAmmo: {
     icon: "🔑",

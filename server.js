@@ -83,6 +83,8 @@ const SKILL_COST_MAX = 8;
 const { NETRAMANA_KILL_CHANCE, netramanaActive } = require("./characters/_universal_status");
 // ยูนะ — ไอดอลเอฟเฟกต์สนาม (ไม่ใช่ตัวละครที่เล่นได้ ไม่อยู่ใน CHARACTERS/CHAR_HOOKS — require ตรงๆ เหมือน _universal_status)
 const YunaMod = require("./characters/yuna");
+// เกราะ Mark 42 — ไอเทมร้านค้าที่ใครก็ใส่ได้ (ไม่ใช่ตัวละคร ไม่อยู่ใน CHAR_HOOKS) — ดู characters/_mark42.js
+const Mark42 = require("./characters/_mark42");
 // SE.RA.PH Moon Cell — โหมดผจญภัย 7 วัน (กติกา: SERAPH_MOONCELL.md · ฉาก: SERAPH_SCENES.md)
 const Seraph = require("./seraph");
 
@@ -216,6 +218,7 @@ const GUTS_AMMO = {
 const GUTS_AMMO_IDS = Object.keys(GUTS_AMMO).filter((id) => id !== "hyper_trigger" && id !== "trigger_dark_key");
 const SHOP_MAX_GUNS = 2;          // ปืนขึ้นได้สูงสุด 2 กระบอกต่อรอบที่ร้านรีสต็อก (ที่เกินสุ่มเป็นกระสุนแทน)
 const SHOP_MAX_HYPER = 1;         // Hyper Key Trigger ขึ้นได้สูงสุด 1 ชิ้นต่อรอบ (ซื้อขาด — ที่เกินสุ่มเป็นกระสุนแทน)
+const SHOP_MAX_MARK42 = 2;        // เกราะ Mark 42: โอกาสออก/เพดานต่อรอบเท่าปืน GUTS (ที่เกินสุ่มเป็นกระสุนแทน)
 // น้ำหนักกระสุนธรรมดาภายในกลุ่ม "กระสุน" (รวม = SHOP_WEIGHTS.gutsAmmo)
 const SHOP_AMMO_WEIGHTS = { shockwave: 4, gargorgon: 4, thunder: 4, nurse: 2 };
 // ตารางโอกาสออกสินค้าต่อ 1 ช่องสุ่ม (รวม 100) — ช่องล็อกช่องแรก (Trigger Dark Key) ไม่ผ่านตารางนี้
@@ -229,6 +232,7 @@ const SHOP_WEIGHTS = {
   gutsGun: 8,      // จำกัด SHOP_MAX_GUNS ต่อรอบ ที่เกินตกไปรวมกับกระสุน
   gutsAmmo: 14,    // แตกย่อยตาม SHOP_AMMO_WEIGHTS
   hyperTrigger: 3, // Hyper Key Trigger: ของแพงสุด สุ่มออก จำกัด SHOP_MAX_HYPER ต่อรอบ
+  mark42: 8,       // เกราะ Mark 42: เจอได้พอๆ กับปืน จำกัด SHOP_MAX_MARK42 ต่อรอบ
 };
 // ---------- DoomGuy (patch 2.2 full) ----------
 const DOOM_BASE = "/characters/doomguy";
@@ -1054,6 +1058,29 @@ function recruitPick(id, targets) {
   if (checkOrtEarlyWin()) return;
   checkAllLocked();
 }
+// ---------- เกราะ Mark 42: เล่นวีดีโอก่อน แล้วค่อยเกิดผล (แพทเทิร์นเดียวกับกระสุน GUTS) ----------
+function mark42Run(p, plan, onUsed) {
+  io.emit("skillFlash", { name: plan.flash, img: Mark42.IMG.item, by: p.name, color: colorOf(p) });
+  if (onUsed) onUsed();
+  const after = () => withEffectSource(p, plan.after);
+  if (plan.video && gameState === "PLAYING") {
+    engine.queueCutscene(p, plan.video); // ผ่าน engine — เทสต์แทนที่ได้ (ในเกมจริงคือฟังก์ชันเดียวกัน)
+    if (cutsceneQueue.length) { pausePlayingForCutscene(after); return; }
+  }
+  after();
+  broadcastState();
+  if (checkOrtEarlyWin()) return;
+  checkAllLocked();
+}
+// เจ้าของคุมชุดที่ส่งออกไปแล้ว: เรียกคืน / ถอด / สั่งระเบิด (ช่วงจั่วการ์ด · คนใส่ถอดเองไม่ได้)
+function mark42Control(id, action) {
+  const p = players[id];
+  if (!p || !p.alive || gameState !== "PLAYING" || asleep(p)) return;
+  if (CHAR_HOOKS.conner.skillBlocked(engine, p) || CHAR_HOOKS.brian.itemBlocked(engine) || CHAR_HOOKS.daisuke.actionBlocked(engine, p)) return;
+  const plan = Mark42.planControl(engine, p, action);
+  if (!plan) { broadcastState(); return; }
+  mark42Run(p, plan, null);
+}
 // ---------- สไตรเกอร์ ยูเรก้า: คำสั่งของนักบิน ----------
 function strikerApprove(id, accept) {
   const p = players[id];
@@ -1572,6 +1599,8 @@ function instantDeath(p, force) {
   if (friendlyEffectBlocked(p)) return;
   // ORT: หลอดเลือดแตก (ทั้งเลือดหมดและโดนสังหารทันที) -> หลอดถัดไปเริ่มเต็ม · หลอดสุดท้ายเท่านั้นที่ตายจริง
   if (isOrt(p) && CHAR_HOOKS.ort.tryBarBreak(engine, p)) return;
+  // เกราะ Mark 42: "ตาย" ระหว่างใส่ชุด (สังหารทันที ฯลฯ) = แค่ชุดพัง กลับร่างเดิม
+  if (!force && Mark42.suited(p)) { Mark42.breakSuit(engine, p, "combat"); return; }
   // Bamboo-Hatted Kim (Resentment): เลือดหมดจากความเสียหายครั้งแรก -> ค้างที่ 1 (สังหารทันทีตอนเลือดยังเหลือไม่นับ)
   if (!force && CHAR_HOOKS.kim.tryResentment(engine, p)) return;
   if (!force && p.characterId === "escanor" && CHAR_HOOKS.escanor.tryNoonRevive(engine, p)) return;
@@ -1677,6 +1706,7 @@ function positionUsedByOther(pos, sid) {
 // รูปที่แสดง: Beat Mode (ถาวรจนตาย) > ร่างสุดท้ายฟุจิมารุ (จนตาย) > Paradise (เหนือกว่าสกิลติดตัว NT-D)
 //  > NT-D คงอยู่จนแก้แค้น > ไคจู Black King > Ginga > สวมเกราะราชัน
 function displayImg(p, unmasked) {
+  if (Mark42.suited(p)) return Mark42.IMG.suit; // เกราะ Mark 42: ภาพประจำตัวเป็นชุดเกราะระหว่างใส่
   if (p.characterId === "escanor" && CHAR_HOOKS.escanor.displayImg) return CHAR_HOOKS.escanor.displayImg(p);
   if (p.characterId === "ultraman_trigger") return "/characters/ultraman_trigger/trigger.webp";
   if (p.characterId === "hisakawa_sister") return CHAR_HOOKS.hisakawa_sister.displayImg(p);
@@ -1923,6 +1953,8 @@ function activeSkillMusic() {
 function loseHp(p) {
   hisakawaSyncIn(p);
   if (friendlyEffectBlocked(p)) return;
+  // เกราะ Mark 42: เส้นทางที่เรียก loseHp ตรงๆ (ไม่ผ่านท่อดาเมจ) ก็ลงชุดแทน
+  if (Mark42.absorb(engine, p, 1)) { hisakawaSyncOut(p); return; }
   // แบทแมนร่างรถแบทโมบิล (characters/bat_ben.js): พลังชีวิตลดไม่ได้เลย — ความเสียหายไปลงเกราะ (พลังชีวิตของรถ)
   //  ต้องอยู่บนสุดของ loseHp เพราะนี่คือจุดคอขวดเดียวที่ hp จะลดได้ ทำให้ครอบคลุมทั้งดาเมจทะลุเกราะ
   //  (dealDirect = สกิลติดตัว 2 "รถคู่ใจ") และดาเมจที่ทะลุเกราะมาเพราะเกราะหมดพอดี
@@ -1961,6 +1993,8 @@ function applyOverloadOverdrawPenalty(p) {
 function loseArmor(p) {
   hisakawaSyncIn(p);
   if (friendlyEffectBlocked(p)) return;
+  // เกราะ Mark 42: ล้าง/สลายเกราะ (Rider Shooting · เชื่อมผล ฯลฯ) ลงเกราะชุดแทนเกราะจริงที่ซ่อนอยู่ข้างใต้
+  if (Mark42.absorb(engine, p, 1)) { hisakawaSyncOut(p); return; }
   p.armor--; p.dmgArmor++;
   hisakawaSyncOut(p);
   CHAR_HOOKS.daichi.onDamageTaken(p); // ไดจิ เกราะเบมสตาร์: นับความเสียหายไว้ฟื้นคืนเทิร์นหน้า
@@ -1996,6 +2030,8 @@ function damageSoft(p) {
   // อมาซอน (ฮารุกะ, characters/haruka.js): ไม่มีเกราะแล้วโดนดาเมจ = เลือดไหลตัวเอง — damageSoft ไม่ผ่าน
   //  adjustIncomingDamage() จึงต้องเรียกฮุคเองที่นี่ ไม่งั้นดาเมจแพ้จั่วจะไม่นับเป็น "ความเสียหายทางใดก็ตาม"
   if (p.characterId === "haruka") CHAR_HOOKS.haruka.onDamaged(engine, p);
+  // เกราะ Mark 42: ดาเมจแพ้จั่วลงชุดแทนตัวจริง
+  if (Mark42.absorb(engine, p, 1)) { hisakawaSyncOut(p); return; }
   // Bamboo-Hatted Kim: ได้รับความเสียหายทุกชนิด (รวมแพ้จั่ว) = ฝักดาบ +3-10
   CHAR_HOOKS.kim.onSoftDamage(engine, p);
   // Recruit [Armor]: ดาเมจแพ้จั่วก็ต้องโดนครบ 2 ครั้งเกราะถึงลด (ตำแหน่งเดียวกับ adjustIncomingDamage ในท่ออื่น = ก่อนโล่)
@@ -2024,6 +2060,8 @@ function adjustIncomingDamage(p, n, isNormalAttack, kind) {
   //  (endTurn) ซึ่งไม่มี effectSourceId แล้ว ORT (วิวัฒนาการ) จึงต้องอ่านผู้ลงมือจากตรงนี้แทน
   if (p && effectSourceId && effectSourceId !== p.id) { p.lastDamageSourceId = effectSourceId; p.lastDamageRound = roundNumber; }
   else if (p && !effectSourceId && n > 0) p.lastDamageSourceId = null;
+  // เกราะ Mark 42: ชุดรับความเสียหายทุกชนิดแทนตัวจริงทั้งก้อน (ส่วนเกินหายไปพร้อมชุด = แค่กลับร่างเดิม)
+  if (n > 0 && Mark42.absorb(engine, p, n)) return 0;
   // SE.RA.PH Matrix ระดับ 2: ลง 2 แต้มบนใคร = รับความเสียหายจากคนนั้นน้อยลง 1 หน่วย (§6)
   //  ต้นตอของดาเมจอ่านจาก effectSourceId (จุดเดียวกับที่ friendly-fire/ตราล่าเวทใช้)
   if (Seraph.active() && effectSourceId && effectSourceId !== p.id) {
@@ -2269,7 +2307,8 @@ function resetCombat(p) {
   CHAR_HOOKS.usagi.resetCombat(p); // อุซากิ: โควตาสกิลพื้นฐาน / ปรุๆ / ข้อเสนอสลับไพ่ / โจทย์คณิต (ติดที่ผู้ถูกทำโจทย์)
   CHAR_HOOKS.kim.resetCombat(p); // Bamboo-Hatted Kim: ฝักดาบ/Poise/บัพ/คูลดาวน์ + เหน็บชาที่จองไว้ (ติดที่ผู้ถูกมอบ)
   CHAR_HOOKS.recruit.resetCombat(p); // Recruit: กระสุน / โควตาเตรียมตัว / ตัวนับเกราะ / คูลดาวน์ / QTE ที่ค้าง
-  CHAR_HOOKS.striker.resetCombat(p); // สไตรเกอร์ ยูเรก้า: โหมดมือมีด/หมัดเหล็ก/นับถอยหลังระเบิด/งานช่าง + สตั้นค้างของเป้าหมาย (p.pair ไม่ถูกล้าง)
+  CHAR_HOOKS.striker.resetCombat(p);
+  Mark42.resetCombat(p); // เกราะ Mark 42: ชุดที่ใส่อยู่ / ชุดที่ส่งออกไป / คูลดาวน์ซื้อ // สไตรเกอร์ ยูเรก้า: โหมดมือมีด/หมัดเหล็ก/นับถอยหลังระเบิด/งานช่าง + สตั้นค้างของเป้าหมาย (p.pair ไม่ถูกล้าง)
   // ไบรอัน: น้ำมัน/ตัวสะสมน้ำมันที่รถกิน/ธงวีดีโอครั้งแรก + ธง "ถูกแช่" ที่อยู่ที่ผู้เล่นทุกคน
   CHAR_HOOKS.brian.resetCombat(p);
   // โปรดิวเซอร์: ไอดอลที่ยืนอยู่ / เลือดโปรดิวเซอร์ / แต้ม "ไอดอล" / คิวดาเมจหน่วง ฯลฯ
@@ -2717,9 +2756,13 @@ function buildStateFor(viewerId) {
         //  (LifeBar วาดหัวใจตามจำนวน maxHp — 0 = ไม่มีหัวใจสักดวง แต่ยังไม่ใช่ null จึงไม่ขึ้น "???")
         //  ค่าจริงในเอนจินยังเต็มอยู่โดยตั้งใจ เพราะมีจุดกวาด `if (hp <= 0) instantDeath()` หลายที่
         //  ซึ่งจะฆ่าเขาทันทีทั้งที่รถยังไม่พัง — เกราะคือพลังชีวิตของรถตัวจริงอยู่แล้ว (ดู carAbsorb)
-        hp: blackout ? null : (CHAR_HOOKS.bat_ben.inCar(p) ? 0 : p.hp),
-        maxHp: blackout ? null : (CHAR_HOOKS.bat_ben.inCar(p) ? 0 : maxHpOf(p)),
-        armor: blackout ? null : p.armor, maxArmor: blackout ? null : maxArmorOf(p),
+        // เกราะ Mark 42: แสดงพลังชีวิต 0/0 + เกราะชุด x/7 (ค่าจริงซ่อนอยู่ข้างใต้ คืนตอนถอด) — แบบเดียวกับรถแบทแมน
+        hp: blackout ? null : (CHAR_HOOKS.bat_ben.inCar(p) || Mark42.suited(p) ? 0 : p.hp),
+        maxHp: blackout ? null : (CHAR_HOOKS.bat_ben.inCar(p) || Mark42.suited(p) ? 0 : maxHpOf(p)),
+        armor: blackout ? null : (Mark42.suited(p) ? p.mark42.armor : p.armor),
+        maxArmor: blackout ? null : (Mark42.suited(p) ? Mark42.SUIT_ARMOR : maxArmorOf(p)),
+        mark42: Mark42.publicState(engine, p), // ใส่ชุดอยู่ไหม / ของใคร (เห็นทุกคน)
+        ...(mine ? Mark42.privateState(engine, p) : {}), // ชุดของเราที่ส่งออกไป / คูลดาวน์ซื้อ (เห็นเจ้าตัว)
         shield: blackout ? null : p.shield,
         tempHp: p.tempHp || 0, // เลือดชั่วคราว (แกมเบลอร์)
         // เอฟเฟครอบการ์ด (เห็นทุกคน): เขี้ยวปฏิปักษ์สีเขียว (ถาวร) / เกราะราชันสีแดง (ตอนสวม)
@@ -3319,8 +3362,9 @@ function rollShopAmmo() {
   const ammoId = pickWeighted(GUTS_AMMO_IDS.map((id) => ({ key: id, w: SHOP_AMMO_WEIGHTS[id] || 1 })));
   return { type: "gutsAmmo", ammo: ammoId, price: GUTS_AMMO[ammoId].price };
 }
-function rollShopItem(allowGun = true, allowHyper = true) {
+function rollShopItem(allowGun = true, allowHyper = true, allowMark42 = true) {
   const weights = { ...SHOP_WEIGHTS };
+  if (!allowMark42) { weights.gutsAmmo += weights.mark42; weights.mark42 = 0; }
   if (!allowGun) { weights.gutsAmmo += weights.gutsGun; weights.gutsGun = 0; }
   if (!allowHyper) { weights.gutsAmmo += weights.hyperTrigger; weights.hyperTrigger = 0; }
   const type = pickWeighted(Object.entries(weights).map(([key, w]) => ({ key, w })));
@@ -3334,6 +3378,7 @@ function rollShopItem(allowGun = true, allowHyper = true) {
     return { type: "skillPoint", size: s.size, value: s.amount, price: s.price };
   }
   if (type === "gutsGun") return { type: "gutsGun", price: GUTS_GUN_PRICE };
+  if (type === "mark42") return { type: "mark42", price: Mark42.PRICE };
   if (type === "hyperTrigger") return { type: "gutsAmmo", ammo: "hyper_trigger", price: GUTS_AMMO.hyper_trigger.price };
   if (type === "gutsAmmo") return rollShopAmmo();
   return { type: "armor", value: SHOP_ARMOR_AMOUNT, price: SHOP_ARMOR_PRICE };
@@ -3347,6 +3392,7 @@ function shopItemName(item) {
   if (item.type === "armor") return `ยาฟื้นเกราะ +${item.value}`;
   if (item.type === "gutsGun") return "ปืนหน่วย GUTS Select";
   if (item.type === "blackSparklence") return "Black Sparklence";
+  if (item.type === "mark42") return "เกราะ Mark 42";
   if (item.type === "gutsAmmo") return (GUTS_AMMO[item.ammo] || {}).name || "กระสุน";
   return "สินค้า";
 }
@@ -3360,9 +3406,11 @@ function openShop() {
   ];
   let guns = 0;
   let hypers = 0;
+  let suits = 0;
   for (let i = 1; i < SHOP_MAX_ITEMS; i++) {
-    const rolled = rollShopItem(guns < SHOP_MAX_GUNS, hypers < SHOP_MAX_HYPER);
+    const rolled = rollShopItem(guns < SHOP_MAX_GUNS, hypers < SHOP_MAX_HYPER, suits < SHOP_MAX_MARK42);
     if (rolled.type === "gutsGun") guns++;
+    if (rolled.type === "mark42") suits++;
     if (rolled.ammo === "hyper_trigger") hypers++;
     shopItems.push({ id: `shop_${shopRoundSeq}_${i}`, ...rolled, sold: false, soldTo: null });
   }
@@ -3405,6 +3453,7 @@ function buyShopItem(id, itemId) {
   if ((p.gold || 0) < item.price) return;
   p.inventory = p.inventory || [];
   if (item.type === "gutsGun" && (hasGutsGun(p) || p.characterId === "ignis" || hasBlackSparklence(p))) return;
+  if (item.type === "mark42" && !Mark42.canBuy(engine, p)) return; // มีชุดอยู่แล้ว / ชุดเพิ่งพังจากการต่อสู้ (10 เทิร์น)
   if (item.type === "gutsAmmo" && item.ammo === "hyper_trigger" && (p.characterId === "ignis" || hasBlackSparklence(p))) return;
   if (item.type === "gutsAmmo" && (item.ammo === "hyper_trigger" || item.ammo === "trigger_dark_key") && p.inventory.some((it) => it.type === "gutsAmmo" && it.ammo === item.ammo)) return;
   item.sold = true;
@@ -3441,6 +3490,15 @@ function useInventoryItemCore(id, uid, opts = {}) {
   const idx = (p.inventory || []).findIndex((it) => it.uid === uid);
   if (idx < 0) return;
   const item = p.inventory[idx];
+  // ---------- เกราะ Mark 42 (characters/_mark42.js): ใส่เอง / ใส่ให้คนอื่น / ใส่ให้คนอื่นแล้วระเบิด — ช่วงจั่วการ์ด ----------
+  if (item.type === "mark42") {
+    if (gameState !== "PLAYING") return;
+    const plan = Mark42.planUse(engine, p, item, opts.mode, opts.targetId);
+    if (!plan) return;
+    p.inventory.splice(idx, 1);
+    mark42Run(p, plan, CHAR_HOOKS.conner.onItemUsed ? () => CHAR_HOOKS.conner.onItemUsed(engine, p) : null);
+    return;
+  }
   let cutsceneKey = null;  // ตั้งค่าโดยกระสุน GUTS Select — ถ้ามีจะตัดเข้า CUTSCENE แทน broadcastState ปกติ
   let pendingShot = null;  // { item, target } ของกระสุนที่ยิง — ให้ผลจริงตอนวีดีโอจบ
   if (item.type === "cardColor") {
@@ -3553,7 +3611,8 @@ function applyGutsBullet(p, item, target) {
   if (item.ammo === "shockwave") {
     const before = target.armor;
     // Recruit [Armor]: สลายเกราะก็นับเป็น "โดน 1 ครั้ง" ไม่ใช่เกราะหายทั้งหมด
-    if (!CHAR_HOOKS.recruit.absorbHit(engine, target)) for (let i = 0; i < before; i++) { if (target.armor > 0) loseArmor(target); }
+    if (Mark42.suited(target)) Mark42.breakSuit(engine, target, "combat"); // เกราะ Mark 42: สลายเกราะ = ชุดพัง
+    else if (!CHAR_HOOKS.recruit.absorbHit(engine, target)) for (let i = 0; i < before; i++) { if (target.armor > 0) loseArmor(target); }
     // ผู้วิงวอน: "ปืนสลายเกราะ" ทำลาย "เกราะศรัทธา" ได้เหมือนเกราะปกติทุกประการ (สเปคระบุไว้ชัด)
     const faithBefore = CHAR_HOOKS.the_supplicant.faithOf(target);
     for (let i = 0; i < faithBefore; i++) CHAR_HOOKS.the_supplicant.faithAbsorb(engine, target);
@@ -5717,13 +5776,14 @@ function computeAttackBase(engine, attacker, target) {
   const phenexPurgeAtk = attacker.characterId === "phenex" && (attacker.statuses.phenexPurge || 0) > 0;
   const cardAtkBonus = triggerForm ? 0 : (attacker.statusAmt.cardAtkBonus || 0); // Trigger เสริมพลังตัวเองไม่ได้
 
-  const base = baseHook + hookBonus + (empowerAtk ? 1 : 0) + (discipleAtk ? CHAR_HOOKS.dan.DISCIPLE_ATK_BONUS : 0)
+  const mark42Atk = Mark42.attackBonus(attacker); // เกราะ Mark 42: พลังโจมตี +1 ระหว่างใส่ (ungated ใครใส่ก็ได้)
+  const base = baseHook + hookBonus + mark42Atk + (empowerAtk ? 1 : 0) + (discipleAtk ? CHAR_HOOKS.dan.DISCIPLE_ATK_BONUS : 0)
     + (yuiRockAtk ? CHAR_HOOKS.yui.ROCK_ATK : 0) + (yuiMelodyAtk ? CHAR_HOOKS.yui.MELODY_ATK : 0)
     + cardAtkBonus;
   return {
     base,
     storiumAtk, empowerAtk, discipleAtk, yuiRockAtk, yuiMelodyAtk, cardAtkBonus,
-    phenexPurgeAtk,
+    phenexPurgeAtk, mark42Atk,
     ...hookCtx,
   };
 }
@@ -5979,7 +6039,7 @@ function doAttack(byId, targetId) {
     oguriGoldAtk, victoryAtk, phenexPurgeAtk, miyakoUltAtk,
     doomLockonAtk, cardAtkBonus,
     triggerCircleAtk, triggerMultiAtk, triggerZeperionAtk, triggerLightBonus, triggerMultiHighestHp, triggerMultiLowHpPenalty,
-    triggerDarkAtk, muimiTowerAtk,
+    triggerDarkAtk, muimiTowerAtk, mark42Atk,
   } = computeAttackBase(engine, attacker, target);
   // ผกผัน (สถานะ Universal patch 2.2.1): โบนัสพลังโจมตีที่ควรได้ กลับกลายเป็นลดพลังโจมตีแทน (คำนวณรอบเพดานฐาน 1 หน่วย)
   if (invertActive(attacker)) base = Math.max(0, 1 - (base - 1));
@@ -6277,6 +6337,7 @@ function doAttack(byId, targetId) {
   if (usagiCritFx.crit) addFx({ name: `ปรุๆ คริติคอล ×2 (${usagiCritFx.chance}%)`, img: CHAR_HOOKS.usagi.IMG.base, by: attacker.name, color: colorOf(attacker) }, "atk");
   if (ortCritFx.crit) addFx({ name: "คริติคอล ×2", img: CHAR_HOOKS.ort.IMG.base, by: attacker.name, color: colorOf(attacker) }, "atk");
   if (CHAR_HOOKS.recruit.consumeHeadshot(attacker)) addFx({ name: "HeadShot +1", img: CHAR_HOOKS.recruit.IMG.base, by: attacker.name, color: colorOf(attacker) }, "atk");
+  if (mark42Atk > 0) addFx({ name: `เกราะ Mark 42 +${mark42Atk}`, img: Mark42.IMG.suit, by: attacker.name, color: colorOf(attacker) }, "atk");
   if (kimCritFx.crit) addFx({ name: `Poise คริติคอล ×2 (${kimCritFx.chance}%)`, img: displayImg(attacker), by: attacker.name, color: colorOf(attacker) }, "atk");
   for (const name of kimAtkFx) addFx({ name, img: displayImg(attacker), by: attacker.name, color: colorOf(attacker) }, "atk");
   if (strikerFistFx) addFx({ name: `หมัดเหล็ก +1${strikerFistFx.stripped ? ` · ปาด "${strikerFistFx.stripped.label}"` : ""}${strikerFistFx.combo ? " · ซ้ำเป้าเดิม สตั้นเทิร์นหน้า" : ""}`, img: CHAR_HOOKS.striker.IMG.skill2, by: attacker.name, color: colorOf(attacker) }, "atk");
@@ -6788,7 +6849,7 @@ function playerIdFor(socket) {
 const PAIR_ROLES = ["pilot", "gunner"];
 const PAIR_ROLE_EVENTS = {
   pilot: new Set(["hit", "lock", "attack", "strikerApprove", "strikerRepairStart", "strikerRepairDone"]),
-  gunner: new Set(["useSkill", "buyShopItem", "useInventoryItem"]),
+  gunner: new Set(["useSkill", "buyShopItem", "useInventoryItem", "mark42Control"]),
 };
 const coSocketHost = new Map(); // socket.id ของคู่หู -> hostId
 const coSessions = new Map();   // sessionToken ของคู่หู -> hostId
@@ -7144,7 +7205,9 @@ io.on('connection', (socket) => {
   onPlayerEvent(socket, 'lock', (id) => lock(id), 4);
   onPlayerEvent(socket, 'useSkill', (id, { tier, targets, item } = {}) => useSkill(id, tier, targets, item), 12);
   onPlayerEvent(socket, 'buyShopItem', (id, { itemId } = {}) => buyShopItem(id, itemId), 8);
-  onPlayerEvent(socket, 'useInventoryItem', (id, { uid, cardIndex, color, targetId } = {}) => withEffectSource(players[id], () => useInventoryItem(id, uid, { cardIndex, color, targetId })), 8);
+  onPlayerEvent(socket, 'useInventoryItem', (id, { uid, cardIndex, color, targetId, mode } = {}) => withEffectSource(players[id], () => useInventoryItem(id, uid, { cardIndex, color, targetId, mode })), 8);
+  // เกราะ Mark 42: เจ้าของคุมชุดที่ส่งออกไปแล้ว (recall / remove / detonate)
+  onPlayerEvent(socket, 'mark42Control', (id, { action } = {}) => withEffectSource(players[id], () => mark42Control(id, action)), 6);
   onPlayerEvent(socket, 'locaAnswer', (id, { accept, fromId } = {}) => answerLoca(id, !!accept, fromId), 4);
   // ริต้า เบอร์นัล: ขอแค่ได้พบกันอีก — เลือกเป้าหมายปลดปล่อยความเจ็บปวด (ใช้ได้แม้ตกรอบไปแล้ว)
   onPlayerEvent(socket, 'phenexRelease', (playerId, { targetId } = {}) => {
@@ -7596,6 +7659,7 @@ module.exports = {
   computeAttackBase,
   resolveRound, // เทสต์เรียกตรงๆ เพื่อพิสูจน์การตัดสินผู้ชนะ/ผู้แพ้จริง (ไม่จำลองเงื่อนไขเอง)
   pairAllows, // สไตรเกอร์ ยูเรก้า: สิทธิ์ตามบทบาทของคู่หู (เทสต์เรียกตรง)
+  mark42Control, // เกราะ Mark 42: เจ้าของคุมชุด (โค้ดจริงเรียกจาก socket)
   strikerApprove, strikerRepairStart, strikerRepairDone, // สไตรเกอร์ ยูเรก้า: คำสั่งของนักบิน (โค้ดจริงเรียกจาก socket)
   attackSoundOf, // เสียงโจมตีปกติเฉพาะตัวละคร (เทสต์อ่านตรงนี้)
   engine,

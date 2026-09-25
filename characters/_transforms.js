@@ -21,6 +21,7 @@ const daisukeChar = require("./daisuke");
 const yagurumaChar = require("./yaguruma");
 const kagamiChar = require("./kagami");
 const usagiChar = require("./usagi"); // อุซากิ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
+const mark42 = require("./_mark42"); // เกราะ Mark 42 (ไอเทมร้านค้า): path วีดีโอชุดเดียวกับไฟล์ระบบ
 const strikerChar = require("./striker"); // สไตรเกอร์ ยูเรก้า: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
 const recruitChar = require("./recruit"); // Recruit: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
 const kimChar = require("./kim"); // Bamboo-Hatted Kim: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
@@ -144,6 +145,11 @@ module.exports = function buildTransforms(img) {
     // สไตรเกอร์ ยูเรก้า — seconds วัดจาก mvhd จริงแล้วปัดขึ้น (intro 6.64 · มือมีด 4.38 · หมัดเหล็ก 9.65/18.86 · ขีปนาวุธ 6.20
     //  · เปิดใช้เป็นเกียรติ 9.81 · ระเบิด 7.28 · แทงสวน 6.87 · เตาปฏิกรณ์ 8.54 · อาศัยจังหวะ 9.75)
     //  มือมีดใช้ triggerCutscene (ครั้งแรกที่เปิดเท่านั้น) · ที่เหลือคิวเองจากโค้ดทุกครั้ง · เตาปฏิกรณ์คุมครั้งเดียวด้วยธงของตัวเอง
+    // เกราะ Mark 42 (ไอเทม) — คิวจากโค้ดทุกครั้ง แล้วผลเกิดหลังคลิปจบ · seconds จาก mvhd (15.40 / 23.24 / 12.51 / 16.17) ปัดขึ้น
+    mark42Suitup:   { img: mark42.IMG.suit, video: mark42.VIDEO.suitup,   title: "เกราะ Mark 42", label: "สวมเกราะ",            seconds: 16, music: null, afterReveal: false },
+    mark42Recall:   { img: mark42.IMG.suit, video: mark42.VIDEO.recall,   title: "เกราะ Mark 42", label: "เรียกเกราะกลับมาสวม",  seconds: 24, music: null, afterReveal: false },
+    mark42SuitSome: { img: mark42.IMG.suit, video: mark42.VIDEO.suitSome, title: "เกราะ Mark 42", label: "ส่งเกราะไปสวมให้",     seconds: 13, music: null, afterReveal: false },
+    mark42Bomb:     { img: mark42.IMG.suit, video: mark42.VIDEO.bomb,     title: "เกราะ Mark 42", label: "ระเบิด!",              seconds: 17, music: null, afterReveal: false },
     strikerIntro:     { img: strikerChar.IMG.base,    video: strikerChar.VIDEO.intro,     title: "สไตรเกอร์ ยูเรก้า", label: "⚠️ วัตถุอันตราย", seconds: 7, music: null, afterReveal: false },
     strikerKnife:     { img: strikerChar.IMG.skill1,  video: strikerChar.VIDEO.knife,     title: "มือมีด", label: "สลับโหมดการโจมตี", seconds: 5, music: null, afterReveal: false },
     strikerFist:      { img: strikerChar.IMG.skill2,  video: strikerChar.VIDEO.fist,      title: "กำจัดศัตรูให้สิ้น", label: "หมัดเหล็ก", seconds: 10, music: null, afterReveal: false },

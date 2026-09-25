@@ -1592,6 +1592,9 @@ function statusEntries(p, full) {
     out.push({ key: "usagiPuru", v: 1, icon: "🐰", label: `ปรุๆ ${u.puru}/${u.puruMax}`, cls: u.puru >= 5 ? "bg-echo-hp" : "bg-echo-gold text-gray-900",
       desc: `ปรุๆ: คริติคอล ${u.puru * 7}% (ดาเมจ ×2)${u.puru >= 5 ? " · พลังโจมตี +1" : " · ครบ 5 หน่วยพลังโจมตี +1"} · ออกหมัดได้ +2 · ไม่ได้เพิ่มครบ 3 เทิร์นลด 1 (ตอนนี้นับไป ${u.idle}/3)` });
   }
+  // เกราะ Mark 42: ใส่ชุดอยู่ (ของใคร / เกราะชุดเหลือเท่าไหร่)
+  if (p.mark42) out.push({ key: "mark42", v: 1, icon: "🦾", label: `Mark 42 ${p.mark42.armor}/${p.mark42.max}`, cls: "bg-orange-500 text-gray-900",
+    desc: `เกราะ Mark 42 (ของ ${p.mark42.ownerName}): พลังชีวิตกลายเป็นเกราะชุด ${p.mark42.max} หน่วย · พลังโจมตี +1 · ชุดพัง = กลับร่างเดิม · คนใส่ถอดเองไม่ได้` });
   // สไตรเกอร์ ยูเรก้า: โหมด/ท่าที่ค้าง/นับถอยหลังระเบิด/งานช่าง — ข้อมูลสาธารณะ
   if (p.striker) {
     const s = p.striker;
@@ -1982,7 +1985,9 @@ function ShopModal({ shop, me, frozen, onClose }) {
               const info = shopInfoOf(it);
               const sold = !!it.sold;
               const afford = (me?.gold ?? 0) >= it.price;
-              const owned = (it.type === "gutsGun" && (hasGun || isIgnis)) || (it.type === "gutsAmmo" && it.ammo === "hyper_trigger" && (isIgnis || (me?.inventory || []).some((ownedItem) => ownedItem.type === "gutsAmmo" && ownedItem.ammo === "hyper_trigger"))) || (it.type === "gutsAmmo" && it.ammo === "trigger_dark_key" && (me?.inventory || []).some((ownedItem) => ownedItem.type === "gutsAmmo" && ownedItem.ammo === "trigger_dark_key")); // ปืนมีได้กระบอกเดียว / Hyper Key ซื้อขาด
+              // เกราะ Mark 42: มีได้ชุดเดียว (ในกระเป๋าหรือส่งออกไปแล้ว) · ชุดพังจากการต่อสู้ ซื้อใหม่ไม่ได้ 10 เทิร์น
+              const suitLock = it.type === "mark42" ? (me?.mark42BuyLock || 0) : 0;
+              const owned = (it.type === "mark42" && (!!me?.mark42Owned || (me?.inventory || []).some((x) => x.type === "mark42"))) || (it.type === "gutsGun" && (hasGun || isIgnis)) || (it.type === "gutsAmmo" && it.ammo === "hyper_trigger" && (isIgnis || (me?.inventory || []).some((ownedItem) => ownedItem.type === "gutsAmmo" && ownedItem.ammo === "hyper_trigger"))) || (it.type === "gutsAmmo" && it.ammo === "trigger_dark_key" && (me?.inventory || []).some((ownedItem) => ownedItem.type === "gutsAmmo" && ownedItem.ammo === "trigger_dark_key")); // ปืนมีได้กระบอกเดียว / Hyper Key ซื้อขาด
               return (
                 <div
                   key={it.id}
@@ -1995,10 +2000,10 @@ function ShopModal({ shop, me, frozen, onClose }) {
                     <div className="av-label" style={{ fontSize: "0.7rem" }}>🪙 {it.price}</div>
                     <AvButton
                       className="w-full py-1.5 text-xs px-2"
-                      disabled={sold || owned || !afford || frozen}
+                      disabled={sold || owned || suitLock > 0 || !afford || frozen}
                       onClick={() => { playSfx("buy_something"); socket.emit("buyShopItem", { itemId: it.id }); }}
                     >
-                      {frozen ? "⏱️ CLOCK UP" : sold ? "ขายแล้ว" : owned ? "มีแล้ว" : afford ? "ซื้อ" : "เหรียญไม่พอ"}
+                      {frozen ? "⏱️ CLOCK UP" : sold ? "ขายแล้ว" : owned ? "มีแล้ว" : suitLock > 0 ? `รออีก ${suitLock} เทิร์น` : afford ? "ซื้อ" : "เหรียญไม่พอ"}
                     </AvButton>
                   </div>
                 </div>
@@ -2019,6 +2024,13 @@ function InventoryModal({ me, players, gameState, roundNumber, frozen, onPickGun
   // ปืนหน่วย GUTS Select: กดที่ปืน -> เลือกกระสุนในกระเป๋า -> ปิดกระเป๋าแล้วไปเลือกเป้าหมายบนกระดานต่อ
   const [gunOpen, setGunOpen] = useState(false);
   const myCards = me?.cards || [];
+  // เกราะ Mark 42: เลือกโหมดที่ต้องเลือกเป้าหมาย ("give" | "bomb") ของชุดในกระเป๋า
+  const [suitMode, setSuitMode] = useState(null);
+  const suitTargets = (players || []).filter((p) => p.alive && p.id !== me?.id && !p.isBoss && !p.mark42);
+  const suitBlock = frozen ? "⏱️ CLOCK UP" : gameState !== "PLAYING" ? "ใช้ได้เฉพาะช่วงจั่วการ์ด" : null;
+  const applySuit = (uid, mode, targetId) => { clickSound(); socket.emit("useInventoryItem", { uid, mode, targetId }); setSuitMode(null); };
+  const suitControl = (action) => { clickSound(); socket.emit("mark42Control", { action }); };
+  const suitOut = me?.mark42Owned || null;
 
   const ammoItems = items.filter((it) => it.type === "gutsAmmo");
   const targets = (players || []).filter((p) => p.alive && p.id !== me?.id && !(me?.teamId && p.teamId === me.teamId));
@@ -2062,6 +2074,22 @@ function InventoryModal({ me, players, gameState, roundNumber, frozen, onPickGun
   return (
     <AvModal label="กระเป๋า" title={`กระเป๋าของ ${me?.name || ""}`} width="min(34rem, 94vw)" onClose={onClose}>
       <>
+        {suitOut && (
+          <div className="av-item flex flex-col gap-2 mb-2" style={{ borderLeftColor: "#f97316" }}>
+            <div className="flex items-center gap-3">
+              <img src="/characters/Mark42/mark42.webp" alt="" className="h-10 w-10 rounded object-cover" />
+              <div className="min-w-0 flex-1">
+                <div className="av-heading text-sm">เกราะ Mark 42 — {suitOut.self ? "สวมอยู่ที่ตัวเอง" : `สวมอยู่ที่ ${suitOut.wearerName}`}</div>
+                <div className="text-xs" style={{ color: "rgba(239,230,245,.62)" }}>เกราะชุดเหลือ {suitOut.armor}/7 · คนใส่ถอดเองไม่ได้ เจ้าของเท่านั้นที่ถอด/เรียกคืน/ระเบิดได้</div>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {!suitOut.self && <AvButton className="px-3 py-1.5 text-xs" disabled={!!suitBlock || !!me?.mark42} title={me?.mark42 ? "ใส่ชุดอยู่แล้ว" : suitBlock || ""} onClick={() => suitControl("recall")}>เรียกคืนมาใส่เอง</AvButton>}
+              <AvButton className="px-3 py-1.5 text-xs" disabled={!!suitBlock} title={suitBlock || ""} onClick={() => suitControl("remove")}>ถอดออก</AvButton>
+              {!suitOut.self && <AvButton className="px-3 py-1.5 text-xs" disabled={!!suitBlock} title={suitBlock || ""} onClick={() => suitControl("detonate")}>💥 สั่งระเบิด (4)</AvButton>}
+            </div>
+          </div>
+        )}
         {items.length === 0 ? (
           <div className="av-label py-8 text-center" style={{ color: "rgba(239,230,245,.4)" }}>ยังไม่มีของในคลัง</div>
         ) : (
@@ -2071,6 +2099,7 @@ function InventoryModal({ me, players, gameState, roundNumber, frozen, onPickGun
               const isColorItem = it.type === "cardColor";
               const isGun = it.type === "gutsGun" || it.type === "blackSparklence";
               const isAmmo = it.type === "gutsAmmo";
+              const isSuit = it.type === "mark42";
               const picking = isColorItem && colorPickUid === it.uid;
               return (
                 <div key={it.uid} className="av-item flex flex-col gap-2" style={isGun ? { borderLeftColor: "var(--av-gold-mid)" } : undefined}>
@@ -2084,6 +2113,8 @@ function InventoryModal({ me, players, gameState, roundNumber, frozen, onPickGun
                       <AvButton className="px-4 py-1.5 text-xs shrink-0" disabled={!gunOpen && !!fireBlock} title={fireBlock || ""} onClick={toggleGun}>
                         {gunOpen ? "ยกเลิก" : "ยิง"}
                       </AvButton>
+                    ) : isSuit ? (
+                      <span className="av-label shrink-0 text-right" style={{ fontSize: "0.62rem" }}>{suitBlock || "เลือกวิธีใช้ด้านล่าง"}</span>
                     ) : isAmmo ? (
                       <span className="av-label shrink-0 text-right" style={{ fontSize: "0.62rem" }}>ใช้ผ่านปืน</span>
                     ) : isColorItem ? (
@@ -2094,6 +2125,25 @@ function InventoryModal({ me, players, gameState, roundNumber, frozen, onPickGun
                       <AvButton className="px-4 py-1.5 text-xs shrink-0" disabled={frozen} onClick={() => applyItem(it.uid)}>{frozen ? "⏱️" : "ใช้"}</AvButton>
                     )}
                   </div>
+                  {isSuit && (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        <AvButton className="px-3 py-1.5 text-xs" disabled={!!suitBlock || !!me?.mark42} title={me?.mark42 ? "ใส่ชุดอยู่แล้ว" : ""} onClick={() => applySuit(it.uid, "self")}>🦾 ใส่ให้ตัวเอง</AvButton>
+                        <AvButton className="px-3 py-1.5 text-xs" disabled={!!suitBlock || !suitTargets.length} onClick={() => { clickSound(); setSuitMode(suitMode === "give" ? null : "give"); }}>ใส่ให้ผู้เล่นอื่น</AvButton>
+                        <AvButton className="px-3 py-1.5 text-xs" disabled={!!suitBlock || !suitTargets.length} onClick={() => { clickSound(); setSuitMode(suitMode === "bomb" ? null : "bomb"); }}>💥 ใส่ให้แล้วระเบิด (4)</AvButton>
+                      </div>
+                      {suitMode && (
+                        <div className="rounded-lg bg-black/40 p-2">
+                          <div className="text-xs opacity-80 mb-1">{suitMode === "give" ? "เลือกคนที่จะใส่ชุดให้:" : "เลือกคนที่จะส่งชุดไประเบิดใส่:"}</div>
+                          <div className="flex flex-wrap gap-2">
+                            {suitTargets.map((t) => (
+                              <button key={t.id} className="text-xs font-bold rounded-lg px-3 py-1.5 border border-white/25 bg-white/10 hover:bg-white/20" onClick={() => applySuit(it.uid, suitMode, t.id)}>{t.name}</button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {isGun && !gunOpen && fireBlock && <div className="text-[11px]" style={{ color: "#e06a78" }}>⚠️ {fireBlock}</div>}
                   {isGun && gunOpen && (
                     <div className="rounded-lg bg-black/40 p-2">

@@ -38,7 +38,7 @@ function giveAmmo(p, ammo) {
 }
 
 // ---------- การสุ่มสินค้า ----------
-const SHOP_TYPES = ['cardColor', 'fortune', 'resist', 'cardRemove', 'skillPoint', 'armor', 'gutsGun', 'gutsAmmo'];
+const SHOP_TYPES = ['cardColor', 'fortune', 'resist', 'cardRemove', 'skillPoint', 'armor', 'gutsGun', 'gutsAmmo', 'mark42'];  // เกราะ Mark 42 (characters/_mark42.js)
 test('rollShopItem: ออกได้เฉพาะชนิดที่มีจริง และราคาปืน/กระสุนตรงกับตาราง', () => {
   for (let i = 0; i < 800; i++) {
     const it = engine.rollShopItem();
@@ -53,6 +53,7 @@ test('rollShopItem: ออกได้เฉพาะชนิดที่มี
 });
 
 test('rollShopItem: allowGun=false ไม่ออกปืนเลย / allowHyper=false ไม่ออก Hyper Key เลย', () => {
+  for (let i = 0; i < 400; i++) assert.notEqual(engine.rollShopItem(true, true, false).type, 'mark42'); // เพดาน Mark 42 ต่อรอบ
   for (let i = 0; i < 400; i++) assert.notEqual(engine.rollShopItem(false).type, 'gutsGun');
   for (let i = 0; i < 400; i++) assert.notEqual(engine.rollShopItem(true, false).ammo, 'hyper_trigger');
 });
