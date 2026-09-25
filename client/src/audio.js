@@ -43,6 +43,20 @@ const FILES = {
   ort_theme: "/characters/ort/ort_theme.mp3",
   // อุซากิ: เพลงตลอดช่วงท่าไม้ตาย (โจทย์คณิต 3 เทิร์น)
   usagi_theme: "/characters/usagi/usagi_theme.mp3",
+  // Bamboo-Hatted Kim: เสียงกดสกิล / เสียงสวนกลับ / เพลงร่าง Awake (เล่นค้างถาวรหลังเข้าร่าง)
+  kim_draw: "/characters/Bamboo-Hatted Kim/สกิลพื้นฐาน/สกิลพื้นฐาน ชักดาบ.mp3",
+  kim_overthrow: "/characters/Bamboo-Hatted Kim/สกิลรอง/สกิลรอง ฟาดฟันลง 01.mp3",
+  kim_counter: "/characters/Bamboo-Hatted Kim/สกิลรอง/สกิลรอง ฟาดฟันลง 02.mp3",
+  kim_bones: "/characters/Bamboo-Hatted Kim/Yield My Flesh To Claim Their Bones.wav",
+  kim_awake: "/characters/Bamboo-Hatted Kim/Limbus Company OST - Intervallo VII-2 Boss Battle Theme [-Lu6w6_P1NA].mp3",
+  // Recruit: เสียงปืนโจมตีปกติ (ไฟล์ .mov ที่ข้างในเป็น MP3) / เสียงสกิลตอนยิงโดน / เสียงสกิลพิเศษ "เตรียมตัว"
+  recruit_attack: "/characters/Recruit/โจมตีปกติ/โจมตีปกติ.mov",
+  recruit_basic: "/characters/Recruit/สกิลพื้นฐาน/สกิลพื้นฐาน.mp3",
+  recruit_secondary: "/characters/Recruit/สกิลรอง/สกิลรอง.mp3",
+  recruit_ult: "/characters/Recruit/สกิลอันติเมต/สกิลอันติเมต.mp3",
+  recruit_bandage: "/characters/Recruit/สกิลพิเศษ/รักษา.mp3",
+  recruit_reload: "/characters/Recruit/สกิลพิเศษ/รีโหลด.mp3",
+  recruit_armor: "/characters/Recruit/สกิลพิเศษ/เกราะ.mp3",
   // ยูนะ ไอดอลประจำสนาม (patch 2.2.6): เพลงล็อกทั้งสนามตลอด 5 เทิร์นที่เอฟเฟกต์ทำงาน
   yuna_longing: "/characters/yuna/Longing.mp3",
   yuna_delete: "/characters/yuna/Delete.mp3",

@@ -157,7 +157,8 @@ const BASIC_DEBUFF_CLEAR = ["discord", "sleep", "stun", "nodraw", "noskill", "we
   "drunk",        // มึนเมา: สุ่มติดห้ามจั่ว/ห้ามสกิล/สตั้นเมื่อกดสกิลหรือจั่วไพ่
   "promo",        // เปิดแต้ม: แต้มการ์ดถูกเปิดให้ทุกคนเห็น
   "energy",       // เครื่องดื่มชูกำลัง: เสียพลัง 1 หน่วยต่อเทิร์น
-  "harukaPunish"]; // จงไปสู่สุขติ (ฮารุกะ): เป้าหมายที่เลือดไหล >= 3 โดนระเบิดเลือดไหลใส่
+  "harukaPunish", // จงไปสู่สุขติ (ฮารุกะ): เป้าหมายที่เลือดไหล >= 3 โดนระเบิดเลือดไหลใส่
+  "numb"];        // เหน็บชา (Bamboo-Hatted Kim): กดสกิลมีโอกาส 30% ไม่ทำงาน
 // ดีบัฟที่ยังไม่เกิดผลทันที (ยามฟ้าสาง / เส้นชีวิต): โดนล้าง = ลดลงทีละ 1 หน่วย ไม่หายทั้งหมด
 const SOFT_DEBUFF_STEP = ["deathline", "curse", "shock"];
 
@@ -432,6 +433,14 @@ function tickBleed(engine, p) {
   if (p.statuses.hbleed <= 0) delete p.statuses.hbleed;
 }
 
+// "เหน็บชา" (numb, สถานะ Universal — Bamboo-Hatted Kim): กดสกิลแล้วมีโอกาส NUMB_FAIL_CHANCE ที่สกิลไม่ทำงาน
+//  แต้มสกิลยังถูกหักตามเดิม — จุดโรลจริงอยู่ใน useSkillCore() ของ server.js ถัดจากจุดหักแต้ม
+//  ดีบัฟพื้นฐานธรรมดา: ลดเทิร์นตามลูปกลาง · ต้าน/ล้างได้ (อยู่ใน BASIC_DEBUFF_CLEAR)
+const NUMB_FAIL_CHANCE = 0.30;
+function numbFizzles(p) {
+  return !!p && ((p.statuses && p.statuses.numb) || 0) > 0 && Math.random() < NUMB_FAIL_CHANCE;
+}
+
 // "เนตรมณะ" (netramana, สถานะ Universal patch 2.2.7 — เจ้าหญิงราก "ทุกอย่างจะต้องราบรื่น"):
 //  ผู้ที่ติดบัฟนี้ โจมตีปกติแล้วมีโอกาสสังหารเป้าหมายทันที 20% — ตัวละครไหนก็ติด/ให้ติดได้
 //  จุดโรลจริงอยู่ใน doAttack() ของ server.js (ต้องใช้ cutscene/lastAttack/เฟสโจมตี จึงเป็น pure predicate ที่นี่)
@@ -541,6 +550,8 @@ module.exports = {
   tickBleed,
   NETRAMANA_KILL_CHANCE,
   netramanaActive,
+  NUMB_FAIL_CHANCE,
+  numbFizzles,
   EVADE_STACK_MAX,
   EVADE_STACK_TURNS,
   grantEvadeStack,

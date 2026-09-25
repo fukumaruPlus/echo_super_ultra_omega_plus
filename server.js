@@ -73,6 +73,7 @@ const {
   grantEvadeStack,
   consumeEvadeStack,
   tickEvadeStacks,
+  numbFizzles,
 } = require("./characters/_universal_status");
 // เพดานค่าใช้พลังงานของสกิล: ตัวปรับราคา "ขาขึ้น" ทุกชนิด (กลางคืน / ภาระเวท) ดันราคาได้ไม่เกินนี้
 //  สกิลที่ราคาแตะเพดานอยู่แล้ว (เช่นท่าไม้ตาย 8) จะไม่ถูกดันให้แพงขึ้นไปอีก — ส่วนกระแสเวทยังลดราคาได้ตามปกติ
@@ -382,6 +383,10 @@ function maxHpOf(p) {
   if (p && p.characterId === "the_supplicant") return Math.max(1, CHAR_HOOKS.the_supplicant.maxHp() - ((p.maxHpPenalty) || 0));
   // โปรดิวเซอร์ (patch 3.6): หลอดเลือดเป็นของ "ไอดอล" (5) ตอนยืนอยู่ และเป็นของ "โปรดิวเซอร์" (3) เมื่อไอดอลล้ม
   if (p && p.characterId === "producer_lumi") return Math.max(1, CHAR_HOOKS.producer_lumi.maxHp(p) - ((p.maxHpPenalty) || 0));
+  // Bamboo-Hatted Kim: พลังชีวิตพื้นฐาน 8 หน่วย
+  if (p && p.characterId === "kim") return Math.max(1, CHAR_HOOKS.kim.maxHp() - ((p.maxHpPenalty) || 0));
+  // Recruit: พลังชีวิตพื้นฐาน 5 หน่วย
+  if (p && p.characterId === "recruit") return Math.max(1, CHAR_HOOKS.recruit.maxHp() - ((p.maxHpPenalty) || 0));
   return Math.max(1, MAX_HP - ((p && p.maxHpPenalty) || 0));
 }
 // ฟื้นเลือดจริงแบบเคารพสถานะ "ไม่ใช้งานต่อ" / "ไร้ทางเยียวยา" — คืนจำนวนที่ฟื้นได้จริง
@@ -965,6 +970,106 @@ function qteTimeout(id) {
 function sweepQte() {
   for (const p of alivePlayers()) if (p.qte) finishQte(p, false);
 }
+
+// ============================================================
+//  Recruit (characters/recruit.js) — QTE คลิกจุดแดง (แยกจาก QTE กลางแบบกดปุ่ม)
+//  โจมตีปกติ: เฟส ATTACK ถูกพักไว้ด้วยตัวจับเวลา server (ตาข่ายกันค้างถ้าเจ้าตัวหลุด) แล้วค่อยยิงจริงผ่าน doAttack
+//  สกิล: เล่นในเฟส PLAYING — ค้างอยู่ = pendingAnswer ของ checkAllLocked · เปิดไพ่แล้วยังไม่จบ = นับจุดที่คลิกได้ตอนนั้น
+// ============================================================
+const RECRUIT_ATTACK_SAFETY_SECONDS = Math.ceil(CHAR_HOOKS.recruit.QTE_MS / 1000) + 3;
+// sweeping = เรียกจาก resolveRound (เปิดไพ่แล้ว) — ห้ามพักเฟสเล่นคลิปตรงนี้ คลิปที่คิวไว้ไปเล่นกับ afterResolve เอง
+function recruitQteFinish(p, sweeping) {
+  const res = CHAR_HOOKS.recruit.takeQte(p);
+  if (!res) return;
+  if (res.mode === "attack") { recruitAttackResolved(p, res); return; }
+  const out = withEffectSource(p, () => CHAR_HOOKS.recruit.resolveSkill(engine, p, res)) || {};
+  const after = out.after ? () => withEffectSource(p, out.after) : null;
+  if (!sweeping && gameState === "PLAYING" && cutsceneQueue.length) { pausePlayingForCutscene(after); return; }
+  if (after) after();
+  if (sweeping) return;
+  broadcastState();
+  if (checkOrtEarlyWin()) return;
+  checkAllLocked();
+}
+function recruitAttackResolved(p, res) {
+  clearPhaseTimer();
+  if (gameState !== "ATTACK" || attackerId !== p.id || !p.alive) { if (gameState === "ATTACK") endTurn(); return; }
+  CHAR_HOOKS.recruit.settleAttack(engine, p, res);
+  if (res.ok) {
+    doAttack(p.id, res.targetId);
+    // doAttack ปฏิเสธเป้าได้ (เป้าตายไปแล้ว ฯลฯ) — อย่าให้เฟส ATTACK ค้าง
+    if (gameState === "ATTACK") { p.recruit.shot = false; endTurn(); }
+    return;
+  }
+  const target = players[res.targetId];
+  recruitShowMiss(p, target, `ยิงพลาด — QTE ${res.hits}/${res.total}`);
+}
+function recruitShowMiss(p, target, label) {
+  lastAttack = {
+    id: ++attackSeq,
+    byName: p.name, byImg: displayImg(p), byColor: colorOf(p), byAttackSound: attackSoundOf(p),
+    targetName: target ? target.name : "", targetImg: target ? displayImg(target) : null, targetColor: target ? colorOf(target) : "#888",
+    dmg: 0, dodge: true, fxMs: ATTACKFX_TIME * 1000,
+    skills: [{ name: label, img: CHAR_HOOKS.recruit.IMG.base, by: p.name, color: colorOf(p), side: "atk" }],
+  };
+  gameState = "ATTACKING";
+  startPhaseTimer(ATTACKFX_TIME, () => runCutsceneQueue(endTurn));
+  broadcastState();
+}
+// doAttack ของ Recruit ที่ยังไม่ได้เล็ง -> เปิด QTE แทนการตีทันที (คืน true = รับช่วงไปแล้ว)
+function recruitInterceptAttack(attacker, target) {
+  if (attacker.characterId !== "recruit" || !attacker.recruit) return false;
+  if (CHAR_HOOKS.recruit.consumeShot(attacker)) return false; // QTE ผ่านแล้ว — นี่คือการยิงจริง
+  clearPhaseTimer();
+  if (!CHAR_HOOKS.recruit.hasBullets(attacker)) {
+    lastLog.push(`🔫 ${attacker.name} กระสุนหมด — ยิงไม่ได้!`);
+    recruitShowMiss(attacker, target, "กระสุนหมด — ยิงไม่ได้");
+    return true;
+  }
+  CHAR_HOOKS.recruit.startQte(engine, attacker, "attack", target.id);
+  startPhaseTimer(RECRUIT_ATTACK_SAFETY_SECONDS, () => recruitQteFinish(attacker, false));
+  broadcastState();
+  return true;
+}
+function recruitQteHit(id, dotId) {
+  const p = players[id];
+  if (!p || !p.alive || !CHAR_HOOKS.recruit.qteActive(p)) return;
+  if (CHAR_HOOKS.recruit.hitDot(engine, p, String(dotId || ""))) recruitQteFinish(p, false);
+  else broadcastState();
+}
+function recruitQteDone(id) {
+  const p = players[id];
+  if (!p || !p.alive || !CHAR_HOOKS.recruit.qteActive(p) || !CHAR_HOOKS.recruit.timeUp(p)) return;
+  recruitQteFinish(p, false);
+}
+function recruitPick(id, targets) {
+  const p = players[id];
+  if (!p || !p.alive || gameState !== "PLAYING") return;
+  if (!withEffectSource(p, () => CHAR_HOOKS.recruit.applyPick(engine, p, targets))) return;
+  broadcastState();
+  if (checkOrtEarlyWin()) return;
+  checkAllLocked();
+}
+// สกิลพิเศษ "เตรียมตัว" — ไม่กินโควตาสกิลของเทิร์น แต่ยังเป็น "การกดสกิล" (ด่านเดียวกับ useSkill ที่เกี่ยวข้อง)
+function recruitPrep(id, kind) {
+  const p = players[id];
+  if (!p || !p.alive || gameState !== "PLAYING" || p.locked || Seraph.active()) return;
+  if ((p.statuses.noskill || 0) > 0 || (p.statuses.phenexTaunt || 0) > 0) return;
+  if (CHAR_HOOKS.conner.skillBlocked(engine, p) || CHAR_HOOKS.brian.skillBlocked(engine, p, "basic") || CHAR_HOOKS.daisuke.skillBlocked(engine, p, "basic")) return;
+  if (!CHAR_HOOKS.recruit.canPrep(engine, p, kind)) return;
+  p.skillPoints -= 1;
+  const prep = CHAR_HOOKS.recruit.PREP[kind];
+  if (numbFizzles(p)) {
+    lastLog.push(`🫨 ${p.name} เหน็บชา — ${prep.name} ไม่ทำงาน! (แต้มสกิลถูกหักไปแล้ว)`);
+    io.emit("skillFlash", { name: `${prep.name} — เหน็บชา สกิลไม่ทำงาน`, img: CHAR_HOOKS.recruit.IMG[kind], by: p.name, color: colorOf(p) });
+  } else {
+    const suffix = withEffectSource(p, () => CHAR_HOOKS.recruit.applyPrep(engine, p, kind)) || "";
+    io.emit("skillFlash", { name: `${prep.name}${suffix}`, img: CHAR_HOOKS.recruit.IMG[kind], by: p.name, color: colorOf(p), sound: CHAR_HOOKS.recruit.SFX[kind] });
+  }
+  CHAR_HOOKS.conner.onSkillUsed(engine, p);
+  broadcastState();
+  checkAllLocked();
+}
 // เอจิ (patch 2.4 new): มีคนกดท่าไม้ตาย "ไม่ว่ายังก็ตาม" ค้างอยู่ไหม — ใช้บีบเวลาเฟสจั่วการ์ด
 //  และกันไม่ให้ยูนะเกิดขึ้นเองแบบปกติระหว่างท่านี้ทำงาน
 function eijiUltFieldActive() {
@@ -1371,7 +1476,8 @@ const TEMARI_ANATA_DRAWS = 3;    // ANATA WAAAAAAAA: บังคับจั่
 //  และแยก ยามฟ้าสาง/เส้นชีวิต ออกไปลดทีละ 1 แทน — ดูใน st === "song")
 const DEBUFF_KEYS = ["discord", "sleep", "stun", "nodraw", "noskill",
   "energy", "nohealing", "moonmark", "unplug", "weak", "fragile", "spellburden",
-  "oblada", "hburn", "phenexBanUlt", "nanayaSeal", "miyakoSeal", "invert", "manaSeal", "manaRupture", "manaLeech", "mageslayerMark"];
+  "oblada", "hburn", "phenexBanUlt", "nanayaSeal", "miyakoSeal", "invert", "manaSeal", "manaRupture", "manaLeech", "mageslayerMark",
+  "numb"]; // เหน็บชา (Bamboo-Hatted Kim)
 // เกราะสูงสุดของผู้เล่น: ปกติ 2 — ระหว่าง Lie Like Vortigern (โอเบรอน) เป้าหมายได้เพดานเกราะ +1
 function maxArmorOf(p) {
   if (isOrt(p)) return CHAR_HOOKS.ort.maxArmor();
@@ -1388,6 +1494,8 @@ function maxArmorOf(p) {
     : (p && p.characterId === "the_supplicant") ? CHAR_HOOKS.the_supplicant.maxArmor() // ผู้วิงวอน (patch 3.4 new): เพดานเกราะ 5
     : (p && p.characterId === "producer_lumi") ? CHAR_HOOKS.producer_lumi.maxArmor(p) // โปรดิวเซอร์: เกราะ 3 ตอนไอดอลยืน · 0 เมื่อไอดอลล้ม
     : (p && p.characterId === "eiji") ? CHAR_HOOKS.eiji.maxArmor() // เอจิ (patch 2.4 new): เกราะพื้นฐาน 4 หน่วย
+    : (p && p.characterId === "kim") ? CHAR_HOOKS.kim.maxArmor() // Bamboo-Hatted Kim: "โล่ 2" = เพดานเกราะ 2
+    : (p && p.characterId === "recruit") ? CHAR_HOOKS.recruit.maxArmor() // Recruit: เกราะ 2
     : MAX_ARMOR;
   return armorBase
     + (oguriGoldStacks(p) >= OGURI_GOLD_ARMOR_AT ? 1 : 0) // ยุคทอง (โอกูริ Rework): ครบ 2 แต้มขึ้นไป เพดานเกราะ +1
@@ -1426,6 +1534,8 @@ function instantDeath(p, force) {
   if (friendlyEffectBlocked(p)) return;
   // ORT: หลอดเลือดแตก (ทั้งเลือดหมดและโดนสังหารทันที) -> หลอดถัดไปเริ่มเต็ม · หลอดสุดท้ายเท่านั้นที่ตายจริง
   if (isOrt(p) && CHAR_HOOKS.ort.tryBarBreak(engine, p)) return;
+  // Bamboo-Hatted Kim (Resentment): เลือดหมดจากความเสียหายครั้งแรก -> ค้างที่ 1 (สังหารทันทีตอนเลือดยังเหลือไม่นับ)
+  if (!force && CHAR_HOOKS.kim.tryResentment(engine, p)) return;
   if (!force && p.characterId === "escanor" && CHAR_HOOKS.escanor.tryNoonRevive(engine, p)) return;
   if (!force && p.characterId === "hisakawa_sister" && resolveHisakawaTwinDeath(p)) return;
   // Ultraman Trigger: ตายในร่างพิเศษถือว่าตายจริง ไม่คืนร่างแทน
@@ -1532,8 +1642,8 @@ function displayImg(p, unmasked) {
   if (p.characterId === "escanor" && CHAR_HOOKS.escanor.displayImg) return CHAR_HOOKS.escanor.displayImg(p);
   if (p.characterId === "ultraman_trigger") return "/characters/ultraman_trigger/trigger.webp";
   if (p.characterId === "hisakawa_sister") return CHAR_HOOKS.hisakawa_sister.displayImg(p);
-  if (p.characterId === "shotaro") { const simg = CHAR_HOOKS.shotaro.displayImg(p); if (simg) return simg; } // ร่างโจ๊กเกอร์
   if (p.characterId === "ignis" && CHAR_HOOKS.ignis.displayImg) return CHAR_HOOKS.ignis.displayImg(p);
+  if (p.characterId === "kim") { const kimg = CHAR_HOOKS.kim.displayImg(p); if (kimg) return kimg; } // ร่าง Awake
   // ฟุจิตะ โคโตเนะ: ระหว่างร่าง [พร้อมลุย] = ภาพ Kotone.png (null = ใช้ภาพปกติ)
   if (p.characterId === "kotone") { const kimg = CHAR_HOOKS.kotone.displayImg(p); if (kimg) return kimg; }
   // เอจิ: ระหว่างท่าไม้ตาย ไม่ว่ายังก็ตาม ทำงาน = ภาพ eiji_change.jpg (null = ใช้ภาพปกติ)
@@ -1668,6 +1778,9 @@ function activeSkillMusic() {
   // อิปโป (characters/ippo.js): เพลงประจำท่า Dempsey roll — เล่นค้างตลอดที่บัฟยังอยู่
   const bestIppo = CHAR_HOOKS.ippo.activeMusic(engine);
   if (bestIppo) return bestIppo;
+  // Bamboo-Hatted Kim: เพลงร่าง Awake เล่นค้างตลอดที่ยังอยู่ในร่าง (ถาวรจนตาย)
+  const bestKim = CHAR_HOOKS.kim.activeMusic(engine);
+  if (bestKim) return bestKim;
   // ยุย (characters/yui.js): เพลงประจำท่าไม้ตายที่กำลังบรรเลงอยู่
   const bestYui = CHAR_HOOKS.yui.activeMusic(engine);
   if (bestYui) return bestYui;
@@ -2110,8 +2223,9 @@ function resetCombat(p) {
   CHAR_HOOKS.ippo.resetCombat(p);    // อิปโป: อัตราหลบสะสม / Dempsey Charge / คูลดาวน์รายสกิล
   // ผู้วิงวอน: คลังคำวิงวอน/โควตาสกิล 2 ครั้ง/เทิร์น + ฟิลด์ "ผู้ถูกตราพิพากษา" ซึ่งอยู่ที่ตัวเป้าหมาย (จึงล้างให้ทุกคน)
   CHAR_HOOKS.the_supplicant.resetCombat(p);
-  CHAR_HOOKS.usagi.resetCombat(p);
-  CHAR_HOOKS.shotaro.resetCombat(p); // ฮิดาริ โชว์ทาโร่: ความน่าสงสัย / คำทาย / Maximum Drive // อุซากิ: โควตาสกิลพื้นฐาน / ปรุๆ / ข้อเสนอสลับไพ่ / โจทย์คณิต (ติดที่ผู้ถูกทำโจทย์)
+  CHAR_HOOKS.usagi.resetCombat(p); // อุซากิ: โควตาสกิลพื้นฐาน / ปรุๆ / ข้อเสนอสลับไพ่ / โจทย์คณิต (ติดที่ผู้ถูกทำโจทย์)
+  CHAR_HOOKS.kim.resetCombat(p); // Bamboo-Hatted Kim: ฝักดาบ/Poise/บัพ/คูลดาวน์ + เหน็บชาที่จองไว้ (ติดที่ผู้ถูกมอบ)
+  CHAR_HOOKS.recruit.resetCombat(p); // Recruit: กระสุน / โควตาเตรียมตัว / ตัวนับเกราะ / คูลดาวน์ / QTE ที่ค้าง
   // ไบรอัน: น้ำมัน/ตัวสะสมน้ำมันที่รถกิน/ธงวีดีโอครั้งแรก + ธง "ถูกแช่" ที่อยู่ที่ผู้เล่นทุกคน
   CHAR_HOOKS.brian.resetCombat(p);
   // โปรดิวเซอร์: ไอดอลที่ยืนอยู่ / เลือดโปรดิวเซอร์ / แต้ม "ไอดอล" / คิวดาเมจหน่วง ฯลฯ
@@ -2448,6 +2562,8 @@ function buildStateFor(viewerId) {
       if (ch.id === "oguri") {
         ultimatePub = pub(oguriAshenReady(p) ? ch.ultimate2 : ch.ultimate);
       }
+      // Bamboo-Hatted Kim: ร่าง Awake -> ท่าไม้ตาย 2 (สูตรเดียวกับ useSkill)
+      if (ch.id === "kim") ultimatePub = pub(CHAR_HOOKS.kim.dynamicSkillFor(p, ch, "ultimate"));
       // สึงาชิ ทาคุโตะ (patch 2.2 new): Apprivoise! ทำงานแล้ว — สกิลพื้นฐานเปลี่ยนเป็น Star Sword Emeraude ถาวร
       // patch 2.2.5: กันตาย (สกิลติดตัว 1) เคยทำงานไปแล้ว — ท่าไม้ตายเปลี่ยนเป็นร่วมเดินทางไปกับฉันเถอะถาวร (แทนพิชิตแสงดาว)
       if (ch.id === "takuto") {
@@ -2526,9 +2642,12 @@ function buildStateFor(viewerId) {
         // อุซากิ: ปรุๆ (เห็นทุกคน) · ข้อเสนอสลับไพ่ / โจทย์คณิต (เห็นเฉพาะเจ้าตัว — ไม่ส่งเฉลย)
         usagi: p.characterId === "usagi" ? CHAR_HOOKS.usagi.publicState(p) : undefined,
         ...(mine ? CHAR_HOOKS.usagi.privateState(engine, p) : {}),
-        // ฮิดาริ โชว์ทาโร่: ความน่าสงสัย/ร่างโจ๊กเกอร์ (เห็นทุกคน) · คำทายของเทิร์นนี้ (เห็นเจ้าตัวคนเดียว)
-        shotaro: p.characterId === "shotaro" ? CHAR_HOOKS.shotaro.publicState(p) : undefined,
-        ...(mine ? CHAR_HOOKS.shotaro.privateState(engine, p) : {}),
+        // Bamboo-Hatted Kim: ฝักดาบ/Poise/เหรียญ/บัพ (เห็นทุกคน) · คูลดาวน์/ห้ามจั่ว (เห็นเจ้าตัวคนเดียว)
+        kim: CHAR_HOOKS.kim.publicState(p),
+        ...(mine ? CHAR_HOOKS.kim.privateState(engine, p) : {}),
+        // Recruit: กระสุน/โควตาเตรียมตัว (เห็นทุกคน) · QTE (ตำแหน่งจุด) / คูลดาวน์ / การเลือกเป้า (เห็นเจ้าตัวคนเดียว)
+        recruit: CHAR_HOOKS.recruit.publicState(p),
+        ...(mine ? CHAR_HOOKS.recruit.privateState(engine, p) : {}),
         modeVote: p.modeVote || null,
         locked: p.locked,
         busted: (show || promoShow || connorReads || teamReveal) ? bustedOf(p) : false,
@@ -2753,6 +2872,7 @@ function buildStateFor(viewerId) {
 }
 function broadcastState() {
   CHAR_HOOKS.usagi.syncPause(engine); // อุซากิ: โจทย์คณิตหยุดนับเวลาระหว่างที่ไม่ได้อยู่เฟสจั่วไพ่ (คัตซีนคั่น)
+  CHAR_HOOKS.recruit.syncPause(engine); // Recruit: QTE หยุดนับเวลาระหว่างคัตซีนคั่น
   CHAR_HOOKS.kai.pruneOverhaulSlots(engine); // เผื่อสถานะรังสรรค์/ลงทัณฑ์หายไปนอกช่องทาง Overhaul (เช่นถูกล้าง)
   for (const id of Object.keys(players)) io.to(id).emit("state", buildStateFor(id));
 }
@@ -3516,7 +3636,6 @@ function dealRound() {
     CHAR_HOOKS.yaguruma.onRoundStartTick(engine, p);
     CHAR_HOOKS.kagami.onRoundStartTick(engine, p);
     CHAR_HOOKS.usagi.onRoundStartTick(engine, p);
-    CHAR_HOOKS.shotaro.onRoundStartTick(engine, p); // โชว์ทาโร่: ร่างโจ๊กเกอร์หมด -> Maximum Drive ที่ค้างหายไป // อุซากิ: โควตาสกิลพื้นฐาน 2 ครั้ง + ปรุๆ ลดเอง
     CHAR_HOOKS.tsurugi.onRoundStartTick(engine, p);
 
     // ---------- ซาโตรุ อาเคฟุ (patch 2.0.8.2): ดาเมจต่อเนื่องทุก 2 เทิร์น ----------
@@ -3568,7 +3687,8 @@ function dealRound() {
     //  และจะไม่มีวันพังเลยถ้าโดนตีเบาๆ (สเปคระบุว่า "ขึ้นรถถาวรจนกว่ารถจะพัง" = ต้องพังได้จริง)
     if (!p.armorLocked && !((p.statuses.decay || 0) > 0) && !Seraph.noCombat() && roundNumber % 2 === 0
         && !CHAR_HOOKS.bat_ben.blocksArmorRegen(p)
-        && !CHAR_HOOKS.daisuke.blocksArmorRegen(p)) { // CAST OFF: ปลดเกราะทิ้งแล้ว เกราะจึงไม่ฟื้น
+        && !CHAR_HOOKS.daisuke.blocksArmorRegen(p) // CAST OFF: ปลดเกราะทิ้งแล้ว เกราะจึงไม่ฟื้น
+        && !CHAR_HOOKS.recruit.blocksArmorRegen(p)) { // Recruit: [Armor] ไม่ฟื้นเองอัตโนมัติ // CAST OFF: ปลดเกราะทิ้งแล้ว เกราะจึงไม่ฟื้น
       // เท็นโนจิ โคทาโร่ (rewrite): เลือดยังไม่เต็ม -> เกราะที่ควรฟื้นถูกเขียนทับเป็นเลือดแทน
       healArmor(p, 1);
     }
@@ -3648,6 +3768,10 @@ function dealRound() {
     // อิปโป (characters/ippo.js): Uper Cut ตั้งสตั้นไว้เมื่อเทิร์นก่อน -> เริ่มมีผลตอนนี้
     //  ต้องอยู่ "ก่อน" บล็อกเช็คสตั้นด้านล่าง ไม่งั้นสตั้นจะเลื่อนไปมีผลอีกเทิร์นหนึ่ง
     CHAR_HOOKS.ippo.applyPendingStun(engine, p);
+    // Bamboo-Hatted Kim: เหน็บชาที่จองไว้เมื่อเทิร์นก่อนเริ่มมีผล (ทุกคน) · ของ Kim เอง: To Claim Their Bones /
+    //  Poise ลดทุก 5 เทิร์น / โยนเหรียญ — อยู่หลังเลือดไหล/ฟื้นเกราะ เพราะเหรียญอ่านพลังชีวิตของต้นเทิร์นนี้
+    CHAR_HOOKS.kim.onRoundStartTick(engine, p);
+    CHAR_HOOKS.recruit.onRoundStartTick(engine, p); // Recruit: ล้างธงยิง/HeadShot/โจมตีอีกครั้งที่ค้างจากเทิร์นก่อน
     // ไดจิ เกราะเอเลคิง: สตั้นที่ติดไว้เมื่อเทิร์นก่อน -> เริ่มมีผลตอนนี้ (ก่อนบล็อกเช็คสตั้นด้านล่างด้วยเหตุผลเดียวกัน)
     CHAR_HOOKS.daichi.applyPendingStun(engine, p);
     // ---------- ผู้วิงวอน (characters/the_supplicant.js): รีเซ็ตโควตาสกิล 2 ครั้ง + ต่ออายุ "กระแสเวท" ถาวร ----------
@@ -3731,6 +3855,7 @@ function hit(id) {
   if ((p.statuses.nodraw || 0) > 0) return; // อิ่มทงคัสสึเกิน: เทิร์นนี้จั่วเพิ่มไม่ได้
   if ((p.statuses.phenexTaunt || 0) > 0) return; // ไม่อยากให้ใครต้องเจ็บปวด (ริต้า เบอร์นัล): ระหว่างล่อเป้าจั่วการ์ดเพิ่มไม่ได้
   if ((p.tepeuPonderTurns || 0) > 0) return; // ครุ่นคิด (เทเปา): จั่วไพ่ไม่ได้ระหว่างนี้ (ยังโจมตีได้ถ้าชนะ)
+  if (CHAR_HOOKS.kim.blocksDraw(engine, p)) return; // Bamboo-Hatted Kim: กดท่าไม้ตาย 1 ตอนออก "หัว" = จั่วต่อไม่ได้จนเปิดไพ่
   if (CHAR_HOOKS.conner.actionBlocked(engine, p)) return; // คอนเนอร์: อยู่นอกวงไล่ล่า -> ถูกแช่ ทำอะไรไม่ได้
   // ไบรอัน: ระหว่างการแข่ง เฉพาะ "คนนอกวง" ที่จั่วไม่ได้ — ไบรอันกับคู่แข่งต้องจั่วได้ตามปกติ
   //  เพราะทั้งท่าคือการดวลแต้มกันตัวต่อตัว (สเปคล็อกแค่สกิล/ไอเทมของคู่แข่งทั้งสอง ไม่ได้ล็อกการจั่ว)
@@ -3976,6 +4101,8 @@ function useSkillCore(id, tier, targets, item) {
   if (ch && ch.id === "dan") skill = CHAR_HOOKS.dan.dynamicSkillFor(engine, p, ch, tier);
   // แบทแมน (patch 3.1): ขึ้นรถแบทโมบิลแล้ว — ทั้งสามช่องเปลี่ยนเป็นเวอร์ชันรถ
   if (ch && ch.id === "bat_ben") skill = CHAR_HOOKS.bat_ben.dynamicSkillFor(p, ch, tier);
+  // Bamboo-Hatted Kim: Resentful Scabbard ครบ 80 (ร่าง Awake) — ท่าไม้ตายเป็นท่าที่ 2 (buildStateFor คิดสูตรเดียวกัน)
+  if (ch && ch.id === "kim") skill = CHAR_HOOKS.kim.dynamicSkillFor(p, ch, tier);
   if (!skill) return;
   const isEscanorSkill = p.characterId === "escanor";
   const isHisakawaSkill = p.characterId === "hisakawa_sister";
@@ -4100,7 +4227,6 @@ function useSkillCore(id, tier, targets, item) {
   const isHarukaBasic = p.characterId === "haruka" && tier === "basic";
   // อุซากิ: สกิลพื้นฐาน (กินไอเทม) มีโควตา 2 ครั้ง/เทิร์นของตัวเอง ไม่กินโควตาสกิลหลักของเทิร์น
   const isUsagiPick = p.characterId === "usagi";
-  const isShotaroPick = p.characterId === "shotaro";
   const isUsagiBasic = isUsagiPick && tier === "basic";
   if (isHarukaBasic && (p.harukaBasicUses || 0) >= CHAR_HOOKS.haruka.BASIC_USES_PER_TURN) return;
   if (isSupPick && (p.supSkillUsesRound || 0) >= CHAR_HOOKS.the_supplicant.SKILL_USES_PER_TURN) return;
@@ -4127,7 +4253,6 @@ function useSkillCore(id, tier, targets, item) {
   const isKagamiPick = p.characterId === "kagami";
   if (isKagamiPick && !CHAR_HOOKS.kagami.canUseSkill(engine, p, tier)) return;
   if (isUsagiPick && !CHAR_HOOKS.usagi.canUseSkill(engine, p, tier, targets, item)) return;
-  if (isShotaroPick && !CHAR_HOOKS.shotaro.canUseSkill(engine, p, tier, targets, item)) return; // โชว์ทาโร่: เป้าหมาย+คำทาย / ร่างโจ๊กเกอร์ / ความน่าสงสัย 3 // อุซากิ: ต้องมีไอเทม / เป้าหมาย / ท่าไม้ตายไม่ซ้อน
   const isTsurugiPick = p.characterId === "tsurugi";
   if (isTsurugiPick && !CHAR_HOOKS.tsurugi.canUseSkill(engine, p, tier)) return;
   // พี่จ๋าอยู่ไหน (อาริมะ มิยาโกะ): กดซ้ำไม่ได้จนกว่าจะได้โจมตี
@@ -4230,6 +4355,14 @@ function useSkillCore(id, tier, targets, item) {
   //  ทั้งสามช่องมีคูลดาวน์รายสกิล (เก็บเป็นเลขรอบ ไม่ใช่สถานะ) — ด่านเดียวกันทั้ง canUseSkill และปุ่มฝั่ง client
   const isIppoPick = p.characterId === "ippo";
   if (isIppoPick && !CHAR_HOOKS.ippo.canUseSkill(engine, p, tier)) return;
+  // ---------- Bamboo-Hatted Kim (characters/kim.js) ----------
+  //  คูลดาวน์รายช่อง (เลขรอบ) · ท่าไม้ตายทั้งสองกดไม่ได้ระหว่างบัพรวมร่าง · ท่าที่ 2 ต้องมีพลังชีวิตพอจ่าย
+  const isKimPick = p.characterId === "kim";
+  if (isKimPick && !CHAR_HOOKS.kim.canUseSkill(engine, p, tier)) return;
+  // ---------- Recruit (characters/recruit.js) ----------
+  //  คูลดาวน์ · กระสุนพอ · ไม่มี QTE/การเลือกเป้าค้าง · Desert Eagle / Barrett ต้องเลือกเป้าก่อนกด
+  const isRecruitPick = p.characterId === "recruit";
+  if (isRecruitPick && !CHAR_HOOKS.recruit.canUseSkill(engine, p, tier, targets)) return;
   // ---------- ผู้วิงวอน (characters/the_supplicant.js) ----------
   //  ทั้งสามช่องต้องเลือกเป้าหมาย 1 คน (เลือกตัวเองได้) — โควตา 2 ครั้ง/เทิร์นเช็คไปแล้วด้านบน (ดู isSupPick)
   let supTarget = null;
@@ -4364,6 +4497,14 @@ function useSkillCore(id, tier, targets, item) {
   // "คำสาป" (สถานะ Universal): กดสกิลสำเร็จแล้ว = เสียพลังชีวิต 1 หน่วย (1 ครั้ง/เทิร์น)
   //  วางหลังหักแต้ม — กดไม่ผ่านเงื่อนไขด้านบนจะ return ไปก่อนถึงตรงนี้ คำสาปจึงไม่กินฟรี
   tickCurseOnSkill(engine, p);
+  // "เหน็บชา" (สถานะ Universal — Bamboo-Hatted Kim): 30% สกิลไม่ทำงาน แต่แต้มสกิล/โควตาของเทิร์นถูกใช้ไปแล้วตามเดิม
+  if (numbFizzles(p)) {
+    lastLog.push(`🫨 ${p.name} เหน็บชา — ${skill.name} ไม่ทำงาน! (แต้มสกิลถูกหักไปแล้ว)`);
+    io.emit("skillFlash", { name: `${skill.name} — เหน็บชา สกิลไม่ทำงาน`, img: skill.img || null, by: p.name, color: colorOf(p) });
+    broadcastState();
+    checkAllLocked();
+    return;
+  }
 
   // ---------- นายมีฝีมือแค่ไหนหรอ? (ชิกิ patch 2.0.6): ยกเลิกท่าไม้ตายทันทีที่มีผู้เล่นอื่นกด ----------
   //  มีชิกิถือชาร์จ godslay อยู่บนสนาม -> ท่าไม้ตายของผู้เล่นอื่นที่เพิ่งกดถูกยกเลิกทันที
@@ -4387,7 +4528,6 @@ function useSkillCore(id, tier, targets, item) {
   if (isKagamiPick) flashSuffix = CHAR_HOOKS.kagami.applyInstantSkill(engine, p, tier) || flashSuffix;
   if (isTsurugiPick) flashSuffix = CHAR_HOOKS.tsurugi.applyInstantSkill(engine, p, tier) || flashSuffix;
   if (isUsagiPick) flashSuffix = CHAR_HOOKS.usagi.applyInstantSkill(engine, p, tier, targets, item) || flashSuffix;
-  if (isShotaroPick) flashSuffix = CHAR_HOOKS.shotaro.applyInstantSkill(engine, p, tier, targets, item) || flashSuffix; // ฮิดาริ โชว์ทาโร่ // อุซากิ (characters/usagi.js)
   // ไรเดอร์ Zect: กด Clock Up/Clock Over กลางเฟสจั่วไพ่ — ต้องแก้เวลาที่เหลือตอนนี้
   //  ก่อนที่ pausePlayingForCutscene() จะอ่าน timeLeft ไปเก็บไว้คืนหลังคลิปจบ
   if ((isDaisukePick || isYagurumaPick || isKagamiPick || isTsurugiPick) && tier === "secondary") syncClockUpPhaseTime();
@@ -4492,6 +4632,8 @@ function useSkillCore(id, tier, targets, item) {
   // ---------- แบทแมน (characters/bat_ben.js) ----------
   //  สกิลที่ไม่ได้ผูกกับสถานะ (รถแบทโมบิล + ทั้งสามช่องของร่างรถ) ลงผลผ่าน applyInstantSkill
   if (isIppoPick) flashSuffix = CHAR_HOOKS.ippo.applyInstantSkill(engine, p, tier) || flashSuffix;
+  if (isKimPick) flashSuffix = CHAR_HOOKS.kim.applyInstantSkill(engine, p, tier) || flashSuffix;
+  if (isRecruitPick) flashSuffix = CHAR_HOOKS.recruit.applyInstantSkill(engine, p, tier, targets) || flashSuffix; // เปิด QTE
   // ---------- ผู้วิงวอน (patch 3.4) ----------
   if (isSupPick && supTarget) flashSuffix = CHAR_HOOKS.the_supplicant.applyInstantSkill(engine, p, tier, supTarget) || flashSuffix;
   if (isBrianPick) flashSuffix = CHAR_HOOKS.brian.applyInstantSkill(engine, p, tier, brianTarget, item) || flashSuffix;
@@ -4601,7 +4743,8 @@ function useSkillCore(id, tier, targets, item) {
     // เทเปา (ชิกิ): กดสกิลพื้นฐาน/สกิลรอง ให้เล่นเสียง tepeu_skill1_2 ก่อนเสมอ
     // คอนเนอร์: เพลงคิด conner_think.m4a "ไม่" เล่นที่นี่ — มันต้องเล่นระหว่างกำลังเรียงลำดับในโมดัล
     //  (ฝั่ง client คุมเอง ดู ConnorPredictModal) ตอนกดยืนยันคือตอนที่คิดเสร็จแล้ว เพลงต้องหยุดพอดี
-    const flashSound = (isTepeuCook || isTepeuPonder) ? "tepeu_skill1_2" : isHisakawaSkill ? CHAR_HOOKS.hisakawa_sister.skillVoice(p, tier, skill) : null;
+    const flashSound = (isTepeuCook || isTepeuPonder) ? "tepeu_skill1_2" : isHisakawaSkill ? CHAR_HOOKS.hisakawa_sister.skillVoice(p, tier, skill)
+      : isKimPick ? CHAR_HOOKS.kim.skillSound(p, tier) : null; // Bamboo-Hatted Kim: เสียงชักดาบ / ฟาดฟันลง
     // อิสึกะ ชิโด "ฝากด้วยนะตัวฉัน": สกิลเงียบ — ห้ามมีแบนเนอร์ให้ใครเห็นว่าเขากดอะไรไป
     if (!CHAR_HOOKS.shido.silentSkill(p, tier)) {
       io.emit("skillFlash", { name: skill.name + flashSuffix, img: flashImg, by: p.name, color: colorOf(p), sound: flashSound });
@@ -4739,7 +4882,9 @@ function checkAllLocked() {
     // QTE ที่ยังเล่นไม่จบ (ยุย: ทำนองเพลงร็อก) — คนอื่นจั่ว/เปิดไพ่ได้ตามปกติ แค่ยังไม่สรุปรอบให้
     qtePending() ||
     // อุซากิ: ยังทำโจทย์คณิตไม่เสร็จ / ยังไม่ตอบ "เอา/ไม่เอา" ไพ่ของเป้าหมาย
-    CHAR_HOOKS.usagi.quizPending(engine) || c.some((p) => p.usagiSwapOffer);
+    CHAR_HOOKS.usagi.quizPending(engine) || c.some((p) => p.usagiSwapOffer) ||
+    // Recruit: QTE ของสกิลยังเล่นไม่จบ / ยังไม่เลือกเป้า (Desert Eagle นัดที่ 2 · FAMAS)
+    CHAR_HOOKS.recruit.pickPending(engine);
   // ถ้าไม่เหลือใครรอดเลย (เช่น ทาคุโตะระเบิดใส่ทุกคนตายหมดรวมถึงตัวเอง) ก็ต้องสรุปผลด้วยเช่นกัน ไม่งั้นเกมค้าง
   // ORT ไม่ต้องกดเปิดไพ่ — รอเฉพาะผู้เล่นจริง (บอสจั่วรอบสุดท้ายใน resolveRound)
   if (c.filter((p) => !isOrt(p)).every((p) => p.locked) && !pendingAnswer) resolveRound();
@@ -4967,6 +5112,9 @@ function resolveRound() {
   }
   // QTE ที่ยังเล่นไม่จบเมื่อถึงเวลาเปิดไพ่ = ถือว่าพลาด (แต้มเสียฟรี) เหมือนข้อเสนออื่นที่ไม่ตอบ
   sweepQte();
+  // Recruit: QTE ของสกิลที่ยังไม่จบ = นับจุดที่คลิกได้ตอนนี้ · นัดที่รอเลือกเป้า = สุ่มเป้าให้
+  for (const p of alivePlayers()) if (CHAR_HOOKS.recruit.qteActive(p)) recruitQteFinish(p, true);
+  CHAR_HOOKS.recruit.sweepPick(engine);
   // อุซากิ: หมดเฟสจั่วไพ่ = ข้อที่เหลือนับเป็นผิด · ข้อเสนอสลับไพ่ที่ยังไม่ตอบ = ไม่เอา
   CHAR_HOOKS.usagi.sweepQuizzes(engine);
   for (const p of Object.values(players)) if (p.usagiSwapOffer) withEffectSource(p, () => CHAR_HOOKS.usagi.answerSwap(engine, p, false));
@@ -5008,8 +5156,8 @@ function resolveRound() {
   // ฟุจิตะ โคโตเนะ (characters/kotone.js): ท่าไม้ตายในร่าง [พร้อมลุย] — ทำงานหลังเปิดไพ่ แต่ต้องอยู่ "ก่อน"
   //  การหาผู้ชนะ เพราะผล "บังคับแตก" เปลี่ยนผู้ชนะของรอบนี้ (เหตุผลเดียวกับ ANATA ด้านบน)
   CHAR_HOOKS.kotone.resolveFormUlts(engine);
-  // ฮิดาริ โชว์ทาโร่ (ยอดนักสืบ): ตัดสินคำทายจากแต้มสุดท้าย — หลังท่าที่บังคับจั่ว และก่อนทางลัดของการไล่ล่า/การแข่ง
-  CHAR_HOOKS.shotaro.resolveGuesses(engine);
+  // Bamboo-Hatted Kim (จักเฉือนเลือดเนื้อตน): หัว = แต้ม 0 · ก้อย = แต้ม 20 — ต้องอยู่ก่อนหาผู้ชนะด้วยเหตุผลเดียวกัน
+  CHAR_HOOKS.kim.resolveUltScores(engine);
 
   // ---------- คอนเนอร์ RK800 (สกิลติดตัว 2 จับกุมขั้นเด็ดขาด, characters/conner.js) ----------
   //  ระหว่างการไล่ล่า: ไม่มีผู้ชนะ/ผู้แพ้ ไม่มีดาเมจแพ้จั่ว/ไพ่แตก ไม่มี Overload Force — นับแค่แต้มดวลกัน
@@ -5178,6 +5326,8 @@ function resolveRound() {
     }
   }
   for (const p of combatants) if (!p.result) p.result = "safe";
+  // Bamboo-Hatted Kim: ท่าไม้ตาย 1 — แพ้ = To Claim Their Bones แล้วได้ Yield My Flesh (อ่าน isLoser ที่เพิ่งตัดสิน)
+  CHAR_HOOKS.kim.onRoundResult(engine);
   // มุยมิ: นับแพ้/ไพ่แตกต่อเนื่องหลังผลของทุกคนถูกกำหนดครบแล้ว
   CHAR_HOOKS.muimi.onAfterRoundScores(engine, combatants);
   CHAR_HOOKS.hisakawa_sister.onAfterRoundScores(engine, combatants, roundWinnerId, val);
@@ -5413,6 +5563,7 @@ function postAttackFollowup(attacker) {
   // ไดจิ เกราะโกโมร่า: สุ่มผ่านแล้ว -> โจมตีเพิ่มอีก 1 ครั้ง (ครั้งเพิ่มไม่สุ่มต่อ)
   if (CHAR_HOOKS.daichi.startExtraAttack(engine, attacker)) return;
   if (CHAR_HOOKS.ippo.startExtraAttack(engine, attacker)) return;
+  if (CHAR_HOOKS.recruit.startExtraAttack(engine, attacker)) return; // Recruit: QTE ผ่าน 30% ได้โจมตีอีกครั้ง
   // โปรดิวเซอร์: All star 765 หมัดที่ 2 · kuroi 961 ตีต่อจากผู้ชนะ (ต้องอยู่หลังหมัดที่ 2 ของตัวเอง)
   if (CHAR_HOOKS.producer_lumi.startExtraAttack(engine, attacker)) return;
   if (CHAR_HOOKS.producer_lumi.startLoserAttack(engine)) return;
@@ -5454,6 +5605,7 @@ function nanayaCancelReattack(id) {
 function attackSoundOf(attacker) {
   if (!attacker) return undefined;
   if (attacker.characterId === "mageslayer") return "mageslayer_attack";
+  if (attacker.characterId === "recruit") return CHAR_HOOKS.recruit.attackSound(attacker); // เสียงปืน
   if (attacker.characterId === "cayenne") return CHAR_HOOKS.cayenne.attackSound(attacker); // ร่างเกพาร์ด: เสียงปืน           // BA.mp3
   if (attacker.characterId === "muimi") return CHAR_HOOKS.muimi.towerActive(attacker) ? "muimi_ub_hit" : "muimi_normal_hit";
   if (CHAR_HOOKS.haruka.omegaActive(attacker)) return "haruka_attack";             // hit_haruka.mp3
@@ -5517,6 +5669,8 @@ function doAttack(byId, targetId) {
       && attackableTargets(attacker.id).some((o) => o.id === attacker.kaiRivalId)) {
     return;
   }
+  // Recruit: ยังไม่ได้เล็ง -> เปิด QTE จุดแดงก่อน (ผ่านแล้วค่อยกลับมายิงจริงที่นี่อีกรอบ)
+  if (recruitInterceptAttack(attacker, target)) return;
   // คาเยนน์ (characters/cayenne.js): "แน่จริงก็หลบสิ" ครั้งแรกของเกม — เล่นวีดีโอก่อน แล้วค่อยเริ่มยิงจริง
   if (CHAR_HOOKS.cayenne.barrageNeedsVideo(attacker)) {
     clearPhaseTimer();
@@ -5533,7 +5687,8 @@ function doAttack(byId, targetId) {
   //  วางไว้ตรงนี้ (ก่อนคิดดาเมจ) เพราะนับที่ "ได้ออกหมัด" ไม่ใช่ "ตีโดน" — ดันหลบได้ก็ยังนับให้
   CHAR_HOOKS.dan.onChasedAttacked(engine, attacker, target);
   CHAR_HOOKS.usagi.onAttack(engine, attacker);
-  CHAR_HOOKS.shotaro.onAttack(engine, attacker, target); // โชว์ทาโร่ร่างโจ๊กเกอร์: แปะเปราะบางตอนกดโจมตี (หมัดนี้แรงขึ้นทันที) // อุซากิ: ออกหมัด = ปรุๆ +2 (นับแม้โดนหลบ — จึงอยู่ก่อนด่านหลบหลีก)
+  // Bamboo-Hatted Kim: จำว่าออกหมัด (ก่อนด่านหลบทั้งหมด) — ถูกหลบ = ฝักดาบ +10 ตัดสินที่หมัดถัดไป/endTurn
+  CHAR_HOOKS.kim.beforeAttack(engine, attacker);
   attacker.nanayaReattackReady = false; // หัวใจฆาตกร (นานายะ ชิกิ): กำลังใช้โอกาสโจมตีซ้ำนี้อยู่ (หรือไม่เกี่ยวข้องกับตัวละครนี้)
 
   let phenexTaunted = false;
@@ -5543,6 +5698,7 @@ function doAttack(byId, targetId) {
     ...CHAR_HOOKS.phenex.findTaunters(engine, attacker),
     ...CHAR_HOOKS.bat_ben.findTaunters(engine, attacker),
     ...CHAR_HOOKS.yui.findTaunters(engine, attacker), // ยุย: ปากแจ๋ว
+    ...CHAR_HOOKS.kim.findTaunters(engine, attacker), // Bamboo-Hatted Kim: Yield My Flesh To Claim Their Bones
   ].filter((t) => !sameTeam(attacker, t)).sort((a, b) => a.position - b.position);
   if (taunters.length) {
     const taunter = taunters[Math.max(0, (attacker.position || 1) - 1) % taunters.length];
@@ -5551,7 +5707,8 @@ function doAttack(byId, targetId) {
       target = taunter;
       phenexTaunted = taunter.characterId === "phenex";
       batTaunted = taunter.characterId === "bat_ben";
-      const label = phenexTaunted ? "🥺 ไม่อยากให้ใครต้องเจ็บปวด" : "🦇 เข้ามาเลย";
+      const label = phenexTaunted ? "🥺 ไม่อยากให้ใครต้องเจ็บปวด"
+        : taunter.characterId === "kim" ? "⚔️ Yield My Flesh To Claim Their Bones" : "🦇 เข้ามาเลย";
       lastLog.push(`${label} — ${taunter.name} ล่อเป้า! การโจมตีของ ${attacker.name} ถูกดึงจาก ${oldTarget.name} มาที่ตัวเอง`);
     }
   }
@@ -5804,6 +5961,8 @@ function doAttack(byId, targetId) {
   dmg = CHAR_HOOKS.ort.applyCrit(engine, attacker, dmg, ortCritFx);
   const usagiCritFx = {};
   dmg = CHAR_HOOKS.usagi.applyCrit(engine, attacker, dmg, usagiCritFx); // อุซากิ: คริติคอล 7% ต่อปรุๆ (×2)
+  const kimCritFx = {};
+  dmg = CHAR_HOOKS.kim.applyCrit(engine, attacker, dmg, kimCritFx); // Bamboo-Hatted Kim: Poise 1.2%/หน่วย (+หัว 15%) ×2
   // ฮารุกะ (characters/haruka.js): จงไปสู่สุขติ — จุดชนวน "เลือดไหล" ของเป้าหมายให้ระเบิดรวมกับหมัดนี้
   //  ต้องอ่านค่าเลือดไหล "ก่อน" ความเสียหายลง และก่อนที่โอเมก้าจะแปะเลือดไหลก้อนใหม่ (onAttackLanded ด้านล่าง)
   const harukaPunishFx = {};
@@ -5836,8 +5995,6 @@ function doAttack(byId, targetId) {
   const yagurumaStingFired = CHAR_HOOKS.yaguruma.stingArmed(attacker);
   const kagamiKickFired = CHAR_HOOKS.kagami.kickArmed(attacker);
   const tsurugiSlashFired = CHAR_HOOKS.tsurugi.slashArmed(attacker);
-  // โชว์ทาโร่ (Maximum Drive): ผ่านด่านหลบมาแล้ว = ใช้ท่าตรงนี้ — ปาดบัฟก่อนหมัดลง + คิววีดีโอ (เล่นก่อนฉากความเสียหาย)
-  const shotaroDriveFired = CHAR_HOOKS.shotaro.prepareDriveOnAttack(engine, attacker, target);
   CHAR_HOOKS.daisuke.stripArmorOnAttack(engine, attacker, target);
   CHAR_HOOKS.yaguruma.stripResistOnAttack(engine, attacker, target); // Rider Sting: เจาะ "ต้านสถานะ" ก่อน ดีบัฟที่ตามมาจึงติด
   // Rider Kick (// คากามิ อาราตะ): เป้าหมายกาง "ต้านสถานะ" ไว้ -> แลกดีบัฟทั้งชุดเป็นหมัดทะลุเกราะเพดาน 3
@@ -5893,6 +6050,9 @@ function doAttack(byId, targetId) {
   const danCounterFx = CHAR_HOOKS.dan.onAttackedNormally(engine, attacker, target);
   // ยุย (characters/yui.js): เยอรมันซูเพล็ก — สวนกลับผู้ที่โจมตีปกติใส่ (เล่นวีดีโอก่อนสรุปความเสียหาย)
   const yuiCounterFx = CHAR_HOOKS.yui.onAttackedNormally(engine, attacker, target);
+  // Bamboo-Hatted Kim: หมัดของ Kim ลง (ฝักดาบ/ชักดาบ/Yield My Flesh/ฟื้นเลือด) · Kim ถูกตี (ฝักดาบ + สวนกลับ)
+  const kimAtkFx = CHAR_HOOKS.kim.onAttackLanded(engine, attacker, target, dmg);
+  const kimCounterFx = CHAR_HOOKS.kim.onAttackedNormally(engine, attacker, target);
   // แบทแมน (characters/bat_ben.js): ปืนติดรถ — ใช้แล้วหมดกระสุน (ดาเมจถูกบวกไปแล้วที่ computeAttackBase)
   const batGunFired = CHAR_HOOKS.bat_ben.consumeGun(engine, attacker);
   // อิปโป (characters/ippo.js): Uper Cut ลงผลตามว่าเป้าหมาย "มีเกราะก่อนโดนหมัดนี้" หรือไม่
@@ -6018,12 +6178,12 @@ function doAttack(byId, targetId) {
   const addFx = (x, side) => { if (x) fxSkills.push({ ...x, side }); };
   for (const fx of hisakawaAttackFx || []) addFx(fx, fx.side || "atk");
   if (isOrt(target) && dmg > 0) ortFx("hit");
-  if (shotaroDriveFired) {
-    CHAR_HOOKS.shotaro.afterDriveHit(engine, attacker, target); // ลุกไหม้ + เปราะบาง 3 เทิร์น หลังหมัดลง
-    addFx({ name: "Maximum Drive (+1 · ปาดบัฟ · ลุกไหม้ · เปราะบาง)", img: CHAR_HOOKS.shotaro.IMG.skill2, by: attacker.name, color: colorOf(attacker) }, "atk");
-  }
   if (usagiCritFx.crit) addFx({ name: `ปรุๆ คริติคอล ×2 (${usagiCritFx.chance}%)`, img: CHAR_HOOKS.usagi.IMG.base, by: attacker.name, color: colorOf(attacker) }, "atk");
   if (ortCritFx.crit) addFx({ name: "คริติคอล ×2", img: CHAR_HOOKS.ort.IMG.base, by: attacker.name, color: colorOf(attacker) }, "atk");
+  if (CHAR_HOOKS.recruit.consumeHeadshot(attacker)) addFx({ name: "HeadShot +1", img: CHAR_HOOKS.recruit.IMG.base, by: attacker.name, color: colorOf(attacker) }, "atk");
+  if (kimCritFx.crit) addFx({ name: `Poise คริติคอล ×2 (${kimCritFx.chance}%)`, img: displayImg(attacker), by: attacker.name, color: colorOf(attacker) }, "atk");
+  for (const name of kimAtkFx) addFx({ name, img: displayImg(attacker), by: attacker.name, color: colorOf(attacker) }, "atk");
+  if (kimCounterFx) addFx({ name: kimCounterFx.name, img: kimCounterFx.img, by: target.name, color: colorOf(target) }, "def");
   for (const fx of ignisAttackFx || []) addFx(fx, fx.side || "atk");
   if (ginga) addFx(skillByStatus(attacker, "ginga"), "atk");
   if (gingastriumAtk) addFx({ name: `Ginga Strium${lastStanding ? " +1 (คู่ต่อสู้คนเดียว)" : ""}`, img: HIKARU_STRIUM_IMG, by: attacker.name, color: colorOf(attacker) }, "atk");
@@ -6115,7 +6275,7 @@ function doAttack(byId, targetId) {
   //  / อย่าอยู่เลย แกน่ะ! (ริต้า เบอร์นัล patch 2.1.6) / ฉันยัง...มองเห็นอยู่!!! กันตาย + อย่างนายน่ะ จะไปเข้าใจอะไร (สึงาชิ ทาคุโตะ patch 2.2.4):
   //  เล่นวีดีโอที่ค้างคิวก่อน แล้วค่อยขึ้นสรุปความเสียหาย
   //  (ปกติทุกท่าอื่นจะขึ้นสรุปความเสียหายก่อนแล้วค่อยเล่นวีดีโอค้างคิวตอนจบ — ท่าเหล่านี้กลับลำดับเฉพาะตัว)
-  if ((storiumAtk || phenexPurgeAtk || miyakoUltAtk || triggerMultiAtk || triggerZeperionAtk || escanorAttackVideoQueued || (beatSaveFired && target.characterId === "takuto") || takutoUlt2VideoQueued || eijiSwordFx.videoQueued || harukaPunishFx.videoQueued || (harukaCounterFx && harukaCounterFx.videoQueued) || (danCounterFx && danCounterFx.videoQueued) || (yuiCounterFx && yuiCounterFx.videoQueued) || batGunFired || daisukeRiderFired || yagurumaStingFired || kagamiKickFired || tsurugiSlashFired || shotaroDriveFired) && cutsceneQueue.length) runCutsceneQueue(showAttackFx);
+  if ((storiumAtk || phenexPurgeAtk || miyakoUltAtk || triggerMultiAtk || triggerZeperionAtk || escanorAttackVideoQueued || (beatSaveFired && target.characterId === "takuto") || takutoUlt2VideoQueued || eijiSwordFx.videoQueued || harukaPunishFx.videoQueued || (harukaCounterFx && harukaCounterFx.videoQueued) || (danCounterFx && danCounterFx.videoQueued) || (yuiCounterFx && yuiCounterFx.videoQueued) || batGunFired || daisukeRiderFired || yagurumaStingFired || kagamiKickFired || tsurugiSlashFired) && cutsceneQueue.length) runCutsceneQueue(showAttackFx);
   else showAttackFx();
 }
 
@@ -6171,6 +6331,8 @@ function seraphAdvance() {
 
 function endTurn() {
   flushOrtCounters();
+  // Bamboo-Hatted Kim: หมัดที่ถูกหลบ (ทุกเส้นทางหลบจบที่นี่) -> ฝักดาบ +10
+  CHAR_HOOKS.kim.flushMiss(engine);
   // คาเยนน์ "แน่จริงก็หลบสิ": ชุดกระสุนยังยิงไม่ครบ -> เปิดเฟสโจมตีครั้งถัดไปแทนการจบเทิร์น
   //  วางไว้บนสุดเพราะทุกทางจบหมัด (โดน/ถูกหลบ/ถูกสะท้อน/ถูกลบล้าง) ไหลมาจบที่ endTurn เหมือนกันหมด
   if (CHAR_HOOKS.cayenne.continueBarrage(engine)) return;
@@ -6839,6 +7001,11 @@ io.on('connection', (socket) => {
   onPlayerEvent(socket, 'usagiQuizAnswer', (id, { value } = {}) => usagiQuizStep(id, value, false), 20);
   onPlayerEvent(socket, 'usagiQuizTimeout', (id) => usagiQuizStep(id, null, true), 20);
   onPlayerEvent(socket, 'qteTimeout', (id) => qteTimeout(id), 10);
+  // Recruit: คลิกจุดแดง (limit สูงเผื่อคลิกรัว) / แจ้งหมดเวลา / เลือกเป้าหลัง QTE / สกิลพิเศษ "เตรียมตัว"
+  onPlayerEvent(socket, 'recruitQteHit', (id, { id: dotId } = {}) => recruitQteHit(id, dotId), 40);
+  onPlayerEvent(socket, 'recruitQteDone', (id) => recruitQteDone(id), 10);
+  onPlayerEvent(socket, 'recruitPick', (id, { targets } = {}) => recruitPick(id, targets), 6);
+  onPlayerEvent(socket, 'recruitPrep', (id, { kind } = {}) => recruitPrep(id, kind), 6);
   onPlayerEvent(socket, 'backToLobby', () => { if (gameState === 'GAMEOVER') backToLobby(); }, 2);
 
   safeOn(socket, "leave", () => {
@@ -6956,6 +7123,7 @@ const engine = {
   startQte,           // ระบบ QTE กลาง (ดูหัวข้อ QTE ด้านบนของไฟล์)
   clearQte,
   qteKey,             // เปิดไว้ให้เทสต์กดปุ่มแทนผู้เล่นได้ (โค้ดจริงเรียกจาก socket handler)
+  recruitQteHit, recruitQteDone, recruitPick, recruitPrep, // Recruit: เปิดไว้ให้เทสต์ (โค้ดจริงเรียกจาก socket handler)
   qtePending,
   // drawCardFor / voidUltimateOnBust มีอยู่แล้วด้านล่าง — ไม่ต้องประกาศซ้ำ
   // ---------- ระบบย้อนเวลา (ท่าไม้ตายของอิสึกะ ชิโด) ----------

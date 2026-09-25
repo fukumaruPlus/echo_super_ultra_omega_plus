@@ -20,8 +20,9 @@ const daichiChar = require("./daichi");
 const daisukeChar = require("./daisuke");
 const yagurumaChar = require("./yaguruma");
 const kagamiChar = require("./kagami");
-const shotaroChar = require("./shotaro"); // ฮิดาริ โชว์ทาโร่: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
 const usagiChar = require("./usagi"); // อุซากิ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
+const recruitChar = require("./recruit"); // Recruit: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
+const kimChar = require("./kim"); // Bamboo-Hatted Kim: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
 const tsurugiChar = require("./tsurugi"); // คามิชิโร่ ซึรุงิ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร // คากามิ อาราตะ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร // โซ ยากุรุมะ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร // คาซามะ ไดสุเกะ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
 const BAT_CAR_IMG = "/characters/bat_ben/bat_update/bat_ben_car.webp";
 const BAT_SHOT_IMG = "/characters/bat_ben/bat_update/skill1.2/bat_ben_skill1.2.jpg";
@@ -135,10 +136,14 @@ module.exports = function buildTransforms(img) {
     //  seconds วัดจาก mvhd จริงแล้วปัดขึ้นเผื่อเวลาตัดฉาก (17.56 -> 19 · 2.60/2.84 -> 4 · 14.35 -> 16)
     yuiSuplex:   { img: yuiImg.skill2, video: "/characters/yui/skill2/yui_skill2.mp4",       title: "เยอรมันซูเพล็ก", label: "สวนกลับ",        seconds: 19, music: null, afterReveal: false },
     yuiSong:     { img: yuiImg.skill3, video: "/characters/yui/skill3/yui_skill3.mp4",       title: "ทำนองเพลงร็อก",  label: "บรรเลงสำเร็จ",    seconds: 4, music: null, afterReveal: false },
+    // Bamboo-Hatted Kim: เข้าร่าง Awake (Resentful Scabbard ครบ 80) — วีดีโอเต็มครั้งเดียว (triggerCutscene)
+    //  คลิปยาว 10.08 วิ (mvhd) · เพลงร่างมาจาก activeSkillMusic ไม่ใช่ช่อง music ของที่นี่
+    // Recruit: Desert Eagle พลาด (Fail_1.mov 1.71 วิ — เล่นทุกครั้ง · คลิปสั้นกว่าการ์ดเปิดตัวจึง noIntro)
+    //  Barrett สำเร็จ (สกิลอัลติเมติ.mp4 9.17 วิ — วีดีโอเต็มครั้งแรกครั้งเดียวผ่าน triggerCutscene)
+    recruitFail: { img: recruitChar.IMG.skill1, video: recruitChar.VIDEO.fail, title: "Desert Eagle", label: "ยิงพลาด", seconds: 2, music: null, afterReveal: false, noIntro: true },
+    recruitUlt:  { img: recruitChar.IMG.skill3, video: recruitChar.VIDEO.ult,  title: "Barrett M82A1", label: "ยิงโดน", seconds: 10, music: null, afterReveal: false },
+    kimAwake:    { img: kimChar.IMG.awake, video: kimChar.VIDEO.awake, title: "Awake", label: "ฝักดาบที่เต็มไปด้วยความขุ่นเคือง", seconds: 11, music: null, afterReveal: false },
     // อุซากิ: เล่นทุกครั้ง (queueCutscene) — ท่าไม้ตายตอนกด / สกิลรองตอนกด "เอา" แล้วค่อยสลับไพ่
-    // ฮิดาริ โชว์ทาโร่: Lost Driver เต็มครั้งแรกครั้งเดียว (triggerCutscene) · Maximum Drive เล่นทุกครั้งก่อนฉากความเสียหาย (queueCutscene)
-    shotaroJoker: { img: shotaroChar.IMG.joker, video: shotaroChar.VIDEO.joker, title: "Lost Driver", label: "ร่างโจ๊กเกอร์ 10 เทิร์น", seconds: 18, music: null, afterReveal: false },
-    shotaroDrive: { img: shotaroChar.IMG.skill2, video: shotaroChar.VIDEO.drive, title: "Maximum Drive", label: "โจ๊กเกอร์ Extreme", seconds: 16, music: null, afterReveal: false },
     usagiUlt:    { img: usagiChar.IMG.skill3, video: usagiChar.VIDEO.ult,  title: "ฮัยย๊ะ ฮ๊ะ ปรุๆ อิอิ อิยะ ฮ๊ะ", label: "โจทย์คณิต 3 เทิร์น", seconds: 3, music: null, afterReveal: false },
     usagiSwap:   { img: usagiChar.IMG.skill2, video: usagiChar.VIDEO.swap, title: "ปรุ้ต.....", label: "สลับไพ่ทั้งมือ", seconds: 5, music: null, afterReveal: false },
     yuiSongFail: { img: yuiImg.skill3, video: "/characters/yui/skill3/yui_skill3_false.mp4", title: "เสียงเพี้ยน",    label: "บรรเลงล้มเหลว",   seconds: 4, music: null, afterReveal: false },

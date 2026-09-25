@@ -445,16 +445,6 @@ qtePending() / sweepQte()                กันสรุปรอบ + กว
 - ท่าไม้ตายมี 6 แบบผ่าน `dynamicSkillFor` (`ultimate_<idol>` × 5 + `ultimate2`) — สลับ **ทั้งที่ `useSkill`
   และ `buildStateFor`** เหมือนไบรอัน · ช่องแรกสลับ `basic`↔`basic2` ตามว่าไอดอลล้มหรือยัง
 
-**ฮิดาริ โชว์ทาโร่ (กลาง)** — `characters/shotaro.js`
-- ยอดนักสืบ: `useSkill` basic รับเป้าหมายทาง `targets` และคำทายทาง `item` (`low`/`mid`/`top`/`bust`) เก็บที่ `p.shotaroGuess`
-  (เห็นเจ้าตัวคนเดียว) แล้ว **ตัดสินใน `resolveRound` ถัดจาก `kotone.resolveFormUlts`** — หลังท่าที่บังคับจั่ว และก่อนทางลัดของการไล่ล่า/การแข่ง
-- ร่างโจ๊กเกอร์ = สถานะ `shotaroJoker` 10 เทิร์น (นับถอยหลังตามลูปกลาง) · Lost Driver ใช้ `triggerCutscene` (วีดีโอเต็มครั้งแรกครั้งเดียว)
-- สกิลติดตัว: `onAttack` แปะเปราะบาง 1 เทิร์น **ก่อนด่านหลบ** (หมัดนั้นแรงขึ้นเลย · หายเองตอนจบเทิร์น) — ข้ามถ้าเป้าหมายมีเปราะบางอยู่แล้ว
-- Maximum Drive (`p.shotaroDrive`): +1 ผ่าน `damageBonus` (คิดก่อน `computeAttackBase` ซึ่งอยู่ก่อนจุดใช้ท่า) · ใช้ท่าที่
-  `prepareDriveOnAttack` ถัดจาก Rider Slash = **ผ่านด่านหลบแล้วเท่านั้น** (หลบได้ = ไม่มีวีดีโอ ท่าไม่หาย) · ลุกไหม้/เปราะบาง 3 เทิร์นลงหลังหมัด
-  · `shotaroDriveFired` อยู่ในรายการ "เล่นวีดีโอก่อนฉากสรุปความเสียหาย" ท้าย `doAttack`
-- เทสต์: [tests/characters/shotaro.test.js](tests/characters/shotaro.test.js)
-
 **อุซากิ (เอาฮา · unique)** — `characters/usagi.js`
 - สกิลพื้นฐาน (กินไอเทมในกระเป๋า) กดได้ 2 ครั้ง/เทิร์น และ **ไม่กินโควตาสกิลของเทิร์น** (`isUsagiBasic` ในสองบรรทัดโควตาของ `useSkill`)
   · client เปิด `UsagiItemModal` แล้วส่ง uid ของไอเทมมาทาง `item`
@@ -466,6 +456,36 @@ qtePending() / sweepQte()                กันสรุปรอบ + กว
     `checkAllLocked` และ `resolveRound` กวาดข้อที่เหลือเป็นผิด · ข้ามเพื่อนร่วมทีม (`sameTeam`) · ORT ไม่ได้โจทย์แต่รับดาเมจเต็ม 3 ทุกเทิร์น (ORT สวนกลับอุซากิตามปกติ)
 - สกิลติดตัว ปรุๆ: `onAttack` ก่อนด่านหลบใน `doAttack` (นับแม้โดนหลบ) · คริติคอลคูณยอดสุทธิถัดจากของ ORT · ATK +1 ผ่าน `damageBonus`
 - เทสต์: [tests/characters/usagi.test.js](tests/characters/usagi.test.js)
+
+**Bamboo-Hatted Kim (พิเศษ · unique)** — `characters/kim.js` · พลังชีวิต 8 / เกราะ 2
+- ทรัพยากรทั้งหมดอยู่ที่ `p.kim` (ฝักดาบ 0-100 · Poise 0-50 · เหรียญหัว/ก้อย · บัพ ymf/tctb/bones · คูลดาวน์เลขรอบ) — **ไม่ใช่ `p.statuses`**
+  จึงไม่ลดเทิร์น/ล้าง/ต้านไม่ได้ · มีแค่ Counter Stance (`kimCounter` 2 เทิร์น) ที่เป็นสถานะนับเทิร์นปกติ
+- โยนเหรียญที่ `onRoundStartTick` ถัดจาก `ippo.applyPendingStun` (หลังเลือดไหล/ฟื้นเกราะ — อ่านพลังชีวิตของต้นเทิร์นนั้น)
+- **"ถูกหลบ" ตัดสินย้อนหลัง**: `beforeAttack` (หัว `doAttack` ก่อนด่านหลบ) จำ reference ของ `lastAttack` ไว้ ·
+  หมัดลง = `onAttackLanded` ล้างธง · ไม่ลงแล้ว `lastAttack` ใหม่มี `dodge: true` = ฝักดาบ +10 ที่ `flushMiss` (หัว `doAttack` ถัดไป / หัว `endTurn`)
+- คริติคอลคูณยอดสุทธิถัดจากของอุซากิ · สวนกลับ (Counter Stance / บัพรวมร่าง) อยู่ถัดจากสวนกลับของยุย ใช้ `counterBase` (ไม่รวม Yield My Flesh ตามสเปค)
+- บัพรวมร่างล่อเป้าผ่านคิว taunter เดียวกับยุย/ริต้า/แบทแมน · ท่าไม้ตาย 1: `resolveUltScores` ปรับแต้มด้วย `cardBonus`
+  ถัดจาก `kotone.resolveFormUlts` แล้ว `onRoundResult` อ่าน `isLoser` หลังตัดสินผลทุกคน (ตาข่าย: รอบถูกตัดทางลัด -> ลงบัพต้นเทิร์นถัดไป)
+- Resentment ดักที่หัว `instantDeath` เฉพาะ `hp <= 0` (สังหารทันทีตอนเลือดยังเหลือไม่นับเป็น "ความเสียหาย")
+- **"เหน็บชา" (`numb`) — ดีบัฟ Universal ใหม่**: 30% กดสกิลแล้วไม่ทำงาน (`numbFizzles` ใน `_universal_status.js`
+  โรลที่ `useSkillCore` ถัดจากจุดหักแต้ม — แต้ม/โควตาเทิร์นเสียไปแล้ว) · อยู่ใน `BASIC_DEBUFF_CLEAR` ·
+  ที่ Kim มอบ "ในเทิร์นถัดไป" จองไว้ที่ `p.kimNumbPending` แล้วแปลงเป็นสถานะจริงต้นเทิร์น (ใส่ 1 เทิร์นตอนเฟสโจมตีเลยจะโดน `endTurn` กินทิ้งก่อนมีผล)
+- เทสต์: [tests/characters/kim.test.js](tests/characters/kim.test.js)
+
+**Recruit (ยาก)** — `characters/recruit.js` · พลังชีวิต 5 / เกราะ 2 / กระสุน 6 (`p.recruit.bullets`)
+- **QTE คลิกจุดแดงเป็นระบบแยกจาก QTE กลาง** (`p.qte` = กดปุ่ม w/a/s/d) เก็บที่ `p.recruit.qte` — `dots` (จุดขึ้นพร้อมกัน ตำแหน่งสุ่มที่ server)
+  / `chase` (จุดเดียววิ่ง เส้นทางสุ่มฝั่ง client) · ไม่มี setTimeout: เส้นตายเป็น ms + `syncPause` หัว `broadcastState` แบบโจทย์ของอุซากิ
+  · socket `recruitQteHit` (นับจุด) / `recruitQteDone` (server ตรวจเวลาซ้ำ) → `recruitQteFinish()` ใน server.js
+- **โจมตีปกติ**: `recruitInterceptAttack` (หัว `doAttack` หลังด่านตรวจเป้า) เปิด QTE แทนการตี แล้วพักเฟส ATTACK ด้วย
+  `RECRUIT_ATTACK_SAFETY_SECONDS` เป็นตาข่ายกันค้าง · ผ่านแล้วปัก `p.recruit.shot` แล้วเรียก `doAttack` ซ้ำเป็นการยิงจริง
+  (ล่อเป้า/หลบหลีกของเป้าหมายยังทำงานตามปกติในรอบนั้น) · พลาด/กระสุนหมด = การ์ดสรุป `dodge: true` แล้วจบเทิร์น
+  · HeadShot โรลตอน QTE ผ่านแล้วเก็บเป็นธง — **ห้ามสุ่มใน `damageBonus`** เพราะ `computeAttackBase` ถูกเรียกจาก `buildStateFor` ทุก broadcast
+- **สกิล**: QTE ค้าง / นัดที่รอเลือกเป้า (Desert Eagle นัด 2 · FAMAS 2 คน) = `pendingAnswer` ของ `checkAllLocked` ·
+  `resolveRound` กวาด: QTE นับจุดที่คลิกได้ตอนนั้น (`sweeping` — ห้ามพักเฟสเล่นคลิป) · นัดที่ยังไม่เลือกเป้าสุ่มให้
+  · ผลที่ต้องเกิด "หลังวีดีโอ" คืนเป็น `{ after }` แล้ว server ส่งเข้า `pausePlayingForCutscene(after)`
+- [Armor] ดักที่ `adjustIncomingDamage` เฉพาะ `isNormalAttack` (คืน 0 ทั้งหมัด · ครบ 2 ครั้ง `loseArmor`) · `blocksArmorRegen` กันฟื้นเกราะรอบคู่
+- สกิลพิเศษ "เตรียมตัว" = socket `recruitPrep` (ไม่ผ่าน `useSkill` → ไม่กินโควตา) แต่ยังเช็คด่านห้ามสกิล/เหน็บชาเอง
+- เทสต์: [tests/characters/recruit.test.js](tests/characters/recruit.test.js)
 
 **คูลดาวน์ท่าไม้ตายที่วัดเป็น "เลขรอบ" (ชิโด · เอจิ)** — คูลดาวน์ที่กินเวลาข้ามเทิร์นห้ามเก็บเป็นตัวนับใน
 `p.statuses` ถ้าไม่อยากให้มันไปโผล่ในรายการสถานะให้ทุกคนเห็น จึงเก็บเป็น **เลขรอบที่ล็อกถึง**
