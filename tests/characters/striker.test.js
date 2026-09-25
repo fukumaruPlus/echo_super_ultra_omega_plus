@@ -172,6 +172,9 @@ test('เป็นเกียรติมากครับ: กดซ้ำข
   engine.setRoundNumber(round + 1);
   S.skillUsedRound = false;
   engine.setGameState('PLAYING');
+  S.skillPoints = 0; // จ่าย 12 ไปแล้วตอนเปิดใช้ — ระเบิดทันทีต้องกดได้แม้แต้มหมด
+  const btn = engine.buildStateFor('S').players.find((p) => p.id === 'S').character.ultimate;
+  assert.equal(btn.cost, 0, 'ปุ่มโชว์ราคา 0 (ไม่งั้น client เช็คแต้มจาก 12 แล้วกดไม่ได้)');
   engine.useSkill('S', 'ultimate');
   assert.equal(S.striker.approval.kind, 'detonate');
   strikerApprove('S', true);

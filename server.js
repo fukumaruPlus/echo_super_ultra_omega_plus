@@ -2699,6 +2699,12 @@ function buildStateFor(viewerId) {
       if (basicPub) basicPub.cost = showCost(basicPub, "basic");
       if (secondaryPub) secondaryPub.cost = showCost(secondaryPub, "secondary");
       if (ultimatePub) ultimatePub.cost = showCost(ultimatePub, "ultimate");
+      // สไตรเกอร์ ยูเรก้า: ระหว่างนับถอยหลัง ปุ่มท่าไม้ตาย = "ระเบิดทันที" ไม่เสียแต้ม (จ่าย 12 ไปแล้วตอนเปิดใช้)
+      //  ต้องโชว์ราคา 0 ด้วย ไม่งั้นปุ่มฝั่ง client เช็คแต้มจากราคา 12 แล้วกดไม่ได้ (server ไม่หักอยู่แล้ว — striker.skillCost)
+      if (ch.id === "striker" && ultimatePub && CHAR_HOOKS.striker.honorOn(p)) {
+        ultimatePub.cost = 0;
+        ultimatePub.name = `${ultimatePub.name} — ระเบิดทันที`;
+      }
       // ---------- SE.RA.PH: ตัวละครถูกซ่อนจนกว่าจะลงดวล (SERAPH_MOONCELL.md §9) ----------
       //  per-viewer: คนที่เคยเห็นตัวละครนั้นลงสนามแล้วจะเห็นตลอดไป คนที่ยังไม่เคยเห็น = ไม่มีข้อมูลเลย
       //  ชื่อ "ผู้เล่น" ไม่ใช่ความลับ — ที่ซ่อนคือ "ตัวละคร" (ภาพ/ชื่อ/สกิลทั้งชุด)
