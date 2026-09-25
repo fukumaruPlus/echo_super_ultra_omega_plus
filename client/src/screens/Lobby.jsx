@@ -282,9 +282,11 @@ function Toggle({ icon, on, label, tip, onToggle }) {
   );
 }
 
-export default function Lobby({ state, onBack, lowQ, onToggleLowQ, skillConfirmOn = true, onToggleSkillConfirm }) {
+export default function Lobby({ state, onBack, lowQ, onToggleLowQ, skillConfirmOn = true, onToggleSkillConfirm, pairRole = null }) {
   const count = state.players.length;
   const me = state.players.find((p) => p.id === state.youId);
+  // ตัวละครคู่ (สไตรเกอร์ ยูเรก้า): ปุ่มพร้อมเป็นของแต่ละคน — ระเบียนจะนับว่าพร้อมเมื่อครบคู่และพร้อมทั้งคู่
+  const mySideReady = me?.pair && pairRole ? !!me.pair[pairRole]?.ready : !!me?.ready;
   const readyCount = state.players.filter((p) => p.ready).length;
   const allReady = count >= 1 && state.players.every((p) => p.ready); // เล่นคนเดียวได้ (Type Mercury)
   const byPos = Object.fromEntries(state.players.map((p) => [p.position, p]));
@@ -361,6 +363,15 @@ export default function Lobby({ state, onBack, lowQ, onToggleLowQ, skillConfirmO
                         {!p.connected && (
                           <div className="av-heading text-xs mt-1" style={{ color: "var(--av-blood)" }}>เชื่อมต่อใหม่…</div>
                         )}
+                        {p.pair && (
+                          <div className="text-[11px] mt-1 leading-snug" style={{ color: "rgba(239,230,245,.75)" }}>
+                            {["pilot", "gunner"].map((k) => (
+                              <div key={k}>
+                                {k === "pilot" ? "🃏 นักบิน" : "🎯 พลปืน"}: {p.pair[k] ? `${p.pair[k].name}${p.pair[k].ready ? " ✓" : ""}` : "รอคู่หู…"}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <div
                         className="av-heading text-sm shrink-0"
@@ -396,15 +407,15 @@ export default function Lobby({ state, onBack, lowQ, onToggleLowQ, skillConfirmO
       </div>
 
       <div className="av-content absolute inset-x-0 flex flex-col items-center gap-3 z-20" style={{ top: "69vh" }}>
-        {count >= 2 && (
+        {(count >= 2 || !!me?.pair) && (
           <SealButton
-            label={me?.ready ? "ยกเลิก" : "พร้อม"}
-            className={me?.ready ? "" : "av-breathe"}
+            label={mySideReady ? "ยกเลิก" : "พร้อม"}
+            className={mySideReady ? "" : "av-breathe"}
             onClick={() => socket.emit("toggleReady")}
           />
         )}
 
-        {count === 1 && (
+        {count === 1 && !me?.pair && (
           <AvButton variant="ghost" className="py-2 px-5 text-xs" onClick={() => socket.emit("startGame")}>
             เล่นคนเดียว (ทดสอบ)
           </AvButton>

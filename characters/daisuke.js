@@ -130,7 +130,9 @@ module.exports = {
   stripArmorOnAttack(engine, attacker, target) {
     if (!riderArmed(attacker) || !target || !target.alive) return 0;
     const before = target.armor || 0;
-    const strip = Math.min(RIDER_STRIP, before);
+    // Recruit [Armor]: ล้างเกราะก็นับเป็น "โดน 1 ครั้ง" (ครบ 2 ถึงลด 1) ไม่ใช่ล้างตามจำนวน
+    const absorbed = engine.CHAR_HOOKS.recruit.absorbHit(engine, target);
+    const strip = absorbed ? 0 : Math.min(RIDER_STRIP, before);
     for (let i = 0; i < strip; i++) engine.loseArmor(target);
     engine.queueCutscene(attacker, "daisukeRider");
     engine.log(strip > 0

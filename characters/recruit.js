@@ -2,8 +2,9 @@
 //  Recruit (ยาก) — มือปืนที่ทุกนัดต้องเล็งเอง (QTE คลิกจุดบนจอ)
 //
 //  ค่าสถานะ: พลังชีวิต 5 · เกราะ 2 · แต้มสกิล 0/8 · กระสุน 6/6 (p.recruit.bullets)
-//  [Armor]: การโจมตีปกติที่เข้ามาขณะยังมีเกราะ = กันทั้งหมัด (ไม่เสียอะไรเลย) แต่ถูกโจมตีครบทุก 2 ครั้ง เกราะ -1
-//           ความเสียหายจากสกิลกินเกราะตามปกติ · เกราะไม่ฟื้นเองตามจังหวะของสนาม (blocksArmorRegen)
+//  [Armor] (ไอคอนสีส้ม): ขณะยังมีเกราะ ความเสียหายทุกชนิดที่ลงเกราะ (โจมตีปกติ / สกิล / พิษ-เลือดไหล / แพ้จั่ว)
+//           ถูกกันทั้งก้อน แต่โดนครบทุก 2 ครั้ง เกราะ -1 — ดาเมจเจาะเกราะ (dealDirect) ข้ามเกราะเข้าเลือดตามนิยาม
+//           เกราะฟื้นไม่ได้จากทุกแหล่ง (healArmor คืน 0) ยกเว้นสกิลพิเศษ "Armor" ของตัวเอง
 //
 //  สกิลติดตัว มือปืนต้องมีมาตรฐาน
 //    - ชนะแล้วโจมตีปกติ = QTE จุดแดง 7 จุด 7 วินาที (คลิกโดน >= 6 = สำเร็จ)
@@ -125,19 +126,29 @@ module.exports = {
     return Math.max(0, (p.recruit.cd[tier] || 0) - engine.roundNumber + 1);
   },
 
-  // ---------- [Armor]: การโจมตีปกติชนเกราะ = กันทั้งหมัด · ครบ 2 ครั้งเกราะ -1 ----------
-  adjustIncomingDamage(engine, p, n, isNormalAttack) {
-    if (!isRecruit(p) || !isNormalAttack || !(p.armor > 0)) return n;
+  // ---------- [Armor]: ความเสียหายทุกชนิดที่ลงเกราะถูกกันทั้งก้อน · โดนครบ 2 ครั้งเกราะ -1 ----------
+  //  เดิมกันเฉพาะโจมตีปกติ -> พิษ/เลือดไหล/สกิลกินเกราะตรงๆ ครั้งเดียวหาย (บั๊กที่ผู้เล่นเจอ)
+  //  ดาเมจแพ้จั่ว (damageSoft) ไม่ผ่านจุดนี้ — server เรียก absorbSoft แยก
+  adjustIncomingDamage(engine, p, n, isNormalAttack, kind) {
+    if (!isRecruit(p) || kind === "direct" || !(n > 0)) return n;
+    return this.absorbHit(engine, p) ? 0 : n;
+  },
+  absorbSoft(engine, p) { return this.absorbHit(engine, p); },
+  // true = เกราะรับไว้ทั้งก้อน
+  absorbHit(engine, p) {
+    if (!isRecruit(p) || !(p.armor > 0)) return false;
     p.recruit.armorHits++;
     if (p.recruit.armorHits >= ARMOR_HITS_PER_UNIT) {
       p.recruit.armorHits = 0;
       engine.loseArmor(p);
       engine.log(`🛡️ ${p.name} [Armor] รับการโจมตีครบ ${ARMOR_HITS_PER_UNIT} ครั้ง — เกราะ -1 (เหลือ ${p.armor})`);
     } else {
-      engine.log(`🛡️ ${p.name} [Armor] กันการโจมตีไว้ทั้งหมัด (${p.recruit.armorHits}/${ARMOR_HITS_PER_UNIT})`);
+      engine.log(`🛡️ ${p.name} [Armor] กันความเสียหายไว้ทั้งก้อน (${p.recruit.armorHits}/${ARMOR_HITS_PER_UNIT})`);
     }
-    return 0;
+    return true;
   },
+  // [Armor] ฟื้นไม่ได้จากทุกแหล่ง (ไอเทม / สกิลคนอื่น / ฟื้นเกราะรอบคู่)
+  blocksArmorHeal(p) { return isRecruit(p); },
 
   // ---------- QTE ----------
   startQte(engine, p, mode, targetId) {
@@ -399,7 +410,10 @@ module.exports = {
       engine.log(`🔄 ${p.name} Reload — กระสุนเต็ม ${BULLET_MAX}/${BULLET_MAX} · ห้ามใช้สกิล 1 เทิร์น`);
       return ` — กระสุน ${BULLET_MAX}/${BULLET_MAX}`;
     }
-    const got = engine.healArmor(p, 1);
+    // [Armor] ฟื้นจากแหล่งอื่นไม่ได้ (healArmor คืน 0) — สกิลของตัวเองเพิ่มตรงๆ ภายในเพดาน
+    const got = Math.max(0, Math.min(RECRUIT_MAX_ARMOR - p.armor, 1));
+    p.armor += got;
+    if (got > 0) r.armorHits = 0; // เกราะใหม่เริ่มนับ 2 ครั้งใหม่
     p.statuses.noskill = Math.max(p.statuses.noskill || 0, 1);
     engine.log(`🛡️ ${p.name} Armor — เกราะ +${got} · ห้ามใช้สกิล 1 เทิร์น (เหลือ ${r.prepUses.armor} ครั้ง)`);
     return ` — เกราะ +${got}`;

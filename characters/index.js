@@ -48,6 +48,7 @@ const tsurugi = require("./tsurugi");
 const usagi = require("./usagi"); // อุซากิ (เอาฮา · unique)
 const kim = require("./kim"); // Bamboo-Hatted Kim (พิเศษ · unique)
 const recruit = require("./recruit"); // Recruit (ยาก · QTE)
+const striker = require("./striker"); // สไตรเกอร์ ยูเรก้า (พิเศษ · ผู้เล่น 2 คนบังคับร่วมกัน)
 const ort = require("./ort"); // บอสมหันตภัย (บอตเท่านั้น — โหมด Type Mercury)
 
 const CHARACTER_MODULES = [
@@ -95,6 +96,7 @@ const CHARACTER_MODULES = [
   usagi,
   kim,
   recruit,
+  striker,
   ort,
 ];
 

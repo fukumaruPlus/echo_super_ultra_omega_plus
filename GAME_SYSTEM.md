@@ -458,6 +458,7 @@ qtePending() / sweepQte()                กันสรุปรอบ + กว
 - เทสต์: [tests/characters/usagi.test.js](tests/characters/usagi.test.js)
 
 **Bamboo-Hatted Kim (พิเศษ · unique)** — `characters/kim.js` · พลังชีวิต 8 / เกราะ 2
+- ฝักดาบ +3-10 เมื่อ**ได้รับความเสียหายทุกชนิด** (`adjustIncomingDamage` + `onSoftDamage` ใน `damageSoft`) · +3-8 เมื่อสร้างความเสียหาย > 0 รวมการสวนกลับ
 - ทรัพยากรทั้งหมดอยู่ที่ `p.kim` (ฝักดาบ 0-100 · Poise 0-50 · เหรียญหัว/ก้อย · บัพ ymf/tctb/bones · คูลดาวน์เลขรอบ) — **ไม่ใช่ `p.statuses`**
   จึงไม่ลดเทิร์น/ล้าง/ต้านไม่ได้ · มีแค่ Counter Stance (`kimCounter` 2 เทิร์น) ที่เป็นสถานะนับเทิร์นปกติ
 - โยนเหรียญที่ `onRoundStartTick` ถัดจาก `ippo.applyPendingStun` (หลังเลือดไหล/ฟื้นเกราะ — อ่านพลังชีวิตของต้นเทิร์นนั้น)
@@ -483,9 +484,29 @@ qtePending() / sweepQte()                กันสรุปรอบ + กว
 - **สกิล**: QTE ค้าง / นัดที่รอเลือกเป้า (Desert Eagle นัด 2 · FAMAS 2 คน) = `pendingAnswer` ของ `checkAllLocked` ·
   `resolveRound` กวาด: QTE นับจุดที่คลิกได้ตอนนั้น (`sweeping` — ห้ามพักเฟสเล่นคลิป) · นัดที่ยังไม่เลือกเป้าสุ่มให้
   · ผลที่ต้องเกิด "หลังวีดีโอ" คืนเป็น `{ after }` แล้ว server ส่งเข้า `pausePlayingForCutscene(after)`
-- [Armor] ดักที่ `adjustIncomingDamage` เฉพาะ `isNormalAttack` (คืน 0 ทั้งหมัด · ครบ 2 ครั้ง `loseArmor`) · `blocksArmorRegen` กันฟื้นเกราะรอบคู่
+- [Armor] (ไอคอนสีส้ม) ดักดาเมจ**ทุกชนิดที่ลงเกราะ** ที่ `adjustIncomingDamage` (kind ไม่ใช่ `direct`) + `damageSoft` (`absorbSoft`) — คืน 0 ทั้งก้อน · ครบ 2 ครั้ง `loseArmor`
+  · เดิมดักแค่โจมตีปกติ -> พิษ/เลือดไหลติกเดียวเกราะหาย (บั๊กที่ผู้เล่นเจอ) · `healArmor` คืน 0 ให้ Recruit (สกิล Armor ของตัวเองเพิ่มตรงๆ)
 - สกิลพิเศษ "เตรียมตัว" = socket `recruitPrep` (ไม่ผ่าน `useSkill` → ไม่กินโควตา) แต่ยังเช็คด่านห้ามสกิล/เหน็บชาเอง
 - เทสต์: [tests/characters/recruit.test.js](tests/characters/recruit.test.js)
+
+**สไตรเกอร์ ยูเรก้า (พิเศษ · ตัวละครคู่)** — กลไกต่อสู้ `characters/striker.js` · ระบบคู่หูอยู่ใน `server.js` ("Striker Eureka: คู่หู")
+- **ระบบคู่หู — ในเกมมีระเบียนผู้เล่นแค่ 1 ระเบียน** (ของคนที่เลือกตัวละครก่อน = host) คนที่สองเก็บที่ `p.pair.co`
+  engine ต่อสู้จึงเห็นยูเรก้าเป็นผู้เล่นคนเดียวโดยไม่ต้องแก้ลูปใดๆ ("แพ้ก็แพ้คู่" ได้มาฟรี) · **ห้ามใส่คู่หูลงใน `players`**
+  - `playerIdFor(socket)` คืน host id ให้ socket ของคู่หูด้วย · `onPlayerEvent` กรองตาม `PAIR_ROLE_EVENTS`
+    (นักบิน: hit/lock/attack/อนุมัติ/ซ่อม · พลปืน: useSkill/buyShopItem/useInventoryItem · อย่างอื่นทำได้ทั้งคู่)
+    · นักบินหลุด = พลปืน `lock` แทนได้ (จั่วไม่ได้) — `pairAllows()`
+  - socket ของคู่หู `join` ห้องของ host -> ได้ state ชุดเดียวกัน (`youId` = host) · บทบาทของแต่ละเครื่องส่งแยกทาง event `pairRole`
+  - เข้าร่วม: host `join` พร้อม `pairRole` · คนที่สอง `joinCopilot` (ไม่ใช้ที่นั่ง) · หน้าเลือกตัวละครเห็นช่องว่างจาก event `pairSlots`
+  - พร้อม: `p.pair.hostReady` + `co.ready` -> `p.ready` จริงเมื่อครบคู่และพร้อมทั้งคู่ (`pairRefreshReady`)
+  - รีคอนเนกต์: `coSessions` (token -> host) · host ออก/ถูกลบในห้องรอ = `dissolvePair` ส่ง `sessionExpired` ให้คู่หู
+  - `p.pair` ไม่ถูกล้างโดย `resetCombat` และอยู่ใน `keep` ของการย้อนสแนปช็อตทั้งสองแบบ + การเลือกตัวใหม่ของ Type Mercury
+  - **โหมดทีม**: ยูเรก้านับเป็นทีมเต็ม 1 ทีม (`pairTeamWeight` = teamSize) — duo 3 ระเบียน (2:1) · trio 4 ระเบียน (2 คนบังคับ : 3)
+- **เพดานราคาสกิลของยูเรก้าคือ 16 ไม่ใช่ `SKILL_COST_MAX`** (ขีปนาวุธ 1-9 · เป็นเกียรติมากครับ 12) — `striker.costCap` ทั้งใน `useSkill` และ `showCost`
+- เป็นเกียรติมากครับ: `useSkill` **ไม่หักแต้ม** แค่ตั้ง `approval` แล้วจบ · หักตอนนักบินอนุมัติ (`strikerApprove`) ·
+  ครบ 4 เทิร์น = `onRoundStartTick` คิวคลิประเบิด แล้ว `dealRound` เล่นก่อนเข้าเฟสจั่ว -> `flushDetonation` · ฆ่าตัวเองแบบไม่ force (กันตายช่วยได้)
+- หมัดเหล็กใช้ที่ `prepareFistOnAttack` ถัดจาก Rider Slash = ผ่านด่านหลบแล้วเท่านั้น (คุ้มครองของเป้าถูกคิดไปก่อนปาด — ลำดับเดียวกับ Rider Slash)
+- อาศัยจังหวะเรียกท้ายสุดของ `postAttackFollowup` (หลังตีเพิ่มทุกแบบของฝั่งตรงข้ามจบ) · งานช่างกันโจมตีที่ `afterSummary`
+- เทสต์: [tests/characters/striker.test.js](tests/characters/striker.test.js) · [tests/striker-pair.integration.test.js](tests/striker-pair.integration.test.js)
 
 **คูลดาวน์ท่าไม้ตายที่วัดเป็น "เลขรอบ" (ชิโด · เอจิ)** — คูลดาวน์ที่กินเวลาข้ามเทิร์นห้ามเก็บเป็นตัวนับใน
 `p.statuses` ถ้าไม่อยากให้มันไปโผล่ในรายการสถานะให้ทุกคนเห็น จึงเก็บเป็น **เลขรอบที่ล็อกถึง**

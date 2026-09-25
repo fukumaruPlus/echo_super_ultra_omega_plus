@@ -119,7 +119,7 @@ test('Counter Stance: ถูกโจมตีปกติแล้วสวน�
   withRandom(0.99, () => attack('T', 'K'));
   assert.equal(T.hp, before - 1, 'สวนกลับด้วยพลังโจมตีพื้นฐาน 1');
   assert.equal(T.statuses.hbleed, 1);
-  assert.equal(K.kim.scabbard, 10, 'ถูกโจมตี ฝักดาบ +3-10');
+  assert.equal(K.kim.scabbard, 18, 'ได้รับความเสียหาย +3-10 · สวนกลับโดน +3-8');
   assert.equal(K.statuses.kimCounter, 2, 'สวนได้ตลอดอายุสถานะ');
 });
 
@@ -173,6 +173,20 @@ test('Yield My Flesh To Claim Their Bones: ล่อเป้า · สวน +1
   assert.equal(X.statuses.hbleed, 1);
   assert.equal(K.kim.bones, false);
   assert.equal(K.kim.poise, 8, 'Poise +2-8');
+});
+
+test('ฝักดาบ: ได้รับความเสียหายทุกชนิด +3-10 (สกิล/สถานะ/แพ้จั่ว) · สร้างความเสียหายได้ 3-8 เฉพาะเมื่อดาเมจ > 0', () => {
+  const { K } = setup();
+  withRandom(0.99, () => engine.dealMixed(K, 1)); // ดาเมจจากสกิล
+  assert.equal(K.kim.scabbard, 10);
+  withRandom(0.99, () => engine.damageSoft(K)); // แพ้จั่ว
+  assert.equal(K.kim.scabbard, 20);
+  K.statuses.hbleed = 1;
+  withRandom(0.99, () => require('../../characters/_universal_status').tickBleed(engine, K)); // เลือดไหล
+  assert.equal(K.kim.scabbard, 30);
+  const fx = kim.onAttackLanded(engine, K, engine.players.T, 0);
+  assert.equal(K.kim.scabbard, 30, 'หมัดที่ดาเมจ 0 ไม่นับ');
+  void fx;
 });
 
 test('Resentment: ความเสียหายเกินพลังชีวิตครั้งแรกค้างที่ 1 · ครั้งที่สองตายจริง', () => {

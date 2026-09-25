@@ -13,7 +13,7 @@ const DIFFICULTY_GROUPS = [
   { key: "fun", label: "เอาฮา", color: "#9B4F96", order: ["appleguy", "dan", "usagi"] },
   { key: "extreme", label: "ยากสุดขีด", color: "#111827", order: ["satoru"] },
   { key: "impossible", label: "ทักษิณ จะโปรหาบิดาท่านหรือ?", color: "#450a0a", order: ["tohno", "nanaya", "princess_shiki"] },
-  { key: "special", label: "พิเศษ", color: "#0e7490", order: ["ultraman_trigger", "yui", "shido", "brian", "producer_lumi", "kim"] },
+  { key: "special", label: "พิเศษ", color: "#0e7490", order: ["ultraman_trigger", "yui", "shido", "brian", "producer_lumi", "kim", "striker"] },
   // หมวดตามสังกัด ไม่ใช่ระดับความยาก — ไรเดอร์ทุกคนที่มี Clock Up (แกนร่วม characters/_zect.js)
   { key: "zect", label: "องค์กรZectz", color: "#3B5BA5", order: ["daisuke", "yaguruma", "kagami", "tsurugi"] },
   // มหันตภัย: บอส (บอตเท่านั้น) — ดูข้อมูลได้แต่เลือกเล่นไม่ได้
@@ -56,10 +56,16 @@ function SkillCard({ label, skill, i }) {
 
 // lostChars / blockedChars / confirmLabel / backLabel / title: ใช้ตอนเลือกตัวใหม่กลางโหมด Type Mercury
 //  lostChars = ตัวที่ตายไปแล้วใน Raid ("ข้อมูลสูญหาย") · blockedChars = ตัวที่ใช้ไม่ได้ด้วยเหตุผลอื่น (เช่น unique ที่เพื่อนใช้อยู่)
-export default function CharacterSelect({ roster, position, color: myColor, name, takenChars = [], lostChars = [], blockedChars = [], confirmLabel = "เรียกขาน", backLabel = "← กลับ", title, onConfirm, onBack }) {
+const PAIR_ROLE_TEXT = {
+  pilot: { t: "นักบิน", d: "จั่วการ์ด · เปิดการ์ด · เลือกเป้าโจมตี · ซ่อม · อนุมัติท่าไม้ตาย 2" },
+  gunner: { t: "พลปืน", d: "ใช้สกิล · ซื้อของ · ใช้ไอเทม" },
+};
+
+export default function CharacterSelect({ roster, position, color: myColor, name, takenChars = [], pairSlots = [], lostChars = [], blockedChars = [], confirmLabel = "เรียกขาน", backLabel = "← กลับ", title, onConfirm, onBack }) {
   const [picked, setPicked] = useState(null);
   const [tab, setTab] = useState("all");
   const [shikiUlt, setShikiUlt] = useState("deatheye");
+  const [pairRole, setPairRole] = useState("pilot"); // ตัวละครคู่: บทบาทที่คนแรกเลือก
   const [dockOpen, setDockOpen] = useState(true);
   const ribbonRef = useRef(null);
   const closeTimer = useRef(null);
@@ -81,7 +87,9 @@ export default function CharacterSelect({ roster, position, color: myColor, name
   const visibleRoster = tab === "all" ? orderedRoster : orderedRoster.filter((c) => (c.difficulty || "easy") === tab);
   const selGroup = sel ? DIFFICULTY_GROUPS.find((g) => g.key === (sel.difficulty || "easy")) : null;
 
-  const isTaken = (c) => !!c && !!c.unique && takenChars.includes(c.id);
+  // ตัวละครคู่ที่ยังรอคู่หู = ยังเข้าร่วมได้ (เป็นคู่หู) แม้จะถูกเลือกไปแล้วหนึ่งคน
+  const pairSlotOf = (c) => (c && c.pair ? pairSlots.find((s) => s.characterId === c.id) : null);
+  const isTaken = (c) => !!c && !!c.unique && takenChars.includes(c.id) && !pairSlotOf(c);
   // เหตุผลที่เลือกตัวนี้ไม่ได้ (null = เลือกได้) — ตัวที่เลือกไม่ได้ยังกดดูข้อมูลได้ ยกเว้นตัว unique ที่ถูกจองไปแล้ว
   const blockReason = (c) => {
     if (!c) return null;
@@ -112,7 +120,11 @@ export default function CharacterSelect({ roster, position, color: myColor, name
     el.scrollLeft += delta;
   }, []);
 
-  const confirm = () => { if (picked && !sel?.locked && !blockReason(sel)) onConfirm(picked, picked === "shiki" ? { shikiUlt } : undefined); };
+  const confirm = () => {
+    if (!picked || sel?.locked || blockReason(sel)) return;
+    if (sel?.pair) { onConfirm(picked, pairSlotOf(sel) ? { copilot: true } : { pairRole }); return; }
+    onConfirm(picked, picked === "shiki" ? { shikiUlt } : undefined);
+  };
 
   const skills = [];
   if (sel) {
@@ -122,6 +134,7 @@ export default function CharacterSelect({ roster, position, color: myColor, name
     if (sel.id === "nanaya") { push("สกิลติดตัว 2", sel.passive2); push("สกิลติดตัว 3", sel.passive3); }
     if (sel.id === "conner") { push("สกิลติดตัว 2", sel.passive2); push("สกิลติดตัว 3", sel.passive3); push("สกิลติดตัว 4", sel.passive4); }
     if (sel.id === "cayenne") push("สกิลติดตัว 2", sel.passive2);
+    if (sel.pair) { push("สกิลติดตัว 2", sel.passive2); push("สกิลติดตัว 3", sel.passive3); }
     if (sel.id === "ort") { push("สกิลติดตัว 2", sel.passive2); push("สกิลติดตัว 3", sel.passive3); }
     push(sel.basicNight ? "สกิลพื้นฐาน (กลางวัน)" : "สกิลพื้นฐาน", sel.basic);
     if (sel.basicNight) push("สกิลพื้นฐาน (กลางคืน)", sel.basicNight);
@@ -132,6 +145,7 @@ export default function CharacterSelect({ roster, position, color: myColor, name
     if (!sel.ultimateSolar) push(sel.ultimateNight ? "ท่าไม้ตาย (กลางวัน)" : sel.id === "shiki" ? "ท่าไม้ตาย 1" : "ท่าไม้ตาย", sel.ultimate);
     if (sel.id === "hisakawa_sister") { push("ท่าไม้ตาย 2 (ฮายาเตะ)", sel.ultimate2); push("ท่าไม้ตาย 3 (รวมพลัง)", sel.ultimate3); }
     if (sel.id === "shiki") push("ท่าไม้ตาย 2", sel.ultimate2);
+    if (sel.pair) push("ท่าไม้ตาย 2", sel.ultimate2);
     if (sel.ultimateNight) push("ท่าไม้ตาย (กลางคืน)", sel.ultimateNight);
     if (sel.secondaryRevert) push("สกิลรอง (คืนร่าง)", sel.secondaryRevert);
     if (sel.ultimateSolar) push("ท่าไม้ตาย (โซล่า)", sel.ultimateSolar);
@@ -207,6 +221,31 @@ export default function CharacterSelect({ roster, position, color: myColor, name
         >
           <div className="flex flex-col gap-3">
             {skills.map((s, i) => <SkillCard key={i} label={s.label} skill={s.skill} i={i} />)}
+
+            {sel.pair && (
+              <div className="av-skill-card av-slide-r">
+                {pairSlotOf(sel) ? (
+                  <>
+                    <div className="av-label mb-2">ตัวละครคู่ — มีคนรอคู่หูอยู่</div>
+                    <div className="text-sm leading-snug">
+                      เข้าร่วมเป็น <b>{PAIR_ROLE_TEXT[pairSlotOf(sel).role]?.t}</b> คู่กับ <b>{pairSlotOf(sel).hostName}</b>
+                      <div className="text-xs mt-1" style={{ color: "rgba(239,230,245,.6)" }}>{PAIR_ROLE_TEXT[pairSlotOf(sel).role]?.d} · ใช้ที่นั่งเดียวกับคู่หู</div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="av-label mb-3">ตัวละครคู่ — เลือกส่วนที่จะบังคับ (อีกคนเข้ามารับส่วนที่เหลือ)</div>
+                    <div className="flex flex-col gap-2">
+                      {["pilot", "gunner"].map((k) => (
+                        <AvButton key={k} variant="ghost" className="text-sm py-2 justify-start" data-on={pairRole === k ? "true" : "false"} onClick={() => setPairRole(k)}>
+                          {PAIR_ROLE_TEXT[k].t} — {PAIR_ROLE_TEXT[k].d}{pairRole === k ? " ✓" : ""}
+                        </AvButton>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {sel.id === "shiki" && sel.ultimate2 && (
               <div className="av-skill-card av-slide-r">

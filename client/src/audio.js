@@ -50,6 +50,9 @@ const FILES = {
   kim_bones: "/characters/Bamboo-Hatted Kim/Yield My Flesh To Claim Their Bones.wav",
   kim_awake: "/characters/Bamboo-Hatted Kim/Limbus Company OST - Intervallo VII-2 Boss Battle Theme [-Lu6w6_P1NA].mp3",
   // Recruit: เสียงปืนโจมตีปกติ (ไฟล์ .mov ที่ข้างในเป็น MP3) / เสียงสกิลตอนยิงโดน / เสียงสกิลพิเศษ "เตรียมตัว"
+  // สไตรเกอร์ ยูเรก้า: เสียงโจมตีปกติ / เสียงยิงขีปนาวุธ-ระเบิด
+  striker_hit: "/characters/striker/striker_hit.mp3",
+  striker_bomb: "/characters/striker/striker_bomb.mp3",
   recruit_attack: "/characters/Recruit/โจมตีปกติ/โจมตีปกติ.mov",
   recruit_basic: "/characters/Recruit/สกิลพื้นฐาน/สกิลพื้นฐาน.mp3",
   recruit_secondary: "/characters/Recruit/สกิลรอง/สกิลรอง.mp3",

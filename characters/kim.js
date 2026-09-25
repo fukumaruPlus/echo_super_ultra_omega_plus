@@ -3,7 +3,7 @@
 //
 //  ค่าสถานะ: พลังชีวิต 8 · เกราะ ("โล่") 2 · แต้มสกิล 0/8 · พลังโจมตีพื้นฐาน 1
 //  ทรัพยากรเฉพาะตัว 2 อย่าง (เก็บที่ p.kim — ไม่ใช่ p.statuses จึงไม่ลดเทิร์น/ล้างไม่ได้/ต้านไม่ได้)
-//    Resentful Scabbard 0/100 — ได้จาก "ถูกโจมตีปกติ" +3-10 · "โจมตีโดน" +3-8 · "ถูกหลบ" +10
+//    Resentful Scabbard 0/100 — ได้จาก "ได้รับความเสียหาย" (ทุกชนิด) +3-10 · "สร้างความเสียหายโดน" (รวมสวนกลับ) +3-8 · "ถูกหลบ" +10
 //      30+ สร้างความเสียหายแล้วฟื้นพลังชีวิต +1 · 55+ เลือดไหล/เหน็บชาที่มอบให้คนอื่น +1 เทิร์น
 //      80+ พลังโจมตี +1 · ถูกโจมตีฟื้นแต้มสกิล +1 · เข้าร่าง Awake (วีดีโอครั้งเดียว + เพลงค้าง + ท่าไม้ตายเป็นท่า 2)
 //      100 สร้างความเสียหายแล้วฟื้นพลังชีวิตเพิ่มอีก +1
@@ -369,7 +369,7 @@ module.exports = {
     const k = attacker.kim;
     k.pendingAtk = null;
     const fx = [];
-    this.addScabbard(engine, attacker, rnd(SCABBARD_HIT_LANDED), "โจมตีโดน");
+    if (dmg > 0) this.addScabbard(engine, attacker, rnd(SCABBARD_HIT_LANDED), "สร้างความเสียหาย");
     let afflicted = false;
     if (k.drawArmed) {
       k.drawArmed = false;
@@ -389,11 +389,21 @@ module.exports = {
     return fx;
   },
 
-  // Kim ถูกโจมตีปกติ (หมัดลงแล้ว) — สแต็กฝักดาบ + สวนกลับ · คืน { name, dmg, sound } เมื่อสวน
+  // ได้รับความเสียหาย (ทุกชนิด — โจมตีปกติ/สกิล/สถานะ) -> ฝักดาบ +3-10 · ไม่แก้ค่าดาเมจ
+  //  ท่อ dealMixed/dealDirect/dealArmorOnly ผ่านจุดนี้ครั้งเดียวต่อก้อน · ดาเมจแพ้จั่ว (damageSoft) server เรียก onSoftDamage แยก
+  adjustIncomingDamage(engine, p, n) {
+    if (isKim(p) && p.alive && n > 0) this.addScabbard(engine, p, rnd(SCABBARD_HIT_TAKEN), "ได้รับความเสียหาย");
+    return n;
+  },
+  onSoftDamage(engine, p) {
+    if (isKim(p) && p.alive) this.addScabbard(engine, p, rnd(SCABBARD_HIT_TAKEN), "ได้รับความเสียหาย");
+  },
+
+  // Kim ถูกโจมตีปกติ (หมัดลงแล้ว) — ร่าง Awake ฟื้นแต้มสกิล + สวนกลับ · คืน { name, dmg } เมื่อสวน
+  //  (ฝักดาบจากการโดนตีได้ไปแล้วที่ adjustIncomingDamage)
   onAttackedNormally(engine, attacker, target) {
     if (!isKim(target) || !target.alive || !attacker || attacker.id === target.id) return null;
     const k = target.kim;
-    this.addScabbard(engine, target, rnd(SCABBARD_HIT_TAKEN), "ถูกโจมตี");
     if (awake(target)) {
       engine.addSkill(target, 1, "passive");
       engine.log(`🗡️ ${target.name} ร่าง Awake — ถูกโจมตี ฟื้นแต้มสกิล +1`);
@@ -420,6 +430,7 @@ module.exports = {
       this.afflict(engine, kim, attacker);
     });
     const g = this.addPoise(kim, rnd(STANCE_POISE));
+    if (dmg > 0) this.addScabbard(engine, kim, rnd(SCABBARD_HIT_LANDED), "สวนกลับโดน");
     this.healOnDamage(engine, kim);
     engine.log(`⚔️ ${kim.name} Counter Stance — สวนกลับ ${attacker.name} -${dmg}${fx.crit ? " (คริติคอล)" : ""} · Poise +${g}`);
     engine.skillFlash({ name: `Counter Stance — สวนกลับ -${dmg}${fx.crit ? " (คริติคอล)" : ""}`, img: IMG.skill2, by: kim.name, color: engine.colorOf(kim), sound: SFX.stance });
@@ -441,6 +452,7 @@ module.exports = {
       for (const t of [attacker, ...splashed]) this.afflict(engine, kim, t);
     });
     const g = this.addPoise(kim, rnd(BONES_POISE));
+    this.addScabbard(engine, kim, rnd(SCABBARD_HIT_LANDED), "สวนกลับโดน"); // สวนครั้งนี้ดาเมจ >= 1 เสมอ (+1 หลังคริติคอล)
     this.healOnDamage(engine, kim);
     engine.log(`⚔️ ${kim.name} Yield My Flesh To Claim Their Bones — สวนกลับ ${attacker.name} -${dmg}${fx.crit ? " (คริติคอล)" : ""}${splashed.length ? ` และฟันคนอื่นอีก ${splashed.length} คน คนละ -1` : ""} · Poise +${g}`);
     engine.skillFlash({ name: `Yield My Flesh To Claim Their Bones — สวนกลับ -${dmg}`, img: IMG.ult2, by: kim.name, color: engine.colorOf(kim), sound: SFX.bones });

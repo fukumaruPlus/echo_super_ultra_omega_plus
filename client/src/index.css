@@ -1528,6 +1528,8 @@ body {
 .sr[data-kind="sp"] .sr-cell { clip-path: polygon(26% 0, 100% 0, 74% 100%, 0 100%); height: 8px; }
 .sr-hp { background: linear-gradient(180deg, #ff9aa3, #bf2038); box-shadow: 0 0 6px rgba(255, 96, 118, 0.75); }
 .sr-ar { background: linear-gradient(180deg, #a9d8ff, #3b82c4); filter: drop-shadow(0 0 4px rgba(90, 160, 230, 0.85)); }
+/* Recruit [Armor]: เกราะพิเศษวาดสีส้ม */
+.sr[data-tone="orange"] .sr-ar { background: linear-gradient(180deg, #fed7aa, #f97316); filter: drop-shadow(0 0 4px rgba(249, 115, 22, 0.85)); }
 .sr-tmp { background: linear-gradient(180deg, #ffe9a8, #c9992f); box-shadow: 0 0 6px rgba(232, 191, 90, 0.8); }
 .sr-sp { background: linear-gradient(90deg, #ffe9a8, #c9992f); filter: drop-shadow(0 0 3px rgba(232, 191, 90, 0.9)); }
 .sr-off { background: rgba(255, 255, 255, 0.11); }

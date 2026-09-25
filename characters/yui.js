@@ -379,7 +379,9 @@ module.exports = {
     engine.instantDeath(yui, true);
     // ล้างเกราะทุกคน + แปะ "ผุพัง" 5 เทิร์นทั้งสนาม (รวมคนที่รอดจากการกันตายด้วย)
     for (const o of engine.alivePlayers()) {
-      if (o.armor > 0) {
+      // Recruit [Armor]: สลายเกราะก็นับเป็น "โดน 1 ครั้ง" ไม่ใช่หายหมด
+      if (o.armor > 0 && engine.CHAR_HOOKS.recruit.absorbHit(engine, o)) { /* เกราะพิเศษรับไว้ */ }
+      else if (o.armor > 0) {
         engine.log(`🥀 ${o.name} เกราะสลายหมดจากคำอธิษฐานของ ${yui.name} (-${o.armor})`);
         o.armor = 0;
       }

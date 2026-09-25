@@ -387,6 +387,8 @@ function maxHpOf(p) {
   if (p && p.characterId === "kim") return Math.max(1, CHAR_HOOKS.kim.maxHp() - ((p.maxHpPenalty) || 0));
   // Recruit: พลังชีวิตพื้นฐาน 5 หน่วย
   if (p && p.characterId === "recruit") return Math.max(1, CHAR_HOOKS.recruit.maxHp() - ((p.maxHpPenalty) || 0));
+  // สไตรเกอร์ ยูเรก้า: พลังชีวิตพื้นฐาน 12 หน่วย
+  if (p && p.characterId === "striker") return Math.max(1, CHAR_HOOKS.striker.maxHp() - ((p.maxHpPenalty) || 0));
   return Math.max(1, MAX_HP - ((p && p.maxHpPenalty) || 0));
 }
 // ฟื้นเลือดจริงแบบเคารพสถานะ "ไม่ใช้งานต่อ" / "ไร้ทางเยียวยา" — คืนจำนวนที่ฟื้นได้จริง
@@ -420,6 +422,7 @@ function healHp(p, amount) {
 // เชื่อมผล (patch 2.1.1): การฟื้นเกราะถูกแชร์ให้คู่เชื่อมเท่ากันด้วย
 // ผกผัน (patch 2.2.1): การฟื้นเกราะกลับกลายเป็นเสียเกราะแทน
 function healArmor(p, amount) {
+  if (CHAR_HOOKS.recruit.blocksArmorHeal(p)) return 0; // Recruit [Armor]: ฟื้นไม่ได้จากทุกแหล่ง
   if (invertActive(p)) {
     if (friendlyEffectBlocked(p)) return 0;
     const lost = Math.max(0, Math.min(p.armor, amount));
@@ -527,6 +530,7 @@ const BARD_SONGS = {
 function maxSkillOf(p) {
   if (isOrt(p)) return 0; // ORT ไม่มีแต้มสกิล
   if (Seraph.active() && p) return Seraph.maxSkill(p); // SE.RA.PH: ความจุแต้มสกิลเริ่ม 4 เพิ่มได้ถึง 8 ที่โบสถ์
+  if (p && p.characterId === "striker") return CHAR_HOOKS.striker.maxSkill(); // สไตรเกอร์ ยูเรก้า: แต้มสกิลสูงสุด 16
   return (p && p.characterId === "bard") ? BARD_MAX_SKILL : MAX_SKILL;
 }
 // มิติมายาบรรเลงที่เปิดอยู่บนสนาม: "day" (โลหิต) | "night" (วิญญาณ) | null — ย้าย body ไป characters/bard.js
@@ -1050,6 +1054,32 @@ function recruitPick(id, targets) {
   if (checkOrtEarlyWin()) return;
   checkAllLocked();
 }
+// ---------- สไตรเกอร์ ยูเรก้า: คำสั่งของนักบิน ----------
+function strikerApprove(id, accept) {
+  const p = players[id];
+  if (!p || !p.alive || gameState !== "PLAYING") return;
+  const out = withEffectSource(p, () => CHAR_HOOKS.striker.answerApproval(engine, p, accept));
+  const after = out && out.after ? () => withEffectSource(p, out.after) : null;
+  if (cutsceneQueue.length) { pausePlayingForCutscene(after); return; }
+  if (after) after();
+  broadcastState();
+  if (checkOrtEarlyWin()) return;
+  checkAllLocked();
+}
+function strikerRepairStart(id) {
+  const p = players[id];
+  if (!p || gameState !== "PLAYING" || p.locked || !CHAR_HOOKS.striker.canRepair(engine, p)) return;
+  CHAR_HOOKS.striker.startRepair(engine, p);
+  broadcastState();
+}
+function strikerRepairDone(id, pairs) {
+  const p = players[id];
+  if (!p || gameState !== "PLAYING") return;
+  if (!p.striker || !p.striker.repair) return;
+  withEffectSource(p, () => CHAR_HOOKS.striker.finishRepair(engine, p, Array.isArray(pairs) ? pairs : null));
+  broadcastState();
+  checkAllLocked();
+}
 // สกิลพิเศษ "เตรียมตัว" — ไม่กินโควตาสกิลของเทิร์น แต่ยังเป็น "การกดสกิล" (ด่านเดียวกับ useSkill ที่เกี่ยวข้อง)
 function recruitPrep(id, kind) {
   const p = players[id];
@@ -1179,9 +1209,14 @@ function resetPregameFlowToLobby() {
   gameState = "LOBBY";
   resetTeamAssignments(true);
   resetModeVotes();
-  for (const p of Object.values(players)) p.ready = false;
+  for (const p of Object.values(players)) {
+    p.ready = false;
+    if (p.pair) { p.pair.hostReady = false; if (p.pair.co) p.pair.co.ready = false; }
+  }
 }
 function validGameMode(mode, count = Object.keys(players).length) {
+  // สไตรเกอร์ ยูเรก้า: คู่หูนับเป็นทีมเต็ม 1 ทีมในโหมดทีม (duo = 2 ช่อง · trio = 3 ช่อง)
+  if (mode === "duo" || mode === "trio") count += teamHeadcount(mode === "duo" ? 2 : 3) - Object.keys(players).length;
   if (mode === "ffa") return count >= 2;
   if (mode === "seraph") return count >= 2; // SE.RA.PH: รับผู้เล่นทุกจำนวน (ตั้งแต่ 2 คนขึ้นไป)
   if (mode === "duo") return count >= 4 && count % 2 === 0;
@@ -1263,7 +1298,7 @@ function startTeamSetup(mode) {
   }
   gameMode = mode;
   teamSize = mode === "duo" ? 2 : 3;
-  teamCount = Math.floor(count / teamSize);
+  teamCount = Math.floor(teamHeadcount(teamSize) / teamSize); // ยูเรก้านับเป็นทีมเต็ม
   resetTeamAssignments(false);
   gameState = "TEAM_SETUP";
   broadcastState();
@@ -1274,8 +1309,10 @@ function chooseTeam(playerId, teamId) {
   if (!p || p.teamConfirmed) return;
   const id = String(teamId || "").toUpperCase();
   if (!currentTeamOptions().some((t) => t.id === id)) return;
-  const members = Object.values(players).filter((o) => o.teamId === id);
-  if (members.length >= teamSize && p.teamId !== id) return;
+  const members = Object.values(players).filter((o) => o.teamId === id && o.id !== p.id);
+  // นับเป็น "ช่อง" — ยูเรก้าเต็มทีมคนเดียว จึงเข้าได้เฉพาะทีมว่าง และไม่มีใครเข้าทีมของยูเรก้าได้
+  const used = members.reduce((n, o) => n + pairTeamWeight(o), 0);
+  if (used + pairTeamWeight(p) > teamSize && p.teamId !== id) return;
   p.teamId = id;
   p.teamConfirmed = false;
   broadcastState();
@@ -1292,7 +1329,7 @@ function maybeStartTeamMatch() {
   if (gameState !== "TEAM_SETUP" || !teamModeActive()) return;
   const list = Object.values(players);
   if (!validGameMode(gameMode, list.length)) return;
-  const fullTeams = currentTeamOptions().every((t) => list.filter((p) => p.teamId === t.id).length === teamSize);
+  const fullTeams = currentTeamOptions().every((t) => list.filter((p) => p.teamId === t.id).reduce((n, p) => n + pairTeamWeight(p), 0) === teamSize);
   if (fullTeams && list.every((p) => p.teamId && p.teamConfirmed)) startMatch();
 }
 function aliveTeamIds(list = alivePlayers()) {
@@ -1496,6 +1533,7 @@ function maxArmorOf(p) {
     : (p && p.characterId === "eiji") ? CHAR_HOOKS.eiji.maxArmor() // เอจิ (patch 2.4 new): เกราะพื้นฐาน 4 หน่วย
     : (p && p.characterId === "kim") ? CHAR_HOOKS.kim.maxArmor() // Bamboo-Hatted Kim: "โล่ 2" = เพดานเกราะ 2
     : (p && p.characterId === "recruit") ? CHAR_HOOKS.recruit.maxArmor() // Recruit: เกราะ 2
+    : (p && p.characterId === "striker") ? CHAR_HOOKS.striker.maxArmor() // สไตรเกอร์ ยูเรก้า: เกราะ 3
     : MAX_ARMOR;
   return armorBase
     + (oguriGoldStacks(p) >= OGURI_GOLD_ARMOR_AT ? 1 : 0) // ยุคทอง (โอกูริ Rework): ครบ 2 แต้มขึ้นไป เพดานเกราะ +1
@@ -1936,7 +1974,8 @@ function loseArmor(p) {
   if (!linkMirror) {
     const buddies = linkedBuddiesOf(p);
     linkMirror = true;
-    for (const b of buddies) if (!sealActive(b) && b.armor > 0) loseArmor(b);
+    // Recruit [Armor]: เกราะหายตามคู่เชื่อมก็นับเป็น "โดน 1 ครั้ง" (ครบ 2 ถึงลด)
+    for (const b of buddies) if (!sealActive(b) && b.armor > 0 && !CHAR_HOOKS.recruit.absorbHit(engine, b)) loseArmor(b);
     linkMirror = false;
   }
 }
@@ -1957,6 +1996,10 @@ function damageSoft(p) {
   // อมาซอน (ฮารุกะ, characters/haruka.js): ไม่มีเกราะแล้วโดนดาเมจ = เลือดไหลตัวเอง — damageSoft ไม่ผ่าน
   //  adjustIncomingDamage() จึงต้องเรียกฮุคเองที่นี่ ไม่งั้นดาเมจแพ้จั่วจะไม่นับเป็น "ความเสียหายทางใดก็ตาม"
   if (p.characterId === "haruka") CHAR_HOOKS.haruka.onDamaged(engine, p);
+  // Bamboo-Hatted Kim: ได้รับความเสียหายทุกชนิด (รวมแพ้จั่ว) = ฝักดาบ +3-10
+  CHAR_HOOKS.kim.onSoftDamage(engine, p);
+  // Recruit [Armor]: ดาเมจแพ้จั่วก็ต้องโดนครบ 2 ครั้งเกราะถึงลด (ตำแหน่งเดียวกับ adjustIncomingDamage ในท่ออื่น = ก่อนโล่)
+  if (CHAR_HOOKS.recruit.absorbSoft(engine, p)) { hisakawaSyncOut(p); return; }
   if (p.shield > 0) { p.shield--; hisakawaSyncOut(p); return; }
   if (faithArmorAbsorb(p)) { hisakawaSyncOut(p); return; } // เกราะศรัทธาอยู่หน้าเกราะหลัก
   if (p.armor > 0) loseArmor(p);
@@ -2226,6 +2269,7 @@ function resetCombat(p) {
   CHAR_HOOKS.usagi.resetCombat(p); // อุซากิ: โควตาสกิลพื้นฐาน / ปรุๆ / ข้อเสนอสลับไพ่ / โจทย์คณิต (ติดที่ผู้ถูกทำโจทย์)
   CHAR_HOOKS.kim.resetCombat(p); // Bamboo-Hatted Kim: ฝักดาบ/Poise/บัพ/คูลดาวน์ + เหน็บชาที่จองไว้ (ติดที่ผู้ถูกมอบ)
   CHAR_HOOKS.recruit.resetCombat(p); // Recruit: กระสุน / โควตาเตรียมตัว / ตัวนับเกราะ / คูลดาวน์ / QTE ที่ค้าง
+  CHAR_HOOKS.striker.resetCombat(p); // สไตรเกอร์ ยูเรก้า: โหมดมือมีด/หมัดเหล็ก/นับถอยหลังระเบิด/งานช่าง + สตั้นค้างของเป้าหมาย (p.pair ไม่ถูกล้าง)
   // ไบรอัน: น้ำมัน/ตัวสะสมน้ำมันที่รถกิน/ธงวีดีโอครั้งแรก + ธง "ถูกแช่" ที่อยู่ที่ผู้เล่นทุกคน
   CHAR_HOOKS.brian.resetCombat(p);
   // โปรดิวเซอร์: ไอดอลที่ยืนอยู่ / เลือดโปรดิวเซอร์ / แต้ม "ไอดอล" / คิวดาเมจหน่วง ฯลฯ
@@ -2564,6 +2608,7 @@ function buildStateFor(viewerId) {
       }
       // Bamboo-Hatted Kim: ร่าง Awake -> ท่าไม้ตาย 2 (สูตรเดียวกับ useSkill)
       if (ch.id === "kim") ultimatePub = pub(CHAR_HOOKS.kim.dynamicSkillFor(p, ch, "ultimate"));
+      if (ch.id === "striker") ultimatePub = pub(CHAR_HOOKS.striker.dynamicSkillFor(p, ch, "ultimate")); // เตาปฏิกรณ์
       // สึงาชิ ทาคุโตะ (patch 2.2 new): Apprivoise! ทำงานแล้ว — สกิลพื้นฐานเปลี่ยนเป็น Star Sword Emeraude ถาวร
       // patch 2.2.5: กันตาย (สกิลติดตัว 1) เคยทำงานไปแล้ว — ท่าไม้ตายเปลี่ยนเป็นร่วมเดินทางไปกับฉันเถอะถาวร (แทนพิชิตแสงดาว)
       if (ch.id === "takuto") {
@@ -2605,7 +2650,7 @@ function buildStateFor(viewerId) {
       //  ซ้อนกับกระแสเวท/ภาระเวทได้ แต่ตัวปรับขาขึ้นรวมกันแล้วต้องไม่ดันราคาเกิน SKILL_COST_MAX
       //  (สกิลที่ค่าใช้พลังงานถึงเพดานอยู่แล้วจะไม่แพงขึ้นไปอีก — ต้องตรงกับ useSkill() เป๊ะ)
       const showCost = (pub, tierName) => Math.min(
-        SKILL_COST_MAX,
+        CHAR_HOOKS.striker.costCap(p, SKILL_COST_MAX), // ยูเรก้า: เพดาน 16 — ต้องตรงกับ useSkill()
         // SE.RA.PH: ฐานราคามาจากระดับทักษะ (2/4/6) ไม่ใช่ค่าของตัวละคร — ต้องตรงกับ useSkill() เป๊ะ
         Math.max(0, (Seraph.active() ? Seraph.costOf(tierName) : pub.cost) - spellflowAmt) + spellburdenAmt + (p.nightTaxTier === tierName ? 1 : 0),
       );
@@ -2648,6 +2693,10 @@ function buildStateFor(viewerId) {
         // Recruit: กระสุน/โควตาเตรียมตัว (เห็นทุกคน) · QTE (ตำแหน่งจุด) / คูลดาวน์ / การเลือกเป้า (เห็นเจ้าตัวคนเดียว)
         recruit: CHAR_HOOKS.recruit.publicState(p),
         ...(mine ? CHAR_HOOKS.recruit.privateState(engine, p) : {}),
+        // สไตรเกอร์ ยูเรก้า: สถานะท่า/นับถอยหลัง/คำขออนุมัติ (เห็นทุกคน) · QTE ต่อสายไฟ (เห็นคู่หูเท่านั้น)
+        striker: CHAR_HOOKS.striker.publicState(engine, p),
+        ...(mine ? CHAR_HOOKS.striker.privateState(engine, p) : {}),
+        pair: pairPublic(p), // คู่หู 2 คนที่บังคับตัวละครนี้ (ชื่อ/บทบาท/พร้อม) — null = ตัวละครปกติ
         modeVote: p.modeVote || null,
         locked: p.locked,
         busted: (show || promoShow || connorReads || teamReveal) ? bustedOf(p) : false,
@@ -2881,6 +2930,7 @@ function broadcastPositions() {
   for (const [sid, sock] of io.sockets.sockets) {
     sock.emit("positions", positionsFor(sid));
     sock.emit("takenChars", taken);
+    sock.emit("pairSlots", openPairSlots()); // สไตรเกอร์ ยูเรก้า: ตัวละครคู่ที่ยังรอคู่หู
   }
 }
 // ตัวละคร unique ที่มีคนเลือกไปแล้วในแมตช์นี้ (หน้าเลือกตัวละครใช้ปิดการ์ดไม่ให้เลือกซ้ำ)
@@ -3044,6 +3094,7 @@ function mercuryRespawnPicked() {
       id: p.id, sessionToken: p.sessionToken, socketId: p.socketId, connected: p.connected,
       name: p.name, customColor: p.customColor, position: p.position,
       gold: p.gold || 0, inventory: p.inventory || [],
+      pair: p.pair, // สไตรเกอร์ ยูเรก้า: คู่หูยังบังคับร่วมกันต่อในตัวละครใหม่
     };
     const origChar = p.mercuryOrigChar || p.characterId; // ตัวที่เลือกตอนเข้าห้อง — คืนให้ตอนกลับห้องรอ
     const fresh = newPlayerRecord({ playerId: p.id, sessionToken: p.sessionToken, socketId: p.socketId, name: p.name, color: p.customColor, pos: p.position, ch, shikiUlt: p.mercuryPickShikiUlt });
@@ -3228,6 +3279,8 @@ function startMatch() {
   const yagurumaIntro = CHAR_HOOKS.yaguruma.maybeQueueIntro(engine);
   const kagamiIntro = CHAR_HOOKS.kagami.maybeQueueIntro(engine);
   const tsurugiIntro = CHAR_HOOKS.tsurugi.maybeQueueIntro(engine);
+  // สไตรเกอร์ ยูเรก้า: วีดีโอเปิดตัว "วัตถุอันตราย" หลังฉากเปิดตัวผู้เล่น
+  const strikerIntro = CHAR_HOOKS.striker.maybeQueueIntro(engine);
   // Type Mercury: ไม่มีฉากเปิดตัวผู้เล่น — ใช้ฉากเปิดตัว ORT (OrtArrival ฝั่ง client) แทน
   //  server พักเกมไว้ในเฟส CUTSCENE (ไม่มีคลิป) ให้ฉากเล่นจบก่อน แล้วค่อยเล่นวีดีโอเปิดตัวตัวละครที่คิวไว้ (ถ้ามี)
   if (mercuryActive()) {
@@ -3240,7 +3293,7 @@ function startMatch() {
     broadcastState();
     return;
   }
-  if (connerIntro || miyakoIntro || daisukeIntro || yagurumaIntro || kagamiIntro || tsurugiIntro) {
+  if (connerIntro || miyakoIntro || daisukeIntro || yagurumaIntro || kagamiIntro || tsurugiIntro || strikerIntro) {
     // พักคิวไว้ก่อนจนกว่าฉากเปิดตัวผู้เล่นจะจบ — อยู่ในเฟส CUTSCENE แต่ยังไม่มีคลิป
     //  (cutsceneInfo = null -> client วาดกระดานปกติไว้ใต้ม่าน GameIntro ซึ่งบังอยู่แล้ว)
     cutsceneInfo = null;
@@ -3499,7 +3552,8 @@ function applyGutsBullet(p, item, target) {
   }
   if (item.ammo === "shockwave") {
     const before = target.armor;
-    for (let i = 0; i < before; i++) { if (target.armor > 0) loseArmor(target); }
+    // Recruit [Armor]: สลายเกราะก็นับเป็น "โดน 1 ครั้ง" ไม่ใช่เกราะหายทั้งหมด
+    if (!CHAR_HOOKS.recruit.absorbHit(engine, target)) for (let i = 0; i < before; i++) { if (target.armor > 0) loseArmor(target); }
     // ผู้วิงวอน: "ปืนสลายเกราะ" ทำลาย "เกราะศรัทธา" ได้เหมือนเกราะปกติทุกประการ (สเปคระบุไว้ชัด)
     const faithBefore = CHAR_HOOKS.the_supplicant.faithOf(target);
     for (let i = 0; i < faithBefore; i++) CHAR_HOOKS.the_supplicant.faithAbsorb(engine, target);
@@ -3772,6 +3826,8 @@ function dealRound() {
     //  Poise ลดทุก 5 เทิร์น / โยนเหรียญ — อยู่หลังเลือดไหล/ฟื้นเกราะ เพราะเหรียญอ่านพลังชีวิตของต้นเทิร์นนี้
     CHAR_HOOKS.kim.onRoundStartTick(engine, p);
     CHAR_HOOKS.recruit.onRoundStartTick(engine, p); // Recruit: ล้างธงยิง/HeadShot/โจมตีอีกครั้งที่ค้างจากเทิร์นก่อน
+    // สไตรเกอร์ ยูเรก้า: สตั้นจากหมัดเหล็กซ้ำ (ทุกคน · ก่อนบล็อกเช็คสตั้น) · Mark 5 แต้มสกิล · นับถอยหลังระเบิด · เตาปฏิกรณ์
+    CHAR_HOOKS.striker.onRoundStartTick(engine, p);
     // ไดจิ เกราะเอเลคิง: สตั้นที่ติดไว้เมื่อเทิร์นก่อน -> เริ่มมีผลตอนนี้ (ก่อนบล็อกเช็คสตั้นด้านล่างด้วยเหตุผลเดียวกัน)
     CHAR_HOOKS.daichi.applyPendingStun(engine, p);
     // ---------- ผู้วิงวอน (characters/the_supplicant.js): รีเซ็ตโควตาสกิล 2 ครั้ง + ต่ออายุ "กระแสเวท" ถาวร ----------
@@ -3843,7 +3899,9 @@ function dealRound() {
   pushSnapshotHistory();  // เก็บใบเดียวกันเข้าประวัติย้อนหลัง 6 เทิร์น (ท่าไม้ตายของชิโดย้อนกลับไปหยิบ)
   gameState = "PLAYING";
   startPhaseTimer(cardPhaseSeconds(), resolveRound);
-  if (cutsceneQueue.length) { pausePlayingForCutscene(); return; }
+  // สไตรเกอร์ ยูเรก้า: ครบกำหนด "เป็นเกียรติมากครับ" — วีดีโอระเบิด (คิวไว้ต้นเทิร์น) เล่นก่อน แล้วค่อยลงความเสียหาย
+  if (cutsceneQueue.length) { pausePlayingForCutscene(() => CHAR_HOOKS.striker.flushDetonation(engine)); return; }
+  CHAR_HOOKS.striker.flushDetonation(engine); // ตาข่าย: ไม่ได้เข้าเส้นทางคัตซีน -> ระเบิดทันที
   broadcastState();
   checkAllLocked();
 }
@@ -4103,6 +4161,8 @@ function useSkillCore(id, tier, targets, item) {
   if (ch && ch.id === "bat_ben") skill = CHAR_HOOKS.bat_ben.dynamicSkillFor(p, ch, tier);
   // Bamboo-Hatted Kim: Resentful Scabbard ครบ 80 (ร่าง Awake) — ท่าไม้ตายเป็นท่าที่ 2 (buildStateFor คิดสูตรเดียวกัน)
   if (ch && ch.id === "kim") skill = CHAR_HOOKS.kim.dynamicSkillFor(p, ch, tier);
+  // สไตรเกอร์ ยูเรก้า: เตาปฏิกรณ์ (พลังชีวิต <= 7) — ท่าไม้ตายเป็น "เป็นเกียรติมากครับ" (buildStateFor คิดสูตรเดียวกัน)
+  if (ch && ch.id === "striker") skill = CHAR_HOOKS.striker.dynamicSkillFor(p, ch, tier);
   if (!skill) return;
   const isEscanorSkill = p.characterId === "escanor";
   const isHisakawaSkill = p.characterId === "hisakawa_sister";
@@ -4122,6 +4182,8 @@ function useSkillCore(id, tier, targets, item) {
   if (isIgnisSkill && !CHAR_HOOKS.ignis.canUseSkill(engine, p, tier, skill)) return;
 
   let cost = skill.cost;
+  // สไตรเกอร์ ยูเรก้า: ขีปนาวุธ = จำนวนนัดที่เลือก (1-9) · เป็นเกียรติมากครับ หักตอนคู่หูอนุมัติ (กดขอ = 0)
+  { const sc = CHAR_HOOKS.striker.skillCost(p, tier, item); if (sc != null) cost = sc; }
   // // คากามิ อาราตะ: Rider Kick เป็นการชาร์จ 3 ขั้น ราคาต่างกัน (1 / 1 / 3)
   //  แทนราคาฐานตรงนี้ก่อนตัวปรับทุกตัว (กระแสเวท/ภาระเวท) — ต้องตรงกับ ultimatePub ใน buildStateFor
   if (p.characterId === "kagami" && tier === "ultimate") cost = CHAR_HOOKS.kagami.ultimateCost(p);
@@ -4172,7 +4234,7 @@ function useSkillCore(id, tier, targets, item) {
   cost = Math.max(0, cost - statusAmtOf(p, "spellflow"));
   //  ตัวปรับราคาขาขึ้นทั้งหมด (กลางคืน + ภาระเวท) รวมกันแล้วดันราคาได้ไม่เกิน SKILL_COST_MAX
   //  → สกิลที่ค่าใช้พลังงานถึงเพดานอยู่แล้ว (เช่นท่าไม้ตาย 8) จะไม่แพงขึ้นไปอีก
-  cost = Math.min(SKILL_COST_MAX, cost + nightTax + Math.min(SPELLBURDEN_MAX, statusAmtOf(p, "spellburden")));
+  cost = Math.min(CHAR_HOOKS.striker.costCap(p, SKILL_COST_MAX), cost + nightTax + Math.min(SPELLBURDEN_MAX, statusAmtOf(p, "spellburden"))); // ยูเรก้า: เพดาน 16 (ท่าไม้ตาย 9/12)
   // การ์ดราชินี: ใช้สกิลไม่เสียแต้ม 1 ครั้ง — ใช้กับสกิลที่มีค่าใช้จ่ายเท่านั้น
   const blessFree = cost > 0 && (p.statuses.freecast || 0) > 0;
   if (blessFree) cost = 0;
@@ -4230,7 +4292,7 @@ function useSkillCore(id, tier, targets, item) {
   const isUsagiBasic = isUsagiPick && tier === "basic";
   if (isHarukaBasic && (p.harukaBasicUses || 0) >= CHAR_HOOKS.haruka.BASIC_USES_PER_TURN) return;
   if (isSupPick && (p.supSkillUsesRound || 0) >= CHAR_HOOKS.the_supplicant.SKILL_USES_PER_TURN) return;
-  if (p.skillUsedRound && !isUsagiBasic && !isBrianKey && !isBrianN2O && !isLumiBasic && !isCayBasic && !isDaichiBasic && !isSupPick && !isHarukaBasic && !isApplePick && !isMuimiBasic && !isTohnoPick && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHisakawaFreeAction) return; // ใช้สกิลได้เพียง 1 อันต่อเทิร์น (ซ้ำ/ซ้อนไม่ได้)
+  if (p.skillUsedRound && !isUsagiBasic && !isBrianKey && !isBrianN2O && !isLumiBasic && !isCayBasic && !isDaichiBasic && !isSupPick && !isHarukaBasic && !isApplePick && !isMuimiBasic && !isTohnoPick && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHisakawaFreeAction && !CHAR_HOOKS.striker.skipsTurnQuota(p, tier)) return; // ใช้สกิลได้เพียง 1 อันต่อเทิร์น (ซ้ำ/ซ้อนไม่ได้)
   // Beat Mode (ประกายเขี้ยว): ท่าไม้ตายใช้ไม่ได้เสมอ / สกิลพื้นฐานใช้ไม่ได้เฉพาะหลังกันตายทำงานแล้ว (patch 2.2 alpha)
   if (tier === "ultimate" && beatActive(p)) return;
   // ท่าไม้ตาย: กดซ้ำไม่ได้จนกว่าผลจะหมดเวลา (สวมเกราะราชันคงอยู่ถาวร = กดซ้ำไม่ได้อีกเลยตลอดเกม)
@@ -4363,6 +4425,10 @@ function useSkillCore(id, tier, targets, item) {
   //  คูลดาวน์ · กระสุนพอ · ไม่มี QTE/การเลือกเป้าค้าง · Desert Eagle / Barrett ต้องเลือกเป้าก่อนกด
   const isRecruitPick = p.characterId === "recruit";
   if (isRecruitPick && !CHAR_HOOKS.recruit.canUseSkill(engine, p, tier, targets)) return;
+  // ---------- สไตรเกอร์ ยูเรก้า (characters/striker.js) ----------
+  //  รอคู่หูตอบ = กดอะไรไม่ได้ · นับถอยหลังระเบิด = กดได้แค่ท่าไม้ตายซ้ำ · ขีปนาวุธต้องเลือกจำนวน 1-9
+  const isStrikerPick = p.characterId === "striker";
+  if (isStrikerPick && !CHAR_HOOKS.striker.canUseSkill(engine, p, tier, item)) return;
   // ---------- ผู้วิงวอน (characters/the_supplicant.js) ----------
   //  ทั้งสามช่องต้องเลือกเป้าหมาย 1 คน (เลือกตัวเองได้) — โควตา 2 ครั้ง/เทิร์นเช็คไปแล้วด้านบน (ดู isSupPick)
   let supTarget = null;
@@ -4480,6 +4546,12 @@ function useSkillCore(id, tier, targets, item) {
     if (!anataTargets) return;
   }
 
+  // สไตรเกอร์ ยูเรก้า (เป็นเกียรติมากครับ): ยังไม่หักแต้ม/ไม่ลงผล — ส่งคำขอให้คู่หู (นักบิน) อนุมัติก่อน
+  if (isStrikerPick && CHAR_HOOKS.striker.needsApproval(p, tier)) {
+    CHAR_HOOKS.striker.requestApproval(engine, p);
+    broadcastState();
+    return;
+  }
   p.skillPoints -= cost;
   // ORT สกิลติดตัว 1: สกิลแรกที่กดในเทิร์นนี้จะ "ข้อมูลสูญหาย" ในเทิร์นถัดไป
   //  ยกเว้นสกิลเงียบของชิโด — log "ท่าไม้ตายของชิโดข้อมูลสูญหาย" ที่ทุกคนเห็นคือการบอกว่าเขาเพิ่งวางกับดัก
@@ -4491,7 +4563,7 @@ function useSkillCore(id, tier, targets, item) {
     if (p.statuses.freecast <= 0) delete p.statuses.freecast;
     lastLog.push(`👸 ${p.name} การ์ดราชินี — ใช้สกิลนี้โดยไม่เสียแต้มสกิล`);
   }
-  if (!CHAR_HOOKS.daisuke.skipsTurnQuota(p, tier) && !isUsagiBasic && !isApplePick && !isMuimiBasic && !isTohnoPick && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHarukaBasic && !isHisakawaFreeAction && !isYuiBasic && !isSupPick && !isBrianKey && !isBrianN2O && !isLumiBasic && !isCayBasic && !isDaichiBasic) p.skillUsedRound = true; // สกิลเลือก/สลับและเสบียงฉุกเฉินไม่นับโควตาสกิลหลัก
+  if (!CHAR_HOOKS.daisuke.skipsTurnQuota(p, tier) && !isUsagiBasic && !isApplePick && !isMuimiBasic && !isTohnoPick && !isDoomguyPick && !isKaiPick && !isTakumiPick && !isHarukaBasic && !isHisakawaFreeAction && !isYuiBasic && !isSupPick && !isBrianKey && !isBrianN2O && !isLumiBasic && !isCayBasic && !isDaichiBasic && !CHAR_HOOKS.striker.skipsTurnQuota(p, tier)) p.skillUsedRound = true; // สกิลเลือก/สลับและเสบียงฉุกเฉินไม่นับโควตาสกิลหลัก
   if (isKaiPick) p.kaiSkillUsesRound = (p.kaiSkillUsesRound || 0) + 1;
   if (isTakumiPick) p.takumiSkillUsesRound = (p.takumiSkillUsesRound || 0) + 1;
   // "คำสาป" (สถานะ Universal): กดสกิลสำเร็จแล้ว = เสียพลังชีวิต 1 หน่วย (1 ครั้ง/เทิร์น)
@@ -4634,6 +4706,8 @@ function useSkillCore(id, tier, targets, item) {
   if (isIppoPick) flashSuffix = CHAR_HOOKS.ippo.applyInstantSkill(engine, p, tier) || flashSuffix;
   if (isKimPick) flashSuffix = CHAR_HOOKS.kim.applyInstantSkill(engine, p, tier) || flashSuffix;
   if (isRecruitPick) flashSuffix = CHAR_HOOKS.recruit.applyInstantSkill(engine, p, tier, targets) || flashSuffix; // เปิด QTE
+  if (isStrikerPick) flashSuffix = CHAR_HOOKS.striker.applyInstantSkill(engine, p, tier, item) || flashSuffix;
+  const strikerAfter = isStrikerPick ? CHAR_HOOKS.striker.takeAfter(p) : null; // ขีปนาวุธ: ยิงหลังวีดีโอ
   // ---------- ผู้วิงวอน (patch 3.4) ----------
   if (isSupPick && supTarget) flashSuffix = CHAR_HOOKS.the_supplicant.applyInstantSkill(engine, p, tier, supTarget) || flashSuffix;
   if (isBrianPick) flashSuffix = CHAR_HOOKS.brian.applyInstantSkill(engine, p, tier, brianTarget, item) || flashSuffix;
@@ -4779,8 +4853,9 @@ function useSkillCore(id, tier, targets, item) {
       const t = connerCloseCase;
       connerCloseCase = null;
       pausePlayingForCutscene(() => CHAR_HOOKS.conner.applyCloseCase(engine, p, t));
-    } else pausePlayingForCutscene();
-  }
+    } else if (strikerAfter) pausePlayingForCutscene(() => withEffectSource(p, strikerAfter));
+    else pausePlayingForCutscene();
+  } else if (strikerAfter) strikerAfter(); // ตาข่าย: ไม่ได้เข้าเส้นทางคัตซีน -> ลงผลทันที
   // ตาข่ายสำรอง (คอนเนอร์ "จัดการปิดคดี"): ไม่ได้เข้าเส้นทางคัตซีนด้วยเหตุใดก็ตาม -> ลงดาเมจทันที
   //  ไม่งั้นแต้มสกิล 8 หน่วยหายไปเปล่าๆ โดยเป้าหมายไม่โดนอะไรเลย
   if (connerCloseCase) CHAR_HOOKS.conner.applyCloseCase(engine, p, connerCloseCase);
@@ -4884,7 +4959,9 @@ function checkAllLocked() {
     // อุซากิ: ยังทำโจทย์คณิตไม่เสร็จ / ยังไม่ตอบ "เอา/ไม่เอา" ไพ่ของเป้าหมาย
     CHAR_HOOKS.usagi.quizPending(engine) || c.some((p) => p.usagiSwapOffer) ||
     // Recruit: QTE ของสกิลยังเล่นไม่จบ / ยังไม่เลือกเป้า (Desert Eagle นัดที่ 2 · FAMAS)
-    CHAR_HOOKS.recruit.pickPending(engine);
+    CHAR_HOOKS.recruit.pickPending(engine) ||
+    // สไตรเกอร์ ยูเรก้า: รอคู่หูอนุมัติท่าไม้ตาย 2 / กำลังต่อสายไฟ
+    CHAR_HOOKS.striker.approvalPending(engine);
   // ถ้าไม่เหลือใครรอดเลย (เช่น ทาคุโตะระเบิดใส่ทุกคนตายหมดรวมถึงตัวเอง) ก็ต้องสรุปผลด้วยเช่นกัน ไม่งั้นเกมค้าง
   // ORT ไม่ต้องกดเปิดไพ่ — รอเฉพาะผู้เล่นจริง (บอสจั่วรอบสุดท้ายใน resolveRound)
   if (c.filter((p) => !isOrt(p)).every((p) => p.locked) && !pendingAnswer) resolveRound();
@@ -4924,6 +5001,7 @@ function applySnapshot(snap, keepPerPlayer) {
     const keep = {
       socketId: live.socketId, connected: live.connected,
       sessionToken: live.sessionToken, ready: live.ready,
+      pair: live.pair, // สไตรเกอร์ ยูเรก้า: ข้อมูลการเชื่อมต่อของคู่หู — ห้ามย้อน
     };
     if (typeof keepPerPlayer === "function") Object.assign(keep, keepPerPlayer(live) || {});
     for (const k of Object.keys(live)) delete live[k];
@@ -4986,6 +5064,7 @@ function restoreTurnSnapshot(skipId, keepOncePerGame) {
     const keep = {
       socketId: live.socketId, connected: live.connected,
       sessionToken: live.sessionToken, ready: live.ready,
+      pair: live.pair, // สไตรเกอร์ ยูเรก้า: ข้อมูลการเชื่อมต่อของคู่หู — ห้ามย้อน
     };
     for (const k of Object.keys(live)) delete live[k];
     Object.assign(live, structuredClone(saved), keep);
@@ -5115,6 +5194,7 @@ function resolveRound() {
   // Recruit: QTE ของสกิลที่ยังไม่จบ = นับจุดที่คลิกได้ตอนนี้ · นัดที่รอเลือกเป้า = สุ่มเป้าให้
   for (const p of alivePlayers()) if (CHAR_HOOKS.recruit.qteActive(p)) recruitQteFinish(p, true);
   CHAR_HOOKS.recruit.sweepPick(engine);
+  CHAR_HOOKS.striker.sweep(engine); // สไตรเกอร์ ยูเรก้า: ไม่ตอบ = ไม่อนุมัติ · ซ่อมไม่เสร็จ = ล้มเหลว
   // อุซากิ: หมดเฟสจั่วไพ่ = ข้อที่เหลือนับเป็นผิด · ข้อเสนอสลับไพ่ที่ยังไม่ตอบ = ไม่เอา
   CHAR_HOOKS.usagi.sweepQuizzes(engine);
   for (const p of Object.values(players)) if (p.usagiSwapOffer) withEffectSource(p, () => CHAR_HOOKS.usagi.answerSwap(engine, p, false));
@@ -5489,6 +5569,12 @@ function afterSummary() {
   // แบทแมน (characters/bat_ben.js): ระหว่างเร้นเงา ออกจากเงามืดมาโจมตีไม่ได้
   // เจ้าหญิงราก (characters/princess_shiki.js): สกิลติดตัว — โจมตีปกติไม่ได้เลย เว้นแต่ติด "ชักดาบ"
   // โปรดิวเซอร์ (ฝึกซ้อม): 3 เทิร์นนี้โจมตีปกติไม่ได้ แต่ทำอย่างอื่นได้ตามปกติ
+  // สไตรเกอร์ ยูเรก้า (งานช่าง): เทิร์นที่เข้าไปซ่อม ชนะก็โจมตีไม่ได้
+  if (winner && winner.alive && CHAR_HOOKS.striker.cannotAttack(engine, winner)) {
+    lastLog.push(`🔧 ${winner.name} กำลังซ่อมอยู่ — ไม่มีเทิร์นโจมตี`);
+    endTurn();
+    return;
+  }
   if (winner && winner.alive && CHAR_HOOKS.producer_lumi.cannotAttack(winner)) {
     lastLog.push(`🎤 ${winner.name} กำลังเตรียมซ้อมอยู่ — ไม่มีเทิร์นโจมตี`);
     endTurn();
@@ -5586,6 +5672,8 @@ function postAttackFollowup(attacker) {
     return;
   }
   if (attacker) { delete attacker.statuses.miyakoHeal; delete attacker.statuses.yaak; }
+  // สไตรเกอร์ ยูเรก้า (อาศัยจังหวะ · โหมดทีม): ฝั่งตรงข้ามตีจบแล้ว 15% ได้โจมตีตาม — ลำดับท้ายสุดหลังตีเพิ่มทุกแบบ
+  if (CHAR_HOOKS.striker.startTimingAttack(engine, attacker)) return;
   endTurn();
 }
 
@@ -5606,6 +5694,7 @@ function attackSoundOf(attacker) {
   if (!attacker) return undefined;
   if (attacker.characterId === "mageslayer") return "mageslayer_attack";
   if (attacker.characterId === "recruit") return CHAR_HOOKS.recruit.attackSound(attacker); // เสียงปืน
+  if (attacker.characterId === "striker") return CHAR_HOOKS.striker.attackSound(attacker);
   if (attacker.characterId === "cayenne") return CHAR_HOOKS.cayenne.attackSound(attacker); // ร่างเกพาร์ด: เสียงปืน           // BA.mp3
   if (attacker.characterId === "muimi") return CHAR_HOOKS.muimi.towerActive(attacker) ? "muimi_ub_hit" : "muimi_normal_hit";
   if (CHAR_HOOKS.haruka.omegaActive(attacker)) return "haruka_attack";             // hit_haruka.mp3
@@ -5845,6 +5934,8 @@ function doAttack(byId, targetId) {
   if (CHAR_HOOKS.eiji.tryAttackDodge(engine, attacker, target)) return;
   // อิปโป (characters/ippo.js): หลบการโจมตีปกติ — หลบพ้นแล้วจบเทิร์นด้วยฉากหลบ
   if (CHAR_HOOKS.ippo.tryAttackDodge(engine, attacker, target)) return;
+  // สไตรเกอร์ ยูเรก้า (Mark 5): หลบการโจมตีปกติ 5%
+  if (CHAR_HOOKS.striker.tryAttackDodge(engine, attacker, target)) return;
   // โปรดิวเซอร์ (Tsubasa 283 ของคาโฮะ): หลบหลีก 40%
   if (CHAR_HOOKS.producer_lumi.tryAttackDodge(engine, attacker, target)) return;
   // Zect (characters/daisuke.js): ระหว่าง Clock Up หลบการโจมตีได้ 25%
@@ -6001,6 +6092,8 @@ function doAttack(byId, targetId) {
   const kagamiKickPierce = CHAR_HOOKS.kagami.prepareKickOnAttack(engine, attacker, target);
   // Rider Slash (คามิชิโร่ ซึรุงิ): จังหวะแรกปาดบัฟล่าสุดทิ้งก่อนหมัดจะลง
   CHAR_HOOKS.tsurugi.prepareSlashOnAttack(engine, attacker, target);
+  // สไตรเกอร์ ยูเรก้า (หมัดเหล็ก): ผ่านด่านหลบแล้ว = ใช้ท่า — ปาดบัฟก่อนหมัดลง + คิววีดีโอ (เล่นก่อนฉากความเสียหาย)
+  const strikerFistFx = CHAR_HOOKS.striker.prepareFistOnAttack(engine, attacker, target);
   const hpBefore = target.hp;
   const armorBefore = target.armor;
   const shieldBefore = target.shield;
@@ -6053,6 +6146,9 @@ function doAttack(byId, targetId) {
   // Bamboo-Hatted Kim: หมัดของ Kim ลง (ฝักดาบ/ชักดาบ/Yield My Flesh/ฟื้นเลือด) · Kim ถูกตี (ฝักดาบ + สวนกลับ)
   const kimAtkFx = CHAR_HOOKS.kim.onAttackLanded(engine, attacker, target, dmg);
   const kimCounterFx = CHAR_HOOKS.kim.onAttackedNormally(engine, attacker, target);
+  // สไตรเกอร์ ยูเรก้า: มือมีดมอบเลือดไหล · เตาปฏิกรณ์ 15% แทงสวน (วีดีโอเล่นก่อนสรุปความเสียหาย)
+  const strikerBleed = CHAR_HOOKS.striker.onAttackLanded(engine, attacker, target);
+  const strikerCounterFx = CHAR_HOOKS.striker.onAttackedNormally(engine, attacker, target);
   // แบทแมน (characters/bat_ben.js): ปืนติดรถ — ใช้แล้วหมดกระสุน (ดาเมจถูกบวกไปแล้วที่ computeAttackBase)
   const batGunFired = CHAR_HOOKS.bat_ben.consumeGun(engine, attacker);
   // อิปโป (characters/ippo.js): Uper Cut ลงผลตามว่าเป้าหมาย "มีเกราะก่อนโดนหมัดนี้" หรือไม่
@@ -6183,6 +6279,9 @@ function doAttack(byId, targetId) {
   if (CHAR_HOOKS.recruit.consumeHeadshot(attacker)) addFx({ name: "HeadShot +1", img: CHAR_HOOKS.recruit.IMG.base, by: attacker.name, color: colorOf(attacker) }, "atk");
   if (kimCritFx.crit) addFx({ name: `Poise คริติคอล ×2 (${kimCritFx.chance}%)`, img: displayImg(attacker), by: attacker.name, color: colorOf(attacker) }, "atk");
   for (const name of kimAtkFx) addFx({ name, img: displayImg(attacker), by: attacker.name, color: colorOf(attacker) }, "atk");
+  if (strikerFistFx) addFx({ name: `หมัดเหล็ก +1${strikerFistFx.stripped ? ` · ปาด "${strikerFistFx.stripped.label}"` : ""}${strikerFistFx.combo ? " · ซ้ำเป้าเดิม สตั้นเทิร์นหน้า" : ""}`, img: CHAR_HOOKS.striker.IMG.skill2, by: attacker.name, color: colorOf(attacker) }, "atk");
+  if (strikerBleed > 0) addFx({ name: `มือมีด — เลือดไหล +${strikerBleed}`, img: CHAR_HOOKS.striker.IMG.skill1, by: attacker.name, color: colorOf(attacker) }, "atk");
+  if (strikerCounterFx) addFx({ name: `เตาปฏิกรณ์ — แทงสวน -${strikerCounterFx.dmg}`, img: CHAR_HOOKS.striker.IMG.base, by: target.name, color: colorOf(target) }, "def");
   if (kimCounterFx) addFx({ name: kimCounterFx.name, img: kimCounterFx.img, by: target.name, color: colorOf(target) }, "def");
   for (const fx of ignisAttackFx || []) addFx(fx, fx.side || "atk");
   if (ginga) addFx(skillByStatus(attacker, "ginga"), "atk");
@@ -6275,7 +6374,7 @@ function doAttack(byId, targetId) {
   //  / อย่าอยู่เลย แกน่ะ! (ริต้า เบอร์นัล patch 2.1.6) / ฉันยัง...มองเห็นอยู่!!! กันตาย + อย่างนายน่ะ จะไปเข้าใจอะไร (สึงาชิ ทาคุโตะ patch 2.2.4):
   //  เล่นวีดีโอที่ค้างคิวก่อน แล้วค่อยขึ้นสรุปความเสียหาย
   //  (ปกติทุกท่าอื่นจะขึ้นสรุปความเสียหายก่อนแล้วค่อยเล่นวีดีโอค้างคิวตอนจบ — ท่าเหล่านี้กลับลำดับเฉพาะตัว)
-  if ((storiumAtk || phenexPurgeAtk || miyakoUltAtk || triggerMultiAtk || triggerZeperionAtk || escanorAttackVideoQueued || (beatSaveFired && target.characterId === "takuto") || takutoUlt2VideoQueued || eijiSwordFx.videoQueued || harukaPunishFx.videoQueued || (harukaCounterFx && harukaCounterFx.videoQueued) || (danCounterFx && danCounterFx.videoQueued) || (yuiCounterFx && yuiCounterFx.videoQueued) || batGunFired || daisukeRiderFired || yagurumaStingFired || kagamiKickFired || tsurugiSlashFired) && cutsceneQueue.length) runCutsceneQueue(showAttackFx);
+  if ((storiumAtk || phenexPurgeAtk || miyakoUltAtk || triggerMultiAtk || triggerZeperionAtk || escanorAttackVideoQueued || (beatSaveFired && target.characterId === "takuto") || takutoUlt2VideoQueued || eijiSwordFx.videoQueued || harukaPunishFx.videoQueued || (harukaCounterFx && harukaCounterFx.videoQueued) || (danCounterFx && danCounterFx.videoQueued) || (yuiCounterFx && yuiCounterFx.videoQueued) || batGunFired || daisukeRiderFired || yagurumaStingFired || kagamiKickFired || tsurugiSlashFired || strikerFistFx || strikerCounterFx) && cutsceneQueue.length) runCutsceneQueue(showAttackFx);
   else showAttackFx();
 }
 
@@ -6672,7 +6771,114 @@ function consumeEventQuota(socket, event, limit, windowMs = 1000) {
 function playerIdFor(socket) {
   const id = socketPlayerIds.get(socket.id);
   const p = id && players[id];
-  return p && p.socketId === socket.id ? id : null;
+  if (p && p.socketId === socket.id) return id;
+  const co = coPilotOf(socket);
+  return co ? co.hostId : null;
+}
+
+// ============================================================
+//  สไตรเกอร์ ยูเรก้า: คู่หู — ผู้เล่น 2 คนบังคับตัวละครเดียว (characters/striker.js คือกลไกต่อสู้)
+//  ในเกมมีระเบียนผู้เล่นแค่ 1 ระเบียน (ของคนที่เลือกตัวละครก่อน = host) — คนที่สองเก็บที่ p.pair.co
+//  engine ต่อสู้ทั้งหมดจึงเห็นยูเรก้าเป็นผู้เล่นคนเดียว "แพ้ก็แพ้คู่" โดยไม่ต้องแก้ลูปใดๆ
+//    · socket ของคู่หู join ห้อง (room) ของ host -> ได้ state ชุดเดียวกัน (youId = host) โดยอัตโนมัติ
+//    · onPlayerEvent ส่งคำสั่งของทั้งคู่มาที่ระเบียนเดียวกัน แล้วกรองตามบทบาท (PAIR_ROLE_EVENTS)
+//    · p.pair ไม่ถูกล้างโดย resetCombat และไม่ถูกย้อนโดยสแนปช็อต (ข้อมูลการเชื่อมต่อ)
+//  p.pair = { role: บทบาทของ host ("pilot" | "gunner"), hostName, hostReady, co: { id, name, sessionToken, socketId, connected, ready } | null }
+// ============================================================
+const PAIR_ROLES = ["pilot", "gunner"];
+const PAIR_ROLE_EVENTS = {
+  pilot: new Set(["hit", "lock", "attack", "strikerApprove", "strikerRepairStart", "strikerRepairDone"]),
+  gunner: new Set(["useSkill", "buyShopItem", "useInventoryItem"]),
+};
+const coSocketHost = new Map(); // socket.id ของคู่หู -> hostId
+const coSessions = new Map();   // sessionToken ของคู่หู -> hostId
+const coTimers = new Map();     // hostId -> ตัวนับถอยหลังลบคู่หูที่หลุดในห้องรอ
+function coPilotOf(socket) {
+  const hostId = coSocketHost.get(socket.id);
+  const p = hostId && players[hostId];
+  const co = p && p.pair && p.pair.co;
+  return co && co.socketId === socket.id ? { hostId, co } : null;
+}
+function otherRole(role) { return role === "pilot" ? "gunner" : "pilot"; }
+// บทบาทของ socket นี้บนระเบียน p (null = ไม่ใช่ตัวละครคู่)
+function pairRoleOf(p, socket) {
+  if (!p || !p.pair) return null;
+  if (p.socketId === socket.id) return p.pair.role;
+  return p.pair.co && p.pair.co.socketId === socket.id ? otherRole(p.pair.role) : null;
+}
+function pairRoleConnected(p, role) {
+  if (!p || !p.pair) return false;
+  return p.pair.role === role ? !!p.connected : !!(p.pair.co && p.pair.co.connected);
+}
+function pairAllows(p, role, event) {
+  if (!p || !p.pair || !role) return true;
+  const need = PAIR_ROLE_EVENTS.pilot.has(event) ? "pilot" : PAIR_ROLE_EVENTS.gunner.has(event) ? "gunner" : null;
+  if (!need || need === role) return true;
+  // นักบินหลุด: พลปืนเปิดการ์ดแทนได้ชั่วคราว (แต่จั่วไม่ได้)
+  if (event === "lock" && role === "gunner" && !pairRoleConnected(p, "pilot")) return true;
+  return false;
+}
+function pairRefreshReady(p) {
+  if (!p || !p.pair) return;
+  const co = p.pair.co;
+  p.ready = !!(p.pair.hostReady && co && co.connected && co.ready);
+}
+function pairRefreshName(p) {
+  if (!p || !p.pair) return;
+  p.name = p.pair.co ? `${p.pair.hostName} & ${p.pair.co.name}`.slice(0, 26) : p.pair.hostName;
+}
+function pairPublic(p) {
+  if (!p || !p.pair) return null;
+  const co = p.pair.co;
+  const hostSide = { name: p.pair.hostName, connected: !!p.connected, ready: !!p.pair.hostReady };
+  const coSide = co ? { name: co.name, connected: !!co.connected, ready: !!co.ready } : null;
+  return {
+    pilot: p.pair.role === "pilot" ? hostSide : coSide,
+    gunner: p.pair.role === "gunner" ? hostSide : coSide,
+    open: !co ? otherRole(p.pair.role) : null,
+  };
+}
+// หน้าเลือกตัวละคร: ตัวละครคู่ที่ยังรอคู่หู (ให้คนอื่นกดเข้าร่วมเป็นคู่หูได้)
+function openPairSlots() {
+  if (!pregameStateActive()) return [];
+  return Object.values(players).filter((p) => p.pair && !p.pair.co)
+    .map((p) => ({ characterId: p.characterId, hostName: p.pair.hostName, role: otherRole(p.pair.role) }));
+}
+function removeCoPilot(p, notify) {
+  const co = p && p.pair && p.pair.co;
+  if (!co) return;
+  const t = coTimers.get(p.id);
+  if (t) clearTimeout(t);
+  coTimers.delete(p.id);
+  coSessions.delete(co.sessionToken);
+  if (co.socketId) {
+    coSocketHost.delete(co.socketId);
+    const sock = io.sockets.sockets.get(co.socketId);
+    if (sock) { sock.leave(p.id); if (notify) sock.emit("sessionExpired"); }
+  }
+  p.pair.co = null;
+  pairRefreshName(p);
+  pairRefreshReady(p);
+}
+// host ออก/ถูกลบ -> คู่หูไม่มีตัวละครให้บังคับแล้ว ส่งกลับไปหน้าเลือกตัวละคร
+function dissolvePair(p) { removeCoPilot(p, true); }
+function bindCoPilotSocket(socket, p) {
+  const co = p.pair.co;
+  if (co.socketId && co.socketId !== socket.id) coSocketHost.delete(co.socketId);
+  const t = coTimers.get(p.id);
+  if (t) clearTimeout(t);
+  coTimers.delete(p.id);
+  co.socketId = socket.id;
+  co.connected = true;
+  coSocketHost.set(socket.id, p.id);
+  socket.join(p.id);
+  socket.emit("pairRole", { role: otherRole(p.pair.role) });
+}
+// โหมดทีม: ยูเรก้า (2 คน) ยืนเป็นทีมเต็ม 1 ทีมคนเดียว — duo สู้ 2:1 · trio สู้ 2:3
+//  นับ "ช่อง" ของทีม: ตัวละครคู่หนัก = teamSize ช่อง (เต็มทีมทันที)
+function pairTeamWeight(p, size = teamSize) { return p && p.pair ? Math.max(1, size) : 1; }
+function teamHeadcount(size) {
+  return Object.values(players).reduce((n, p) => n + pairTeamWeight(p, size), 0);
 }
 
 function bindPlayerSocket(socket, playerId) {
@@ -6704,6 +6910,7 @@ function removeDisconnectedPlayer(playerId) {
   const wasAttacker = attackerId === playerId;
   const wasPregame = pregameStateActive();
   forgetPlayerSession(p);
+  dissolvePair(p);
   delete players[playerId];
   disconnectTimers.delete(playerId);
 
@@ -6743,7 +6950,11 @@ function onPlayerEvent(socket, event, handler, limit = 20) {
     if (!consumeEventQuota(socket, event, limit)) return;
     const playerId = playerIdFor(socket);
     if (!playerId) return;
-    handler(playerId, payload);
+    // สไตรเกอร์ ยูเรก้า: คำสั่งของคู่หูลงระเบียนเดียวกัน แต่แต่ละคนทำได้เฉพาะส่วนของตัวเอง
+    const p = players[playerId];
+    const role = pairRoleOf(p, socket);
+    if (!pairAllows(p, role, event)) return;
+    handler(playerId, payload, { role, co: !!(p && p.pair && p.socketId !== socket.id) });
   });
 }
 
@@ -6797,12 +7008,25 @@ io.on('connection', (socket) => {
   socket.emit("roster", publicRoster());
   socket.emit("positions", positionsFor(socket.id));
   socket.emit("takenChars", takenUniqueChars());
+  socket.emit("pairSlots", openPairSlots());
 
   safeOn(socket, 'reconnectSession', ({ sessionToken } = {}) => {
     if (!consumeEventQuota(socket, 'reconnectSession', 3, 10_000)) return;
     if (typeof sessionToken !== 'string' || sessionToken.length > 128) return;
     const playerId = sessions.get(sessionToken);
     const p = playerId && players[playerId];
+    // สไตรเกอร์ ยูเรก้า: session ของคู่หู — ผูก socket ใหม่เข้ากับระเบียนของ host
+    const coHost = !p && players[coSessions.get(sessionToken)];
+    if (coHost && coHost.pair && coHost.pair.co && coHost.pair.co.sessionToken === sessionToken) {
+      const co = coHost.pair.co;
+      if (co.connected && co.socketId !== socket.id && io.sockets.sockets.has(co.socketId)) { socket.emit('sessionInUse'); return; }
+      bindCoPilotSocket(socket, coHost);
+      pairRefreshReady(coHost);
+      socket.emit('reconnected', { sessionToken });
+      broadcastState();
+      broadcastPositions();
+      return;
+    }
     if (!p || p.sessionToken !== sessionToken) { socket.emit('sessionExpired'); return; }
     if (p.connected && p.socketId !== socket.id && io.sockets.sockets.has(p.socketId)) {
       socket.emit('sessionInUse');
@@ -6810,6 +7034,7 @@ io.on('connection', (socket) => {
     }
     if (!bindPlayerSocket(socket, playerId)) { socket.emit('sessionExpired'); return; }
     socket.emit('reconnected', { sessionToken });
+    if (p.pair) { socket.emit("pairRole", { role: p.pair.role }); pairRefreshReady(p); }
     broadcastState();
     broadcastPositions();
   });
@@ -6823,7 +7048,25 @@ io.on('connection', (socket) => {
     broadcastPositions();
   });
 
-  safeOn(socket, "join", ({ name, position, characterId, shikiUlt, color } = {}) => {
+  // สไตรเกอร์ ยูเรก้า: เข้าร่วมเป็นคู่หูของตัวละครคู่ที่ยังรออยู่ (ไม่ใช้ที่นั่ง — นั่งที่เดียวกับ host)
+  safeOn(socket, "joinCopilot", ({ name, characterId } = {}) => {
+    if (!consumeEventQuota(socket, 'join', 3, 10_000) || playerIdFor(socket)) return;
+    if (gameState !== "LOBBY") { socket.emit("inProgress"); return; }
+    const host = Object.values(players).find((p) => p.pair && !p.pair.co && (!characterId || p.characterId === characterId));
+    if (!host) { socket.emit("pairTaken"); return; }
+    releaseReservation(socket.id);
+    const sessionToken = crypto.randomBytes(32).toString('base64url');
+    host.pair.co = { id: crypto.randomUUID(), name: (name || "ผู้เล่น").toString().slice(0, 12), sessionToken, socketId: null, connected: true, ready: false };
+    coSessions.set(sessionToken, host.id);
+    bindCoPilotSocket(socket, host);
+    pairRefreshName(host);
+    pairRefreshReady(host);
+    socket.emit('joined', { sessionToken });
+    broadcastState();
+    broadcastPositions();
+  });
+
+  safeOn(socket, "join", ({ name, position, characterId, shikiUlt, color, pairRole } = {}) => {
     if (!consumeEventQuota(socket, 'join', 3, 10_000) || playerIdFor(socket)) return;
     if (Object.keys(players).length >= MAX_PLAYERS) { socket.emit("full"); return; }
     if (gameState !== "LOBBY") { socket.emit("inProgress"); return; }
@@ -6843,9 +7086,15 @@ io.on('connection', (socket) => {
     const playerId = crypto.randomUUID();
     const sessionToken = crypto.randomBytes(32).toString('base64url');
     players[playerId] = newPlayerRecord({ playerId, sessionToken, socketId: socket.id, name, color, pos, ch, shikiUlt });
+    // สไตรเกอร์ ยูเรก้า: คนแรกเลือกบทบาท (นักบิน/พลปืน) แล้วรอคู่หูเข้ามารับอีกส่วน
+    if (ch.id === "striker") {
+      const np = players[playerId];
+      np.pair = { role: PAIR_ROLES.includes(pairRole) ? pairRole : "pilot", hostName: np.name, hostReady: false, co: null };
+    }
     sessions.set(sessionToken, playerId);
     bindPlayerSocket(socket, playerId);
     socket.emit('joined', { sessionToken });
+    if (players[playerId].pair) socket.emit("pairRole", { role: players[playerId].pair.role });
     broadcastState();
     broadcastPositions();
   });
@@ -6877,11 +7126,16 @@ io.on('connection', (socket) => {
   onPlayerEvent(socket, 'chooseTeam', (id, { teamId } = {}) => chooseTeam(id, teamId), 8);
   onPlayerEvent(socket, 'confirmTeam', (id, { confirmed } = {}) => confirmTeam(id, confirmed), 8);
   // ห้องรอ: กดพร้อม/ยกเลิกพร้อม — ครบทุกคน (อย่างน้อย 2 คน) เริ่มเกมอัตโนมัติ
-  onPlayerEvent(socket, 'toggleReady', (playerId) => {
+  onPlayerEvent(socket, 'toggleReady', (playerId, _payload, actor) => {
     if (!pregameStateActive()) return;
     const p = players[playerId];
     if (!p) return;
-    p.ready = !p.ready;
+    if (p.pair) {
+      // ตัวละครคู่: พร้อมทีละคน — ต้องมีคู่หูครบและกดพร้อมทั้งคู่ ระเบียนถึงนับว่าพร้อม
+      if (actor && actor.co) { if (p.pair.co) p.pair.co.ready = !p.pair.co.ready; }
+      else p.pair.hostReady = !p.pair.hostReady;
+      pairRefreshReady(p);
+    } else p.ready = !p.ready;
     broadcastState();
     checkLobbyReady();
   });
@@ -7002,6 +7256,10 @@ io.on('connection', (socket) => {
   onPlayerEvent(socket, 'usagiQuizTimeout', (id) => usagiQuizStep(id, null, true), 20);
   onPlayerEvent(socket, 'qteTimeout', (id) => qteTimeout(id), 10);
   // Recruit: คลิกจุดแดง (limit สูงเผื่อคลิกรัว) / แจ้งหมดเวลา / เลือกเป้าหลัง QTE / สกิลพิเศษ "เตรียมตัว"
+  // สไตรเกอร์ ยูเรก้า: นักบินอนุมัติ "เป็นเกียรติมากครับ" / เริ่มซ่อม / ส่งผลต่อสายไฟ
+  onPlayerEvent(socket, 'strikerApprove', (id, { accept } = {}) => strikerApprove(id, !!accept), 6);
+  onPlayerEvent(socket, 'strikerRepairStart', (id) => strikerRepairStart(id), 4);
+  onPlayerEvent(socket, 'strikerRepairDone', (id, { pairs } = {}) => strikerRepairDone(id, pairs), 6);
   onPlayerEvent(socket, 'recruitQteHit', (id, { id: dotId } = {}) => recruitQteHit(id, dotId), 40);
   onPlayerEvent(socket, 'recruitQteDone', (id) => recruitQteDone(id), 10);
   onPlayerEvent(socket, 'recruitPick', (id, { targets } = {}) => recruitPick(id, targets), 6);
@@ -7011,9 +7269,19 @@ io.on('connection', (socket) => {
   safeOn(socket, "leave", () => {
     if (!consumeEventQuota(socket, 'leave', 2, 10_000)) return;
     if (!pregameStateActive()) return;
+    // สไตรเกอร์ ยูเรก้า: คู่หูออก = ตัวละครกลับไปรอคู่หูใหม่ (host ยังอยู่)
+    const coRef = coPilotOf(socket);
+    if (coRef) {
+      removeCoPilot(players[coRef.hostId], false);
+      resetPregameFlowToLobby();
+      broadcastState();
+      broadcastPositions();
+      return;
+    }
     const playerId = playerIdFor(socket);
     const p = playerId && players[playerId];
     if (!p) return;
+    dissolvePair(p);
     reservePosition(socket.id, p.position);
     forgetPlayerSession(p);
     delete players[playerId];
@@ -7025,6 +7293,24 @@ io.on('connection', (socket) => {
   });
 
   safeOn(socket, 'disconnect', () => {
+    // สไตรเกอร์ ยูเรก้า: คู่หูหลุด — ระหว่างแมตช์ส่วนนั้นหยุดทำงานจนกว่าจะกลับมา · ห้องรอหมดเวลาแล้วลบออก
+    const coRef = coPilotOf(socket);
+    if (coRef) {
+      coSocketHost.delete(socket.id);
+      const host = players[coRef.hostId];
+      coRef.co.connected = false;
+      coRef.co.socketId = null;
+      if (pregameStateActive()) {
+        resetPregameFlowToLobby();
+        coTimers.set(host.id, setTimeout(() => {
+          if (host.pair && host.pair.co === coRef.co && !coRef.co.connected) { removeCoPilot(host, false); broadcastState(); broadcastPositions(); }
+        }, RECONNECT_GRACE_MS));
+      }
+      pairRefreshReady(host);
+      broadcastState();
+      broadcastPositions();
+      return;
+    }
     const playerId = socketPlayerIds.get(socket.id);
     socketPlayerIds.delete(socket.id);
     releaseReservation(socket.id);
@@ -7309,6 +7595,8 @@ const engine = {
 module.exports = {
   computeAttackBase,
   resolveRound, // เทสต์เรียกตรงๆ เพื่อพิสูจน์การตัดสินผู้ชนะ/ผู้แพ้จริง (ไม่จำลองเงื่อนไขเอง)
+  pairAllows, // สไตรเกอร์ ยูเรก้า: สิทธิ์ตามบทบาทของคู่หู (เทสต์เรียกตรง)
+  strikerApprove, strikerRepairStart, strikerRepairDone, // สไตรเกอร์ ยูเรก้า: คำสั่งของนักบิน (โค้ดจริงเรียกจาก socket)
   attackSoundOf, // เสียงโจมตีปกติเฉพาะตัวละคร (เทสต์อ่านตรงนี้)
   engine,
   maxHpOf,

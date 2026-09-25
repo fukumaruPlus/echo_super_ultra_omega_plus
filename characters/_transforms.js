@@ -21,6 +21,7 @@ const daisukeChar = require("./daisuke");
 const yagurumaChar = require("./yaguruma");
 const kagamiChar = require("./kagami");
 const usagiChar = require("./usagi"); // อุซากิ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
+const strikerChar = require("./striker"); // สไตรเกอร์ ยูเรก้า: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
 const recruitChar = require("./recruit"); // Recruit: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
 const kimChar = require("./kim"); // Bamboo-Hatted Kim: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
 const tsurugiChar = require("./tsurugi"); // คามิชิโร่ ซึรุงิ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร // คากามิ อาราตะ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร // โซ ยากุรุมะ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร // คาซามะ ไดสุเกะ: path รูป/วีดีโอชุดเดียวกับไฟล์ตัวละคร
@@ -140,6 +141,19 @@ module.exports = function buildTransforms(img) {
     //  คลิปยาว 10.08 วิ (mvhd) · เพลงร่างมาจาก activeSkillMusic ไม่ใช่ช่อง music ของที่นี่
     // Recruit: Desert Eagle พลาด (Fail_1.mov 1.71 วิ — เล่นทุกครั้ง · คลิปสั้นกว่าการ์ดเปิดตัวจึง noIntro)
     //  Barrett สำเร็จ (สกิลอัลติเมติ.mp4 9.17 วิ — วีดีโอเต็มครั้งแรกครั้งเดียวผ่าน triggerCutscene)
+    // สไตรเกอร์ ยูเรก้า — seconds วัดจาก mvhd จริงแล้วปัดขึ้น (intro 6.64 · มือมีด 4.38 · หมัดเหล็ก 9.65/18.86 · ขีปนาวุธ 6.20
+    //  · เปิดใช้เป็นเกียรติ 9.81 · ระเบิด 7.28 · แทงสวน 6.87 · เตาปฏิกรณ์ 8.54 · อาศัยจังหวะ 9.75)
+    //  มือมีดใช้ triggerCutscene (ครั้งแรกที่เปิดเท่านั้น) · ที่เหลือคิวเองจากโค้ดทุกครั้ง · เตาปฏิกรณ์คุมครั้งเดียวด้วยธงของตัวเอง
+    strikerIntro:     { img: strikerChar.IMG.base,    video: strikerChar.VIDEO.intro,     title: "สไตรเกอร์ ยูเรก้า", label: "⚠️ วัตถุอันตราย", seconds: 7, music: null, afterReveal: false },
+    strikerKnife:     { img: strikerChar.IMG.skill1,  video: strikerChar.VIDEO.knife,     title: "มือมีด", label: "สลับโหมดการโจมตี", seconds: 5, music: null, afterReveal: false },
+    strikerFist:      { img: strikerChar.IMG.skill2,  video: strikerChar.VIDEO.fist,      title: "กำจัดศัตรูให้สิ้น", label: "หมัดเหล็ก", seconds: 10, music: null, afterReveal: false },
+    strikerFistFinal: { img: strikerChar.IMG.skill2,  video: strikerChar.VIDEO.fistFinal, title: "กำจัดศัตรูให้สิ้น", label: "หมัดเหล็กซ้ำเป้าเดิม", seconds: 19, music: null, afterReveal: false },
+    strikerMissile:   { img: strikerChar.IMG.skill3,  video: strikerChar.VIDEO.missile,   title: "ระบบขีปนาวุธ", label: "ยิงขีปนาวุธ", seconds: 7, music: null, afterReveal: false },
+    strikerArm:       { img: strikerChar.IMG.skill32, video: strikerChar.VIDEO.arm,       title: "เป็นเกียรติมากครับ", label: "เริ่มนับถอยหลัง", seconds: 10, music: null, afterReveal: false },
+    strikerBoom:      { img: strikerChar.IMG.skill32, video: strikerChar.VIDEO.boom,      title: "เป็นเกียรติมากครับ", label: "ระเบิด!", seconds: 8, music: null, afterReveal: false },
+    strikerCounter:   { img: strikerChar.IMG.base,    video: strikerChar.VIDEO.counter,   title: "เตาปฏิกรณ์นิวเคลียร์", label: "แทงสวน", seconds: 7, music: null, afterReveal: false },
+    strikerReactor:   { img: strikerChar.IMG.base,    video: strikerChar.VIDEO.reactor,   title: "เตาปฏิกรณ์นิวเคลียร์", label: "ท่าไม้ตายเปลี่ยนเป็นท่าที่ 2", seconds: 9, music: null, afterReveal: false },
+    strikerTiming:    { img: strikerChar.IMG.base,    video: strikerChar.VIDEO.timing,    title: "อาศัยจังหวะ", label: "โจมตีสวนกลับ", seconds: 10, music: null, afterReveal: false },
     recruitFail: { img: recruitChar.IMG.skill1, video: recruitChar.VIDEO.fail, title: "Desert Eagle", label: "ยิงพลาด", seconds: 2, music: null, afterReveal: false, noIntro: true },
     recruitUlt:  { img: recruitChar.IMG.skill3, video: recruitChar.VIDEO.ult,  title: "Barrett M82A1", label: "ยิงโดน", seconds: 10, music: null, afterReveal: false },
     kimAwake:    { img: kimChar.IMG.awake, video: kimChar.VIDEO.awake, title: "Awake", label: "ฝักดาบที่เต็มไปด้วยความขุ่นเคือง", seconds: 11, music: null, afterReveal: false },

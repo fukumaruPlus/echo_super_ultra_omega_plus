@@ -1095,11 +1095,15 @@ function TwinPortraitCards({ p, size = "md", className = "" }) {
     </div>
   );
 }
-function Shield({ on, size = 16 }) {
+// Recruit [Armor]: เกราะพิเศษ (โดน 2 ครั้งถึงลด · ฟื้นไม่ได้) วาดเป็นสีส้มให้แยกจากเกราะปกติ
+const ARMOR_ORANGE = "#f97316";
+const armorToneOf = (p) => (p?.character?.id === "recruit" ? "orange" : null);
+function Shield({ on, size = 16, tone }) {
+  const c = tone === "orange" ? ARMOR_ORANGE : "#3b82c4";
   return (
     <svg width={size} height={Math.round(size * 1.125)} viewBox="0 0 24 24" className="shrink-0">
       <path d="M12 2 L21 6 V12 C21 17 12 22 12 22 C12 22 3 17 3 12 V6 Z"
-        fill={on ? "#3b82c4" : "transparent"} stroke="#3b82c4" strokeWidth="2" />
+        fill={on ? c : "transparent"} stroke={c} strokeWidth="2" />
     </svg>
   );
 }
@@ -1136,7 +1140,7 @@ function LifeBar({ p, sm, className = "" }) {
       </span>
       {p.tempHp > 0 && <span className={`${sm ? "text-xs" : "text-sm"} text-echo-gold font-bold`}>💛{p.tempHp}</span>}
       <span className="inline-flex gap-0.5 shrink-0">
-        {Array.from({ length: p.maxArmor }, (_, i) => <Shield key={i} on={i < p.armor} size={sm ? 12 : 16} />)}
+        {Array.from({ length: p.maxArmor }, (_, i) => <Shield key={i} on={i < p.armor} size={sm ? 12 : 16} tone={armorToneOf(p)} />)}
       </span>
       {/* ผู้วิงวอน "เกราะศรัทธา" (patch 3.4.6): เกราะพิเศษที่กินดาเมจก่อนเกราะหลัก — วาดต่อท้ายเกราะหลัก
           ❤️❤️… 🛡️🛡️🛡️ 🔰🔰🔰 · โชว์เฉพาะจำนวนที่เหลือจริง (ไม่มีช่องว่างของหน่วยที่แตกไปแล้ว) */}
@@ -1588,13 +1592,24 @@ function statusEntries(p, full) {
     out.push({ key: "usagiPuru", v: 1, icon: "🐰", label: `ปรุๆ ${u.puru}/${u.puruMax}`, cls: u.puru >= 5 ? "bg-echo-hp" : "bg-echo-gold text-gray-900",
       desc: `ปรุๆ: คริติคอล ${u.puru * 7}% (ดาเมจ ×2)${u.puru >= 5 ? " · พลังโจมตี +1" : " · ครบ 5 หน่วยพลังโจมตี +1"} · ออกหมัดได้ +2 · ไม่ได้เพิ่มครบ 3 เทิร์นลด 1 (ตอนนี้นับไป ${u.idle}/3)` });
   }
+  // สไตรเกอร์ ยูเรก้า: โหมด/ท่าที่ค้าง/นับถอยหลังระเบิด/งานช่าง — ข้อมูลสาธารณะ
+  if (p.striker) {
+    const s = p.striker;
+    if (s.knife) out.push({ key: "strikerKnife", v: 1, icon: "🔪", label: "มือมีด", cls: "bg-echo-hp", desc: "มือมีด: พลังโจมตีเหลือ 1 แต่โจมตีโดนมอบเลือดไหล 2" });
+    if (s.fist) out.push({ key: "strikerFist", v: 1, icon: "👊", label: "หมัดเหล็ก", cls: "bg-echo-gold text-gray-900", desc: "หมัดเหล็ก: โจมตีปกติครั้งถัดไป +1 และปาดบัฟล่าสุดของเป้าหมาย · ต่อยคนเดิมซ้ำ = สตั้นเทิร์นถัดไป" });
+    if (s.reactor) out.push({ key: "strikerReactor", v: 1, icon: "☢️", label: "เตาปฏิกรณ์", cls: "bg-echo-hp", desc: "เตาปฏิกรณ์นิวเคลียร์: ท่าไม้ตายเป็น \"เป็นเกียรติมากครับ\" · ถูกโจมตีปกติ 15% แทงสวน" });
+    if (s.honor) out.push({ key: "strikerHonor", v: 1, icon: "💣", label: `ระเบิดใน ${s.honor.left} เทิร์น · แรง ${s.honor.power}`, cls: "bg-echo-hp", desc: "เป็นเกียรติมากครับ: ครบเวลาระเบิดตัวเอง ทุกคนรับความเสียหายตามความแรง (สูงสุด 8) · กดซ้ำเพื่อระเบิดทันที (คู่หูต้องอนุมัติ)" });
+    if (s.approval) out.push({ key: "strikerAsk", v: 1, icon: "⏳", label: "รอนักบินอนุมัติ", cls: "bg-white/20", desc: "พลปืนขอใช้ \"เป็นเกียรติมากครับ\" — รอนักบินอนุมัติ" });
+    if (s.repairing) out.push({ key: "strikerRepairing", v: 1, icon: "🔧", label: "กำลังซ่อม", cls: "bg-white/20", desc: "งานช่าง: กำลังต่อสายไฟ" });
+    else if (s.repairCd > 0) out.push({ key: "strikerRepairCd", v: 1, icon: "🔧", label: `ซ่อมได้อีก ${s.repairCd} เทิร์น`, cls: "bg-white/20", desc: "งานช่าง: ซ่อมแล้วต้องรอ 2 เทิร์น · เทิร์นที่ซ่อมชนะก็โจมตีไม่ได้" });
+  }
   // Recruit: กระสุน / ตัวนับ [Armor] / โควตาเตรียมตัว — ข้อมูลสาธารณะ
   if (p.recruit) {
     const r = p.recruit;
     out.push({ key: "recruitAmmo", v: 1, icon: "🔫", label: `กระสุน ${r.bullets}/${r.bulletMax}`, cls: r.bullets > 0 ? "bg-echo-gold text-gray-900" : "bg-echo-hp",
       desc: "กระสุน: โจมตีปกติ QTE สำเร็จ -1 / ไม่สำเร็จ -2 · Desert Eagle 3 · FAMAS 6 · Barrett 6 · หมด = ยิงไม่ได้ (Reload เติมเต็ม)" });
-    out.push({ key: "recruitArmor", v: 1, icon: "🛡️", label: `[Armor] ${r.armorHits}/2`, cls: "bg-echo-armor",
-      desc: "[Armor]: ขณะยังมีเกราะ การโจมตีปกติถูกกันทั้งหมัด · ถูกโจมตีครบ 2 ครั้งเกราะ -1 · เกราะไม่ฟื้นเองอัตโนมัติ" });
+    out.push({ key: "recruitArmor", v: 1, icon: "🛡️", label: `[Armor] ${r.armorHits}/2`, cls: "bg-orange-500 text-gray-900",
+      desc: "[Armor]: ขณะยังมีเกราะ ความเสียหายทุกชนิดถูกกันทั้งก้อน (ยกเว้นเจาะเกราะ) · โดนครบ 2 ครั้งเกราะ -1 · ฟื้นไม่ได้ (ยกเว้นสกิลพิเศษ Armor ของตัวเอง)" });
     out.push({ key: "recruitPrep", v: 1, icon: "🎒", label: `Bandage ${r.bandage} · Armor ${r.armorUses}`, cls: "bg-white/20",
       desc: `สกิลพิเศษ เตรียมตัว: Bandage เหลือ ${r.bandage} ครั้ง · Armor เหลือ ${r.armorUses} ครั้ง · Reload ไม่จำกัด` });
     if (r.aiming) out.push({ key: "recruitAim", v: 1, icon: "🎯", label: "กำลังเล็ง", cls: "bg-echo-hp", desc: "Recruit กำลังเล่น QTE เล็งยิง" });
@@ -2158,10 +2173,10 @@ function HeartGlyph() {
     </svg>
   );
 }
-function ShieldGlyph() {
+function ShieldGlyph({ tone }) {
   return (
     <svg viewBox="0 0 24 24" className="sr-ico" aria-hidden="true">
-      <path d="M12 2 21 6v6c0 5-9 10-9 10S3 17 3 12V6Z" fill="#8ec5ff" stroke="#0e2c4c" strokeWidth="1.4" />
+      <path d="M12 2 21 6v6c0 5-9 10-9 10S3 17 3 12V6Z" fill={tone === "orange" ? "#fdba74" : "#8ec5ff"} stroke={tone === "orange" ? "#7c2d12" : "#0e2c4c"} strokeWidth="1.4" />
     </svg>
   );
 }
@@ -2172,25 +2187,25 @@ function ShieldGlyph() {
 const SEG_LIMIT = 9;
 const SEG_LIMIT_BIG = 14;
 
-function StatRow({ kind, value, max, extra = 0, extraLabel, big }) {
+function StatRow({ kind, value, max, extra = 0, extraLabel, big, tone }) {
   // ทาคุมิ ฟุจิวาระ: ถึงจะมองไม่เห็น แต่ฉันยังอยู่ — ค่าถูกซ่อนเป็น null
   if (max == null) {
     return (
       <div className={`sr ${big ? "sr-big" : ""}`} title="ถูกซ่อน (ถึงจะมองไม่เห็น แต่ฉันยังอยู่)">
-        {kind === "hp" ? <HeartGlyph /> : <ShieldGlyph />}
+        {kind === "hp" ? <HeartGlyph /> : <ShieldGlyph tone={tone} />}
         <span className="sr-num">🌑 ???</span>
       </div>
     );
   }
   const total = max + extra;
   const label = `${kind === "hp" ? "พลังชีวิต" : "เกราะ"} ${value}/${max}${extra > 0 && extraLabel ? ` · ${extraLabel} ${extra}` : ""}`;
-  const icon = kind === "hp" ? <HeartGlyph /> : <ShieldGlyph />;
+  const icon = kind === "hp" ? <HeartGlyph /> : <ShieldGlyph tone={tone} />;
   const num = <span className="sr-num">{value}<span className="sr-max">/{max}</span></span>;
 
   // หลอดต่อเนื่อง: ขีดแบ่งทุกหน่วยยังวาดอยู่ จึงนับได้เหมือนเดิมถ้าอยากนับ
   if (total > (big ? SEG_LIMIT_BIG : SEG_LIMIT)) {
     return (
-      <div className={`sr ${big ? "sr-big" : ""}`} data-kind={kind} title={label}>
+      <div className={`sr ${big ? "sr-big" : ""}`} data-kind={kind} data-tone={tone || undefined} title={label}>
         {icon}
         <span className="sr-track sr-solid" style={{ "--n": total }}>
           <span className={`sr-fill sr-${kind}`} style={{ width: `${(Math.min(value, max) / total) * 100}%` }} />
@@ -2207,7 +2222,7 @@ function StatRow({ kind, value, max, extra = 0, extraLabel, big }) {
   for (let i = 0; i < max; i++) cells.push(i < value ? kind : "off");
   for (let i = 0; i < extra; i++) cells.push("tmp"); // ส่วนเกินเพดาน (เลือดชั่วคราว / เกราะศรัทธา) ต่อท้ายเป็นช่องสีทอง
   return (
-    <div className={`sr ${big ? "sr-big" : ""}`} data-kind={kind} title={label}>
+    <div className={`sr ${big ? "sr-big" : ""}`} data-kind={kind} data-tone={tone || undefined} title={label}>
       {icon}
       <span className="sr-track">
         {cells.map((c, i) => <span key={i} className={`sr-cell sr-${c}`} />)}
@@ -2312,7 +2327,7 @@ function OtherPlayer({ p, phase, slot, targetable, onAttack, picked, onInspect, 
                     {p.name}{!p.connected && <span className="ml-1 text-[10px] text-echo-hp">•offline</span>}
                   </div>
                   <StatRow kind="hp" value={p.hp} max={p.maxHp} extra={p.tempHp || 0} extraLabel="เลือดชั่วคราว" />
-                  <StatRow kind="ar" value={p.armor} max={p.maxArmor} extra={p.supFaith || 0} extraLabel="เกราะศรัทธา" />
+                  <StatRow kind="ar" value={p.armor} max={p.maxArmor} extra={p.supFaith || 0} extraLabel="เกราะศรัทธา" tone={armorToneOf(p)} />
                   <SpRow p={p} />
                 </div>
               </div>
@@ -3161,6 +3176,103 @@ function QtePanel({ qte }) {
   );
 }
 
+// ---------- สไตรเกอร์ ยูเรก้า: เลือกจำนวนขีปนาวุธ (1-9 แต้ม · 1 แต้ม = 1 นัด) ----------
+function StrikerMissileModal({ me, onPick, onClose }) {
+  const max = Math.min(9, me?.skillPoints || 0);
+  const [n, setN] = useState(Math.max(1, Math.min(3, max)));
+  return (
+    <div className="fixed inset-0 z-40 bg-black/60 grid place-items-center p-4" onClick={onClose}>
+      <div className="bg-echo-navy rounded-2xl p-5 max-w-sm w-full shadow-2xl flex flex-col gap-3 text-center" onClick={(e) => e.stopPropagation()}>
+        <div className="text-lg font-black text-echo-cyan">🚀 ระบบขีปนาวุธ</div>
+        <div className="text-sm opacity-80">1 แต้ม = 1 นัด สุ่มลงฝ่ายตรงข้าม นัดละ 1 ความเสียหาย (คนละไม่เกิน 4)</div>
+        <div className="grid grid-cols-9 gap-1">
+          {Array.from({ length: 9 }, (_, i) => i + 1).map((k) => (
+            <button key={k} disabled={k > max} onClick={() => setN(k)}
+              className={`py-2 rounded-md font-black border ${n === k ? "bg-echo-hp border-white" : "bg-white/10 border-white/20"} disabled:opacity-30`}>{k}</button>
+          ))}
+        </div>
+        <button disabled={max < 1} onClick={() => onPick(n)} className="py-3 rounded-lg font-black bg-echo-hp/80 hover:bg-echo-hp border border-white/30 disabled:opacity-40">
+          ยิง {n} นัด ({n} แต้ม)
+        </button>
+        <button onClick={onClose} className="py-2 rounded-lg bg-white/10 border border-white/20 text-sm">ยกเลิก</button>
+      </div>
+    </div>
+  );
+}
+// ---------- สไตรเกอร์ ยูเรก้า: นักบินอนุมัติ "เป็นเกียรติมากครับ" (เปิดใช้ / ระเบิดทันที) ----------
+function StrikerApproveModal({ striker, onAnswer }) {
+  const detonate = striker.approval === "detonate";
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 grid place-items-center p-4">
+      <div className="bg-echo-navy rounded-2xl p-5 max-w-sm w-full shadow-2xl flex flex-col gap-3 text-center border-2 border-echo-hp">
+        <div className="text-lg font-black text-echo-hp">☢️ เป็นเกียรติมากครับ</div>
+        <div className="text-sm">
+          {detonate
+            ? <>พลปืนขอ <b>ระเบิดทันที</b> — ทุกคนรับความเสียหาย <b>{striker.honor?.power ?? 4}</b> และยูเรก้าตกรอบ</>
+            : <>พลปืนขอ <b>เปิดใช้</b> — ใช้ 12 แต้ม นับถอยหลัง 4 เทิร์นแล้วระเบิดตัวเอง (ความแรง 4 → สูงสุด 8)</>}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => onAnswer(true)} className="py-3 rounded-lg font-black bg-echo-hp/80 hover:bg-echo-hp border border-white/30">อนุมัติ</button>
+          <button onClick={() => onAnswer(false)} className="py-3 rounded-lg font-black bg-white/10 hover:bg-white/20 border border-white/25">ไม่อนุมัติ</button>
+        </div>
+        <div className="text-xs opacity-70">ไม่ตอบก่อนเปิดไพ่ = ไม่อนุมัติ (ไม่เสียแต้ม)</div>
+      </div>
+    </div>
+  );
+}
+// ---------- สไตรเกอร์ ยูเรก้า (งานช่าง): QTE ต่อสายไฟแบบ Among Us ----------
+//  คลิกสายฝั่งซ้าย แล้วคลิกขั้วฝั่งขวาสีเดียวกัน — ต่อผิดสีสายหลุดกลับ · ครบ 4 เส้นส่งผลให้ server ตรวจ (สีต้องตรง + ทันเวลา)
+const WIRE_HEX = { red: "#ef4444", blue: "#3b82f6", yellow: "#facc15", pink: "#ec4899" };
+function StrikerWirePanel({ repair }) {
+  const [links, setLinks] = useState({}); // leftIdx -> rightIdx
+  const [pick, setPick] = useState(null);
+  const [left, setLeft] = useState(repair.leftMs);
+  const sent = useRef(false);
+  useEffect(() => {
+    const end = Date.now() + repair.leftMs;
+    const t = setInterval(() => setLeft(Math.max(0, end - Date.now())), 100);
+    return () => clearInterval(t);
+  }, [repair.leftMs]);
+  const send = (pairs) => {
+    if (sent.current) return;
+    sent.current = true;
+    socket.emit("strikerRepairDone", { pairs });
+  };
+  useEffect(() => { if (left <= 0) send(null); }, [left]);
+  const connect = (ri) => {
+    if (pick == null || Object.values(links).includes(ri)) return;
+    if (repair.left[pick] !== repair.right[ri]) { setPick(null); return; } // ผิดสี — สายหลุด
+    clickSound();
+    const next = { ...links, [pick]: ri };
+    setLinks(next);
+    setPick(null);
+    if (Object.keys(next).length === repair.left.length) send(Object.entries(next).map(([l, r]) => [Number(l), r]));
+  };
+  const rowY = (i) => 30 + i * 60;
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/65 grid place-items-center select-none text-hard">
+      <div className="bg-[#1f2937] rounded-2xl p-5 border-4 border-[#4b5563] shadow-2xl">
+        <div className="text-center font-black mb-2">🔧 งานช่าง — ต่อสายไฟให้ตรงสี ({Math.ceil(left / 1000)} วิ)</div>
+        <svg width="360" height="250" className="block">
+          {Object.entries(links).map(([l, r]) => (
+            <line key={l} x1="60" y1={rowY(Number(l))} x2="300" y2={rowY(r)} stroke={WIRE_HEX[repair.left[l]]} strokeWidth="10" strokeLinecap="round" />
+          ))}
+          {repair.left.map((c, i) => (
+            <rect key={`l${i}`} x="10" y={rowY(i) - 14} width="50" height="28" rx="6" fill={WIRE_HEX[c]}
+              stroke={pick === i ? "#fff" : "#111"} strokeWidth={pick === i ? 4 : 2} className="cursor-pointer"
+              onClick={() => { if (links[i] == null) setPick(i); }} />
+          ))}
+          {repair.right.map((c, i) => (
+            <rect key={`r${i}`} x="300" y={rowY(i) - 14} width="50" height="28" rx="6" fill={WIRE_HEX[c]} stroke="#111" strokeWidth="2"
+              className="cursor-pointer" onClick={() => connect(i)} />
+          ))}
+        </svg>
+        <div className="text-xs opacity-75 text-center">คลิกสายซ้าย แล้วคลิกขั้วขวาสีเดียวกัน · สำเร็จฟื้นพลังชีวิต 2</div>
+      </div>
+    </div>
+  );
+}
+
 // ---------- Recruit: QTE คลิกจุดแดง ----------
 //  dots = จุดทั้งหมดขึ้นพร้อมกันตามตำแหน่งที่ server สุ่มให้ · chase = จุดเดียววิ่งสุ่มไปทั่วจอ (เส้นทางสุ่มฝั่ง client)
 //  คลิกแต่ละจุดส่ง recruitQteHit ไปให้ server นับ (server เป็นคนตัดสินเวลา) · หมดเวลาแจ้ง recruitQteDone ให้ server ตรวจซ้ำ
@@ -3890,7 +4002,7 @@ export default function Game(props) {
     </OrtLostTierContext.Provider>
   );
 }
-function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, roster = [] }) {
+function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, roster = [], pairRole = null }) {
   const [skillOpen, setSkillOpen] = useState(false);
   const [showChar, setShowChar] = useState(false);
   const [flash, setFlash] = useState(null); // สกิลช่วงจั่วการ์ด เด้งทันทีบนกระดาน
@@ -3923,6 +4035,7 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
   const [bylethInfoOpen, setBylethInfoOpen] = useState(false);     // ไบเลธ: หน้าต่างอ่านผลของหลักสูตรที่เปิดอยู่ (ทุกคนเปิดได้)
   const [bylethSwordOpen, setBylethSwordOpen] = useState(false);   // ไบเลธ: หน้าต่างเลือกแบบของ "ดาบต้องสาป"
   const [bylethCourseOpen, setBylethCourseOpen] = useState(false);  // ไบเลธ: หน้าต่างเลือกหลักสูตรของท่าไม้ตาย
+  const [strikerMissileOpen, setStrikerMissileOpen] = useState(false); // สไตรเกอร์: หน้าต่างเลือกจำนวนขีปนาวุธ
   const [recruitSel, setRecruitSel] = useState(null);   // Recruit: โหมดเลือกเป้าก่อน QTE ("basic" | "ultimate" | null)
   const [recruitPicks, setRecruitPicks] = useState([]); // Recruit: เป้าที่เลือกไปแล้วของนัดหลัง QTE (FAMAS เลือก 2 คน)
   const [recruitPrepOpen, setRecruitPrepOpen] = useState(false); // Recruit: หน้าต่างสกิลพิเศษ "เตรียมตัว"
@@ -3991,7 +4104,13 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
   const slots = raid ? raidSlots(seatOthers.length)
     : invader ? (ORT_SIDE_SLOTS[Math.min(seatOthers.length, 6)] || [])
     : (SLOTS[Math.min(others.length, 6)] || []);
-  const iAmAttacker = phase === "ATTACK" && state.attackerId === state.youId;
+  // สไตรเกอร์ ยูเรก้า (ตัวละครคู่): เครื่องนี้บังคับส่วนไหน — นักบิน (จั่ว/เปิดการ์ด/โจมตี/ซ่อม) · พลปืน (สกิล/ร้านค้า/ไอเทม)
+  const meRec = state.players.find((pl) => pl.id === state.youId);
+  const isPairChar = !!meRec?.pair && !!pairRole;
+  const pairPilot = !isPairChar || pairRole === "pilot";
+  const pairGunner = !isPairChar || pairRole === "gunner";
+  const pilotAway = isPairChar && !!meRec.pair.pilot && !meRec.pair.pilot.connected; // นักบินหลุด: พลปืนเปิดการ์ดแทนได้
+  const iAmAttacker = phase === "ATTACK" && state.attackerId === state.youId && pairPilot;
   const attacker = state.players.find((p) => p.id === state.attackerId);
   const rankedTiers = rankTiers(state.players);
   const summaryWinners = rankedTiers[0]?.players || [];
@@ -4174,6 +4293,12 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
   const recruitBasicLocked = isRecruit && (recruitBusy || (recruitCd.basic || 0) > 0 || recruitBullets < 3);
   const recruitSecLocked = isRecruit && (recruitBusy || (recruitCd.secondary || 0) > 0 || recruitBullets < 6);
   const recruitUltLocked = isRecruit && (recruitBusy || (recruitCd.ultimate || 0) > 0 || recruitBullets < 6);
+  // สไตรเกอร์ ยูเรก้า: สกิลเป็นของพลปืน · รออนุมัติ = กดอะไรไม่ได้ · นับถอยหลังระเบิด = กดได้แค่ท่าไม้ตายซ้ำ
+  const isStriker = ch?.id === "striker";
+  const st = (isStriker && me?.striker) || {};
+  const strikerBasicLocked = isStriker && (!!st.approval || !!st.honor);
+  const strikerSecLocked = isStriker && (!!st.approval || !!st.honor || !!st.fist);
+  const strikerUltLocked = isStriker && (!!st.approval || (st.reactor && !st.honor && (me?.skillPoints || 0) < 12));
   // ผู้วิงวอน: โควตาสกิล 2 ครั้ง/เทิร์น (ล็อกทุกช่องพร้อมกันเมื่อครบ) + คูลดาวน์ท่าไม้ตาย 6 เทิร์น
   const isSup = ch?.id === "the_supplicant";
   const supBudgetLocked = isSup && (me?.supSkillUses || 0) >= (me?.supSkillMax || 2);
@@ -4383,6 +4508,8 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
     // อุซากิ: สกิลพื้นฐานเปิดหน้าต่างเลือกไอเทมที่จะกิน / สกิลรองเข้าโหมดเลือกเป้าหมาย
     if (tier === "basic" && ch?.id === "usagi") { setUsagiItemOpen(true); setSkillOpen(false); return; }
     if (tier === "secondary" && ch?.id === "usagi") { setUsagiSel(true); setSkillOpen(false); return; }
+    // สไตรเกอร์ ยูเรก้า: ระบบขีปนาวุธ เลือกจำนวนนัดก่อน (เป็นเกียรติมากครับ ส่งคำขออนุมัติตรงๆ)
+    if (tier === "ultimate" && ch?.id === "striker" && !me?.striker?.reactor) { setStrikerMissileOpen(true); setSkillOpen(false); return; }
     // Recruit: Desert Eagle / Barrett เลือกเป้าก่อน แล้ว server เปิด QTE ให้ · FAMAS กดแล้วเล่น QTE เลย
     if ((tier === "basic" || tier === "ultimate") && ch?.id === "recruit") { setRecruitSel(tier); setSkillOpen(false); return; }
     if (tier === "secondary" && ch?.id === "appleguy") { setAppleSel(true); setSkillOpen(false); return; }
@@ -4783,9 +4910,10 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
     if (usagiSel && (phase !== "PLAYING" || done)) setUsagiSel(false);
     if (recruitSel && (phase !== "PLAYING" || done)) setRecruitSel(null);
     if (recruitPrepOpen && (phase !== "PLAYING" || done)) setRecruitPrepOpen(false);
+    if (strikerMissileOpen && (phase !== "PLAYING" || done)) setStrikerMissileOpen(false);
     if (!me?.recruitPick && recruitPicks.length) setRecruitPicks([]);
     if (usagiItemOpen && (phase !== "PLAYING" || done)) setUsagiItemOpen(false);
-  }, [usagiSel, usagiItemOpen, recruitSel, recruitPrepOpen, recruitPicks.length, me?.recruitPick, phase, done]);
+  }, [usagiSel, usagiItemOpen, recruitSel, recruitPrepOpen, strikerMissileOpen, recruitPicks.length, me?.recruitPick, phase, done]);
   useEffect(() => {
     if (danSel && (phase !== "PLAYING" || me?.skillUsed || done)) setDanSel(null);
   }, [danSel, phase, me?.skillUsed, done]);
@@ -5366,6 +5494,9 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
       {/* QTE (ยุย) — ลอยกลางจอ ไม่บังกองการ์ด */}
       {me?.qte && <QtePanel key={me.qte.idx} qte={me.qte} />}
       {me?.usagiQuiz && <UsagiQuizPanel key={`${me.usagiQuiz.idx}-${me.usagiQuiz.q}`} quiz={me.usagiQuiz} />}
+      {strikerMissileOpen && me && <StrikerMissileModal me={me} onPick={(n) => { clickSound(); socket.emit("useSkill", { tier: "ultimate", item: n }); setStrikerMissileOpen(false); }} onClose={() => { clickSound(); setStrikerMissileOpen(false); }} />}
+      {me?.striker?.approval && pairPilot && phase === "PLAYING" && <StrikerApproveModal striker={me.striker} onAnswer={(accept) => { clickSound(); socket.emit("strikerApprove", { accept }); }} />}
+      {me?.strikerRepair && pairPilot && <StrikerWirePanel key={me.strikerRepair.left.join("")} repair={me.strikerRepair} />}
       {me?.recruitQte && <RecruitQtePanel key={me.recruitQte.dots.map((d) => d.id).join("")} qte={me.recruitQte} lowQ={lowQ} />}
       {recruitPrepOpen && me && <RecruitPrepModal me={me} onPick={(kind) => { clickSound(); socket.emit("recruitPrep", { kind }); setRecruitPrepOpen(false); }} onClose={() => { clickSound(); setRecruitPrepOpen(false); }} />}
       {me?.usagiSwapOffer && <UsagiSwapModal offer={me.usagiSwapOffer} />}
@@ -5676,7 +5807,7 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
                   //  ด้วยไอคอน ตัวเลข และรูปทรงช่อง ไม่ต้องอาศัยสีอย่างเดียวเหมือนเกจแบบก่อน
                   <div className="self-vitals mt-1.5">
                     <StatRow big kind="hp" value={me.hp} max={me.maxHp} extra={me.tempHp || 0} extraLabel="เลือดชั่วคราว" />
-                    <StatRow big kind="ar" value={me.armor} max={me.maxArmor} extra={me.supFaith || 0} extraLabel="เกราะศรัทธา" />
+                    <StatRow big kind="ar" value={me.armor} max={me.maxArmor} extra={me.supFaith || 0} extraLabel="เกราะศรัทธา" tone={armorToneOf(me)} />
                     <VitalExtras p={me} className="pc-extra-inline" />
                   </div>
                 )}
@@ -5750,7 +5881,7 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
               {/* ปุ่มจั่ว/เปิดไพ่ — ย้ายมาไว้ใต้การ์ดแล้ว */}
               <div className="flex gap-2 mt-2">
                 <button
-                  disabled={state.deckEmpty || !(phase === "PLAYING" && me.alive && !done) || me.atCap || noDraw || shCharging || rgCharging || phenexTaunting || tepeuPonderLocked || frozenByClockUp || !!me.kimNoDraw}
+                  disabled={state.deckEmpty || !(phase === "PLAYING" && me.alive && !done) || me.atCap || noDraw || shCharging || rgCharging || phenexTaunting || tepeuPonderLocked || frozenByClockUp || !!me.kimNoDraw || !pairPilot}
                   onClick={() => { clickSound(); socket.emit("hit"); }}
                   className="p-hs-action p-hs-action-draw w-28 sm:w-32 h-14 sm:h-16 flex items-center justify-center gap-2 disabled:opacity-35 disabled:cursor-not-allowed"
                   title="จั่วการ์ด"
@@ -5759,7 +5890,7 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
                   <span className="text-xs font-black text-echo-cyan" style={{ fontFamily: P_DISPLAY }}>จั่ว</span>
                 </button>
                 <button
-                  disabled={!(phase === "PLAYING" && me.alive && !done) || frozenByClockUp}
+                  disabled={!(phase === "PLAYING" && me.alive && !done) || frozenByClockUp || (!pairPilot && !pilotAway)}
                   onClick={() => { clickSound(); socket.emit("lock"); }}
                   className="p-hs-action p-hs-action-reveal w-28 sm:w-32 h-14 sm:h-16 flex items-center justify-center gap-2 disabled:opacity-35 disabled:cursor-not-allowed"
                   title="เปิดไพ่"
@@ -5776,13 +5907,13 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
               <div className="flex flex-col items-center gap-1.5">
                 <div className="flex items-end gap-2 sm:gap-3">
                   <div className="w-40 sm:w-48">
-                    <SkillSlot size="lg" label="พื้นฐาน" tier="basic" skill={ch?.basic} points={me.skillPoints} disabled={!me.alive || phase !== "PLAYING" || (!isHisakawa && (done || noSkill || moonCellOn)) || hisakawaSwitchLocked || miyakoHealPending || hakunoSecondaryPending || beatBasicLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || witchMarkCooldown || (me.skillUsed && !gambleRepeat && !isByleth && !isHaruka && !isApple && !isMuimi && !isBard && !isTohno && !isHakuno && !isDoomguy && !isKai && !isTakumi && !isHisakawa && !isSup && !isBrian && !isLumi && !isCay && !isDaichi) || harukaBasicLocked || muimiBasicLocked || bylethBasicLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || cassiusLocked || daisukeBasicLocked || frozenByClockUp || ktBasicLocked || (isHakuno && me.hakunoGenderSwitched) || doomBasicLocked || takutoBasicPending || tepeuCookLocked || tepeuPonderLocked || psBladeLocked || ippoBasicCd > 0 || supBudgetLocked || arjunaBasicLocked || connorPredictLocked || lumiBasicLocked || cayBasicLocked || daichiBasicLocked || kimBasicCd > 0 || recruitBasicLocked} onUse={requestSkillUse} cooldown={witchMarkCd || ippoBasicCd || kimBasicCd || recruitCd.basic} ammo={isGambler ? me.gamblerUses : isMuimi ? me.muimiEmergencyUses : undefined} cost={isGambler && goldenOn ? halfCost(ch?.basic) : undefined} />
+                    <SkillSlot size="lg" label="พื้นฐาน" tier="basic" skill={ch?.basic} points={me.skillPoints} disabled={!me.alive || phase !== "PLAYING" || (!isHisakawa && (done || noSkill || moonCellOn)) || hisakawaSwitchLocked || miyakoHealPending || hakunoSecondaryPending || beatBasicLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || witchMarkCooldown || (me.skillUsed && !gambleRepeat && !isByleth && !isHaruka && !isApple && !isMuimi && !isBard && !isTohno && !isHakuno && !isDoomguy && !isKai && !isTakumi && !isHisakawa && !isSup && !isBrian && !isLumi && !isCay && !isDaichi && !isStriker) || harukaBasicLocked || muimiBasicLocked || bylethBasicLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || cassiusLocked || daisukeBasicLocked || frozenByClockUp || ktBasicLocked || (isHakuno && me.hakunoGenderSwitched) || doomBasicLocked || takutoBasicPending || tepeuCookLocked || tepeuPonderLocked || psBladeLocked || ippoBasicCd > 0 || supBudgetLocked || arjunaBasicLocked || connorPredictLocked || lumiBasicLocked || cayBasicLocked || daichiBasicLocked || kimBasicCd > 0 || recruitBasicLocked || strikerBasicLocked || !pairGunner} onUse={requestSkillUse} cooldown={witchMarkCd || ippoBasicCd || kimBasicCd || recruitCd.basic} ammo={isGambler ? me.gamblerUses : isMuimi ? me.muimiEmergencyUses : undefined} cost={isGambler && goldenOn ? halfCost(ch?.basic) : undefined} />
                   </div>
                   <div className="w-40 sm:w-48">
-                    <SkillSlot size="lg" label="รอง" tier="secondary" skill={ch?.secondary} points={me.skillPoints} disabled={done || phase !== "PLAYING" || noSkill || moonCellOn || miyakoComboPending || hakunoSecondaryPending || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || (me.skillUsed && !isByleth && !isBard && !isDoomguy && !isKai && !isTakumi && !isSup) || bylethSecLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || ohgerLocked || lanLocked || ktSecLocked || daisukeSecLocked || (frozenByClockUp && !dai) || skSecLocked || banagherAssaultLocked || doomNoEffectLocked || takutoSecPending || takutoNotApprivoiseLocked || monsterMe || tepeuPonderLocked || tepeuCookLocked || batKarmaLocked || psSealLocked || harukaSecLocked || muimiSecLocked || burdenCooldown || ippoSecCd > 0 || supBudgetLocked || arjunaSecLocked || brianSecLocked || lumiSecLocked || caySecLocked || daichiSecLocked || kimSecCd > 0 || recruitSecLocked} onUse={requestSkillUse} cooldown={burdenCd || ippoSecCd || kimSecCd || recruitCd.secondary} ammo={isApple ? me.appleGiveUses : isCay ? cayState.ammo : me.beamAmmo} cost={isGambler && goldenOn ? halfCost(ch?.secondary) : undefined} />
+                    <SkillSlot size="lg" label="รอง" tier="secondary" skill={ch?.secondary} points={me.skillPoints} disabled={done || phase !== "PLAYING" || noSkill || moonCellOn || miyakoComboPending || hakunoSecondaryPending || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || (me.skillUsed && !isByleth && !isBard && !isDoomguy && !isKai && !isTakumi && !isSup) || bylethSecLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || ohgerLocked || lanLocked || ktSecLocked || daisukeSecLocked || (frozenByClockUp && !dai) || skSecLocked || banagherAssaultLocked || doomNoEffectLocked || takutoSecPending || takutoNotApprivoiseLocked || monsterMe || tepeuPonderLocked || tepeuCookLocked || batKarmaLocked || psSealLocked || harukaSecLocked || muimiSecLocked || burdenCooldown || ippoSecCd > 0 || supBudgetLocked || arjunaSecLocked || brianSecLocked || lumiSecLocked || caySecLocked || daichiSecLocked || kimSecCd > 0 || recruitSecLocked || strikerSecLocked || !pairGunner} onUse={requestSkillUse} cooldown={burdenCd || ippoSecCd || kimSecCd || recruitCd.secondary} ammo={isApple ? me.appleGiveUses : isCay ? cayState.ammo : me.beamAmmo} cost={isGambler && goldenOn ? halfCost(ch?.secondary) : undefined} />
                   </div>
                   <div className="w-40 sm:w-48">
-                    {isBard ? <BardComposeSlot me={me} /> : isKai ? <KaiOverhaulSlot me={me} frozen={frozenByClockUp} /> : <SkillSlot size="lg" label="ท่าไม้ตาย" tier="ultimate" skill={ch?.ultimate} points={me.skillPoints} disabled={(done || phase !== "PLAYING" || noSkill || moonCellOn || beatMe || (me.skillUsed && !isByleth && !isSup && !isBrianN2O) || bylethUltLocked || bylethBudgetLocked || ultimateActive || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || takumiBudgetLocked || monsterMe || fourthLocked || doomUltLocked || takutoUltLockedNow || tepeuCookLocked || tepeuPonderLocked || offerLocked || ktUltLocked || shUltLocked || shCharging || rgCharging || phenexTaunting || shidoUltLocked || daisukeUltLocked || frozenByClockUp || eijiUltLocked || muimiUltLocked || ippoUltLocked || supBudgetLocked || supUltCd > 0 || arjunaUltCd > 0 || brianUltLocked || lumiUltLocked || cayUltLocked || daichiUltLocked || kimUltLocked || recruitUltLocked)} onUse={requestSkillUse} ammo={isCay ? cayState.ammo : undefined} cooldown={shidoUltCd || eijiUltCd || muimiUltCd || ippoUltCd || supUltCd || arjunaUltCd || kimUltCd || recruitCd.ultimate} cost={undefined} />}
+                    {isBard ? <BardComposeSlot me={me} /> : isKai ? <KaiOverhaulSlot me={me} frozen={frozenByClockUp} /> : <SkillSlot size="lg" label="ท่าไม้ตาย" tier="ultimate" skill={ch?.ultimate} points={me.skillPoints} disabled={(done || phase !== "PLAYING" || noSkill || moonCellOn || beatMe || (me.skillUsed && !isByleth && !isSup && !isBrianN2O) || bylethUltLocked || bylethBudgetLocked || ultimateActive || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || takumiBudgetLocked || monsterMe || fourthLocked || doomUltLocked || takutoUltLockedNow || tepeuCookLocked || tepeuPonderLocked || offerLocked || ktUltLocked || shUltLocked || shCharging || rgCharging || phenexTaunting || shidoUltLocked || daisukeUltLocked || frozenByClockUp || eijiUltLocked || muimiUltLocked || ippoUltLocked || supBudgetLocked || supUltCd > 0 || arjunaUltCd > 0 || brianUltLocked || lumiUltLocked || cayUltLocked || daichiUltLocked || kimUltLocked || recruitUltLocked || strikerUltLocked || !pairGunner)} onUse={requestSkillUse} ammo={isCay ? cayState.ammo : undefined} cooldown={shidoUltCd || eijiUltCd || muimiUltCd || ippoUltCd || supUltCd || arjunaUltCd || kimUltCd || recruitCd.ultimate} cost={undefined} />}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -5811,6 +5942,21 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
                   >
                     👁️ Mystic eye — {me.nanayaEyeOn ? "เปิดอยู่" : "ปิดอยู่"}
                   </button>
+                )}
+                {isStriker && pairPilot && phase === "PLAYING" && me.alive && !done && (
+                  <button
+                    onClick={() => { clickSound(); socket.emit("strikerRepairStart"); }}
+                    disabled={(st.repairCd || 0) > 0 || !!st.repairing || frozenByClockUp}
+                    className="text-[11px] font-bold rounded-lg px-2 py-1 border bg-white/5 border-white/25 disabled:opacity-35"
+                    title="งานช่าง: ต่อสายไฟ ฟื้นพลังชีวิต 2 (เทิร์นนี้ชนะก็โจมตีไม่ได้)"
+                  >
+                    🔧 ซ่อม{(st.repairCd || 0) > 0 ? ` (อีก ${st.repairCd} เทิร์น)` : ""}
+                  </button>
+                )}
+                {isPairChar && (
+                  <span className="text-[11px] font-bold rounded-lg px-2 py-1 border border-white/25 bg-black/30">
+                    {pairRole === "pilot" ? "🃏 คุณคือนักบิน" : "🎯 คุณคือพลปืน"}{pilotAway && pairRole === "gunner" ? " · นักบินหลุด: เปิดการ์ดแทนได้" : ""}
+                  </span>
                 )}
                 {isRecruit && phase === "PLAYING" && me.alive && !done && (
                   <button

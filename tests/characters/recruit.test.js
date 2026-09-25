@@ -60,7 +60,7 @@ test('ข้อมูล: พลังชีวิต 5 · เกราะ 2 · 
   assert.equal(R.recruit.bullets, 6);
 });
 
-test('[Armor]: การโจมตีปกติชนเกราะถูกกันทั้งหมัด · ครบ 2 ครั้งเกราะ -1 · ไม่ฟื้นเอง', () => {
+test('[Armor]: ความเสียหายทุกชนิดถูกกันทั้งก้อน · ครบ 2 ครั้งเกราะ -1', () => {
   const { R } = setup();
   R.armor = 2;
   startAttack('T', 'R');
@@ -72,9 +72,58 @@ test('[Armor]: การโจมตีปกติชนเกราะถู�
   assert.equal(R.armor, 1, 'ครบ 2 ครั้ง เกราะ -1');
   assert.equal(R.hp, 5);
   assert.equal(recruit.blocksArmorRegen(R), true);
-  engine.dealMixed(R, 2); // ดาเมจจากสกิลกินเกราะตามปกติ
-  assert.equal(R.armor, 0);
-  assert.equal(R.hp, 4);
+  engine.dealMixed(R, 3); // ดาเมจจากสกิลก็ถูกกันทั้งก้อนเหมือนกัน
+  assert.equal(R.armor, 1);
+  assert.equal(R.hp, 5);
+  engine.dealMixed(R, 3);
+  assert.equal(R.armor, 0, 'ครั้งที่ 2 เกราะ -1');
+  assert.equal(R.hp, 5);
+  engine.dealMixed(R, 2); // เกราะหมดแล้ว = เข้าเลือดตามปกติ
+  assert.equal(R.hp, 3);
+});
+
+test('[Armor]: พิษ/เลือดไหลทีละติกไม่ทำเกราะหายทันที · แพ้จั่วก็นับ · เจาะเกราะข้ามเกราะ · ฟื้นไม่ได้', () => {
+  const { R } = setup();
+  R.armor = 2;
+  R.statuses.poison = 3;
+  engine.tickPoison(engine, R); // บั๊กเดิม: พิษติกเดียวเกราะหาย 1 ทันที
+  assert.equal(R.armor, 2, 'ติกแรกเกราะรับไว้ทั้งก้อน');
+  engine.tickPoison(engine, R);
+  assert.equal(R.armor, 1, 'ติกที่ 2 เกราะ -1');
+  engine.damageSoft(R); // แพ้จั่ว
+  assert.equal(R.armor, 1);
+  assert.equal(R.hp, 5);
+  engine.dealDirect(R, 2); // เจาะเกราะ
+  assert.equal(R.hp, 3);
+  assert.equal(R.armor, 1);
+  assert.equal(engine.healArmor(R, 1), 0, 'ฟื้นเกราะจากแหล่งอื่นไม่ได้');
+  assert.equal(R.armor, 1);
+});
+
+test('[Armor]: นับเป็นจำนวนครั้ง ไม่สนความแรง — ทุกแหล่งดาเมจ/ล้างเกราะ ครั้งเดียวไม่ทำให้เกราะหาย', () => {
+  const U = require('../../characters/_universal_status');
+  const daisuke = require('../../characters/daisuke.js');
+  const sources = {
+    'ลุกไหม้': (R) => { R.statuses.hburn = 3; U.tickBurn(engine, R); },
+    'เลือดไหล': (R) => { R.statuses.hbleed = 3; U.tickBleed(engine, R); },
+    'พิษร้าย': (R) => { R.statuses.poison = 3; engine.tickPoison(engine, R); },
+    '[โดนดูด] DoomGuy': (R) => { R.statuses.doomDrain = 3; engine.CHAR_HOOKS.doomguy.tickDrain(engine, R); },
+    'สกิลแรง 6': (R) => engine.dealMixed(R, 6),
+    'ดาเมจเกราะอย่างเดียว': (R) => engine.dealArmorOnly(R, 3),
+    'แพ้จั่ว': (R) => engine.damageSoft(R),
+    'Rider Shooting ล้างเกราะ': (R) => { const a = { characterId: 'daisuke', daisukeRider: true, name: 'D' }; daisuke.stripArmorOnAttack(engine, a, R); },
+  };
+  for (const [label, hit] of Object.entries(sources)) {
+    const { R } = setup();
+    R.armor = 2;
+    hit(R);
+    assert.equal(R.armor, 2, `${label}: ครั้งแรกเกราะรับไว้ทั้งก้อน`);
+    assert.equal(R.hp, 5, `${label}: ไม่เข้าเลือด`);
+    assert.equal(R.recruit.armorHits, 1, `${label}: นับ 1 ครั้ง`);
+    hit(R);
+    assert.equal(R.armor, 1, `${label}: ครั้งที่ 2 เกราะ -1 (ไม่ว่าแรงแค่ไหน)`);
+    assert.equal(R.hp, 5, `${label}: ยังไม่เข้าเลือด`);
+  }
 });
 
 test('โจมตีปกติ: QTE 7 จุด โดน 6 = ยิงโดน 1 กระสุน -1 · โดน 5 = พลาด กระสุน -2', () => {

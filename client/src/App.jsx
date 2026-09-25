@@ -45,6 +45,9 @@ export default function App() {
   const prevGameStateRef = useRef(null);
   const [roster, setRoster] = useState([]);
   const [takenChars, setTakenChars] = useState([]); // ตัวละคร unique ที่มีคนเลือกไปแล้ว (คอนเนอร์ RK800)
+  // สไตรเกอร์ ยูเรก้า (ตัวละครคู่): ช่องคู่หูที่ยังว่าง (หน้าเลือกตัวละคร) + บทบาทของเครื่องนี้ ("pilot" | "gunner" | null)
+  const [pairSlots, setPairSlots] = useState([]);
+  const [pairRole, setPairRole] = useState(null);
   const [taken, setTaken] = useState([]);
   const [name, setName] = useState("");
   const [position, setPosition] = useState(null);
@@ -123,6 +126,15 @@ export default function App() {
     const onRoster = (r) => setRoster(r);
     const onPositions = (t) => setTaken(t);
     const onTakenChars = (list) => setTakenChars(Array.isArray(list) ? list : []);
+    const onPairSlots = (list) => setPairSlots(Array.isArray(list) ? list : []);
+    const onPairRole = ({ role } = {}) => setPairRole(role || null);
+    // ช่องคู่หูถูกคนอื่นรับไปก่อน (กดพร้อมกัน) -> กลับไปเลือกใหม่
+    const onPairTaken = () => {
+      curtainRef.current?.release();
+      navLockRef.current = false;
+      alert("ช่องคู่หูถูกผู้เล่นอื่นรับไปแล้ว — เลือกตัวใหม่นะ");
+      setStage("character");
+    };
     // ตัวละครที่เลือกได้คนเดียวต่อเกมถูกคนอื่นชิงไปก่อน (กดพร้อมกันเป๊ะ) -> กลับไปเลือกใหม่
     const onCharTaken = ({ name } = {}) => {
       alert(`${name || "ตัวละครนี้"} ถูกผู้เล่นอื่นเลือกไปแล้ว (เลือกได้ 1 คนต่อเกม) — เลือกตัวใหม่นะ`);
@@ -145,6 +157,7 @@ export default function App() {
     const onSessionExpired = () => {
       saveSessionToken(null);
       setState(null);
+      setPairRole(null);
       setStage((current) => current === 'connected' ? 'setup' : current);
     };
     const onSessionInUse = () => console.warn('This game session is already connected in another tab.');
@@ -171,6 +184,9 @@ export default function App() {
     socket.on("roster", onRoster);
     socket.on("positions", onPositions);
     socket.on("takenChars", onTakenChars);
+    socket.on("pairSlots", onPairSlots);
+    socket.on("pairRole", onPairRole);
+    socket.on("pairTaken", onPairTaken);
     socket.on("characterTaken", onCharTaken);
     socket.on("joined", onJoined);
     socket.on('connect', onConnect);
@@ -188,6 +204,9 @@ export default function App() {
       socket.off("roster", onRoster);
       socket.off("positions", onPositions);
       socket.off("takenChars", onTakenChars);
+      socket.off("pairSlots", onPairSlots);
+      socket.off("pairRole", onPairRole);
+      socket.off("pairTaken", onPairTaken);
       socket.off("characterTaken", onCharTaken);
       socket.off("joined", onJoined);
       socket.off('connect', onConnect);
@@ -279,10 +298,13 @@ export default function App() {
     if (navLockRef.current) return;
     navLockRef.current = true;
     curtainRef.current?.holdCover("forward");
+    // สไตรเกอร์ ยูเรก้า: เข้าร่วมเป็นคู่หูของตัวละครคู่ที่รออยู่ (ไม่ใช้ที่นั่งของตัวเอง)
+    if (extra && extra.copilot) { socket.emit("joinCopilot", { name, characterId }); return; }
     socket.emit("join", { name, position, color, characterId, ...(extra || {}) });
   };
   const leaveLobby = () => {
     saveSessionToken(null);
+    setPairRole(null);
     socket.emit('leave');
     setState(null);
     setStage('character');
@@ -330,6 +352,7 @@ export default function App() {
       <CharacterSelect
         roster={roster}
         takenChars={takenChars}
+        pairSlots={pairSlots}
         position={position}
         color={color}
         name={name}
@@ -355,6 +378,7 @@ export default function App() {
         onToggleLowQ={toggleLowQ}
         skillConfirmOn={skillConfirmOn}
         onToggleSkillConfirm={toggleSkillConfirm}
+        pairRole={pairRole}
         onBack={() => navigate("character", () => leaveLobby())}
       />
     );
@@ -381,7 +405,7 @@ export default function App() {
     screen = <SeraphGame state={state} lowQ={lowQ} skillConfirmOn={skillConfirmOn} />;
     screenKey = "game";
   } else {
-    screen = <Game state={state} lowQ={lowQ} skillConfirmOn={skillConfirmOn} roster={roster} />;
+    screen = <Game state={state} lowQ={lowQ} skillConfirmOn={skillConfirmOn} roster={roster} pairRole={pairRole} />;
     screenKey = "game";
   }
 
