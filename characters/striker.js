@@ -18,7 +18,7 @@
 //  สกิลติดตัว Mark 5: หลบ 5% · พลังโจมตีพื้นฐาน 2 · ยังมีเกราะ = แต้มสกิล +1 ต่อเทิร์น
 //  สกิลติดตัว เตาปฏิกรณ์นิวเคลียร์: พลังชีวิต <= 7 ท่าไม้ตายเปลี่ยนเป็นท่า 2 (วีดีโอครั้งแรกครั้งเดียว)
 //    + ถูกโจมตีปกติ 15% แทงสวนด้วยพลังโจมตีปกติขณะนั้น
-//  สกิลติดตัว งานช่าง: QTE ต่อสายไฟ สำเร็จฟื้นพลังชีวิต 2 · ซ่อมแล้วเทิร์นนั้นชนะก็โจมตีไม่ได้ · คูลดาวน์ 2 เทิร์น
+//  สกิลติดตัว งานช่าง: QTE ต่อสายไฟ สำเร็จฟื้นพลังชีวิต 3 + เกราะ 1 · ซ่อมแล้วเทิร์นนั้นชนะก็โจมตีไม่ได้ · คูลดาวน์ 2 เทิร์น
 //  สกิลติดตัว อาศัยจังหวะ (โหมดทีมเท่านั้น): ฝั่งตรงข้ามตีแล้ว 15% ได้โจมตีปกติตาม
 // ============================================================
 
@@ -41,7 +41,8 @@ const HONOR_COST = 12;
 const HONOR_BASE = 4;
 const HONOR_MAX = 8;
 const HONOR_TURNS = 4;
-const REPAIR_HEAL = 2;
+const REPAIR_HEAL = 3;
+const REPAIR_ARMOR = 1;
 const REPAIR_COOLDOWN = 2;
 const REPAIR_MS = 10000;
 const REPAIR_GRACE_MS = 500;
@@ -101,7 +102,7 @@ module.exports = {
   IMG, VIDEO, SFX,
   MAX_HP: STRIKER_MAX_HP, MAX_ARMOR: STRIKER_MAX_ARMOR, MAX_SKILL: STRIKER_MAX_SKILL,
   BASE_ATK, KNIFE_ATK, DODGE_PCT, REACTOR_HP, COUNTER_CHANCE, MISSILE_MAX, MISSILE_CAP_PER_TARGET,
-  HONOR_COST, HONOR_BASE, HONOR_MAX, HONOR_TURNS, REPAIR_HEAL, REPAIR_COOLDOWN, REPAIR_MS, WIRE_COLORS, TIMING_CHANCE,
+  HONOR_COST, HONOR_BASE, HONOR_MAX, HONOR_TURNS, REPAIR_HEAL, REPAIR_ARMOR, REPAIR_COOLDOWN, REPAIR_MS, WIRE_COLORS, TIMING_CHANCE,
 
   maxHp() { return STRIKER_MAX_HP; },
   maxArmor() { return STRIKER_MAX_ARMOR; },
@@ -420,7 +421,8 @@ module.exports = {
       && pairs.every((x) => Array.isArray(x) && r.left[x[0]] && r.left[x[0]] === r.right[x[1]]);
     if (!ok) { engine.log(`🔧 ${p.name} ต่อสายไฟไม่สำเร็จ — ซ่อมไม่ได้`); return false; }
     const healed = engine.healHp(p, REPAIR_HEAL);
-    engine.log(`🔧 ${p.name} ซ่อมสำเร็จ — ฟื้นพลังชีวิต +${healed}`);
+    const armored = engine.healArmor(p, REPAIR_ARMOR);
+    engine.log(`🔧 ${p.name} ซ่อมสำเร็จ — ฟื้นพลังชีวิต +${healed} · เกราะ +${armored}`);
     return true;
   },
 

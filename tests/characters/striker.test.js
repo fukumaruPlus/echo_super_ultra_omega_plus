@@ -208,15 +208,17 @@ test('Mark 5: หลบ 5% · ยังมีเกราะฟื้นแต�
   void T;
 });
 
-test('งานช่าง: ต่อสายถูกฟื้นเลือด 2 · ผิดไม่ได้ · เทิร์นที่ซ่อมชนะก็โจมตีไม่ได้ · คูลดาวน์ 2 เทิร์น', () => {
+test('งานช่าง: ต่อสายถูกฟื้นเลือด 3 + เกราะ 1 · ผิดไม่ได้ · เทิร์นที่ซ่อมชนะก็โจมตีไม่ได้ · คูลดาวน์ 2 เทิร์น', () => {
   const { S } = setup();
   S.hp = 5;
   strikerRepairStart('S');
   const r = S.striker.repair;
   assert.ok(r);
   const good = r.left.map((c, i) => [i, r.right.indexOf(c)]);
+  S.armor = 0;
   strikerRepairDone('S', good);
-  assert.equal(S.hp, 7);
+  assert.equal(S.hp, 8, 'ฟื้นพลังชีวิต 3');
+  assert.equal(S.armor, 1, 'และเกราะ 1');
   assert.equal(striker.cannotAttack(engine, S), true);
   assert.equal(striker.repairCooldown(engine, S), 3, 'รอ 2 เทิร์นเต็มนับจากเทิร์นหน้า');
   strikerRepairStart('S');
@@ -227,5 +229,5 @@ test('งานช่าง: ต่อสายถูกฟื้นเลือ
   const r2 = S.striker.repair;
   const bad = r2.left.map((c, i) => [i, (r2.right.indexOf(c) + 1) % 4]);
   strikerRepairDone('S', bad);
-  assert.equal(S.hp, 7, 'ต่อผิดสีไม่ฟื้น');
+  assert.equal(S.hp, 8, 'ต่อผิดสีไม่ฟื้น');
 });

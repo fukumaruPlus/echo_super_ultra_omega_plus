@@ -7,24 +7,27 @@
 //      30+ สร้างความเสียหายแล้วฟื้นพลังชีวิต +1 · 55+ เลือดไหล/เหน็บชาที่มอบให้คนอื่น +1 เทิร์น
 //      80+ พลังโจมตี +1 · ถูกโจมตีฟื้นแต้มสกิล +1 · เข้าร่าง Awake (วีดีโอครั้งเดียว + เพลงค้าง + ท่าไม้ตายเป็นท่า 2)
 //      100 สร้างความเสียหายแล้วฟื้นพลังชีวิตเพิ่มอีก +1
-//    Poise 0/50 — 1 หน่วย = คริติคอล 1.2% (สูงสุด 60%) ×2 · คริติคอลเมื่อไหร่ -15 · ทุก 5 เทิร์นลด 2-5
+//    Poise 0/50 — 1 หน่วย = คริติคอล 1.2% (สูงสุด 60%) ×2 · คริติคอลเมื่อไหร่ -15 · ทุก 3 เทิร์นลด 2-5
+//      โจมตีปกติ (โดนหรือถูกหลบ) ได้ Poise +1-4
 //
 //  สกิลติดตัว ฝักดาบที่เต็มไปด้วยความขุ่นเคือง
 //    - Resentment: ความเสียหายที่มากกว่าพลังชีวิตที่เหลือ -> ค้างที่ 1 (ครั้งเดียวต่อเกม — ดักที่ instantDeath)
-//    - โยนเหรียญทุกต้นเทิร์น หัว/ก้อย 50/50 — เสียพลังชีวิตไปทุก 1 หน่วย ก้อย +5%
+//    - โยนเหรียญทุกต้นเทิร์น หัว/ก้อย 50/50 — เสียพลังชีวิตไปทุก 1 หน่วย ก้อย +3%
 //        ก้อย: พลังชีวิต <= 5 เกราะ +1 · >= 5 Poise +1-3   (ที่ 5 พอดีได้ทั้งคู่ตามตัวอักษรสเปค)
 //        หัว:  พลังชีวิต <= 4 คริติคอล +15% ทั้งเทิร์น · >= 5 แต้มสกิล +1
 //    - มี Yield My Flesh + To Claim Their Bones พร้อมกัน -> รวมเป็น Yield My Flesh To Claim Their Bones
 //
 //  สกิลพื้นฐาน ชักดาบ (3 · คูลดาวน์ 2) — การโจมตีปกติครั้งถัดไปที่โดน: Poise +2-5 + เลือดไหล/เหน็บชา 1 เทิร์น
-//  สกิลรอง ฟาดฟันลง (5 · คูลดาวน์ 3) — Counter Stance 2 เทิร์น (ถูกโจมตีปกติ = สวนกลับ · คริติคอลได้)
+//  สกิลรอง ฟาดฟันลง (5 · คูลดาวน์ 3) — Counter Stance 2 เทิร์น (โดนดาเมจจากโจมตีปกติ/สกิล = สวนกลับ · คริติคอลได้)
+//    สวนกลับ "ดาเมจจากสกิล" หน่วงไว้ลงตอน flushCounters (จุดเดียวกับสวนกลับของ ORT — หลังสกิล/ไอเทม/คลิปจบ)
+//    ไม่สวนกลางท่อดาเมจของสกิลคนอื่น · ดาเมจจากสถานะ/ไอเทม/แพ้จั่วไม่นับ
 //  ท่าไม้ตาย 1 จักเฉือนเลือดเนื้อตน (7 · คูลดาวน์ 3) — หลังเปิดไพ่
 //    หัว: กดแล้วจั่วต่อไม่ได้ + แต้มกลายเป็น 0 · ก้อย: ปรับแต้มเป็น 20 (21 พอดีไม่ทำงาน)
 //    เปิดไพ่แพ้ -> To Claim Their Bones · แล้วได้ Yield My Flesh เสมอ
 //  ท่าไม้ตาย 2 ข้าจักเฉือนเลือดเนื้อตนเพื่อผ่าอัฐิศัตรู (8 + พลังชีวิต 1 · คูลดาวน์ 5) — ก่อนเปิดไพ่
 //    ก้อย: ทุกคนติดเปราะบาง 1 เทิร์น · ได้ Yield My Flesh To Claim Their Bones
 //
-//  บัพรวมร่าง (Yield My Flesh To Claim Their Bones) — อยู่จนกว่าจะถูกโจมตีปกติ:
+//  บัพรวมร่าง (Yield My Flesh To Claim Their Bones) — อยู่จนกว่าจะโดนดาเมจจากโจมตีปกติ/สกิล:
 //    ล่อเป้าทุกคน (คิว taunter เดียวกับยุย/ริต้า/แบทแมน) · ถูกตีแล้วสวน (พลังโจมตี + คริติคอล) +1
 //    และทุกคนที่เหลือโดน 1 หน่วย · ทุกคนที่โดนติดเลือดไหล + เหน็บชา · Poise +2-8
 //
@@ -52,10 +55,11 @@ const POISE_MAX = 50;
 const POISE_CRIT_PER = 1.2;     // % ต่อ 1 หน่วย
 const POISE_CRIT_CAP = 60;      // %
 const CRIT_POISE_COST = 15;
-const POISE_DECAY_EVERY = 5;
+const POISE_DECAY_EVERY = 3;
 const POISE_DECAY = [2, 5];
 const HEADS_CRIT = 15;          // % (หัว + พลังชีวิต <= 4)
-const TAILS_PER_HP = 5;         // % ก้อยเพิ่มต่อพลังชีวิตที่เสียไป 1 หน่วย
+const TAILS_PER_HP = 3;         // % ก้อยเพิ่มต่อพลังชีวิตที่เสียไป 1 หน่วย
+const ATTACK_POISE = [1, 4];    // โจมตีปกติ = Poise +1-4
 
 const DRAW_POISE = [2, 5];
 const STANCE_POISE = [1, 6];
@@ -98,6 +102,7 @@ function freshState() {
     awakeSeen: false,
     resentUsed: false,
     pendingAtk: null,      // { ref } — ออกหมัดแล้ว รอดูว่าโดนหรือถูกหลบ
+    counterQueue: [],      // id ผู้ที่ทำดาเมจจากสกิลใส่ Kim — สวนกลับตอน flushCounters
   };
 }
 
@@ -356,7 +361,10 @@ module.exports = {
       const ref = p.kim.pendingAtk.ref;
       p.kim.pendingAtk = null;
       const la = engine.lastAttack;
-      if (p.alive && la && la !== ref && la.dodge) this.addScabbard(engine, p, SCABBARD_DODGED, "เป้าหมายหลบได้");
+      if (p.alive && la && la !== ref && la.dodge) {
+        this.addScabbard(engine, p, SCABBARD_DODGED, "เป้าหมายหลบได้");
+        this.addPoise(p, rnd(ATTACK_POISE)); // ออกหมัดแล้ว (ถูกหลบ) ก็ได้ Poise
+      }
     }
   },
   applyCrit(engine, attacker, dmg, fx) {
@@ -369,6 +377,7 @@ module.exports = {
     const k = attacker.kim;
     k.pendingAtk = null;
     const fx = [];
+    this.addPoise(attacker, rnd(ATTACK_POISE)); // โจมตีปกติ = Poise +1-4
     if (dmg > 0) this.addScabbard(engine, attacker, rnd(SCABBARD_HIT_LANDED), "สร้างความเสียหาย");
     let afflicted = false;
     if (k.drawArmed) {
@@ -391,9 +400,35 @@ module.exports = {
 
   // ได้รับความเสียหาย (ทุกชนิด — โจมตีปกติ/สกิล/สถานะ) -> ฝักดาบ +3-10 · ไม่แก้ค่าดาเมจ
   //  ท่อ dealMixed/dealDirect/dealArmorOnly ผ่านจุดนี้ครั้งเดียวต่อก้อน · ดาเมจแพ้จั่ว (damageSoft) server เรียก onSoftDamage แยก
-  adjustIncomingDamage(engine, p, n) {
-    if (isKim(p) && p.alive && n > 0) this.addScabbard(engine, p, rnd(SCABBARD_HIT_TAKEN), "ได้รับความเสียหาย");
+  //  ดาเมจจากสกิล (ไม่ใช่โจมตีปกติ / สถานะ / ไอเทม) + มีท่าสวนอยู่ -> จองสวนกลับผู้ลงมือ (ลงตอน flushCounters)
+  adjustIncomingDamage(engine, p, n, isNormalAttack) {
+    if (!isKim(p) || !p.alive || !(n > 0)) return n;
+    this.addScabbard(engine, p, rnd(SCABBARD_HIT_TAKEN), "ได้รับความเสียหาย");
+    const src = engine.effectSourceId;
+    if (!isNormalAttack && !p._statusDamage && !p._itemDamage && src && src !== p.id && this.hasCounter(p)) {
+      const q = p.kim.counterQueue || (p.kim.counterQueue = []);
+      if (!q.includes(src)) q.push(src); // สกิลเดียวโดนหลายก้อน = สวนครั้งเดียว
+    }
     return n;
+  },
+  hasCounter(p) { return isKim(p) && (p.kim.bones || (p.statuses.kimCounter || 0) > 0); },
+  // สวนกลับดาเมจจากสกิลที่จองไว้ — คืน true ถ้ามีการสวนเกิดขึ้น (ผู้เรียก broadcast)
+  flushCounters(engine) {
+    let fired = false;
+    for (const k of Object.values(engine.players)) {
+      if (!isKim(k) || !(k.kim.counterQueue || []).length) continue;
+      const q = k.kim.counterQueue;
+      k.kim.counterQueue = [];
+      for (const id of q) {
+        const a = engine.players[id];
+        if (!k.alive || !a || !a.alive || engine.sameTeam(k, a)) continue;
+        if (k.kim.bones) this.counterBones(engine, k, a);
+        else if ((k.statuses.kimCounter || 0) > 0) this.counterStance(engine, k, a);
+        else continue;
+        fired = true;
+      }
+    }
+    return fired;
   },
   onSoftDamage(engine, p) {
     if (isKim(p) && p.alive) this.addScabbard(engine, p, rnd(SCABBARD_HIT_TAKEN), "ได้รับความเสียหาย");

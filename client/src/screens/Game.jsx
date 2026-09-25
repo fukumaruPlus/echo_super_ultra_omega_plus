@@ -1299,7 +1299,7 @@ const STATUS_INFO = {
   stun:      { icon: "😵", label: "สตั้น", cls: "bg-echo-hp", desc: "สตั้น: ไม่สามารถทำอะไรได้จนจบเทิร์นหรือจนกว่าดีบัฟจะหมดเวลา" },
   chaa:     { icon: "🌀", label: "สภาพชา", cls: "bg-echo-hp", desc: "สภาพชา: กดจั่วการ์ด 1 ครั้งจะได้ไพ่ 2 ใบ (ใบที่ 2 สุ่มปกติ โชคลาภไม่ช่วย)" },
   numb:     { icon: "🫨", label: "เหน็บชา", cls: "bg-echo-hp", desc: "เหน็บชา: กดสกิลแล้วมีโอกาส 30% ที่สกิลจะไม่ทำงาน แต่แต้มสกิลยังถูกหักตามเดิม" },
-  kimCounter: { icon: "⚔️", label: "Counter Stance", cls: "bg-echo-magenta", desc: "Counter Stance (Bamboo-Hatted Kim): ถูกโจมตีปกติเมื่อไหร่ สวนกลับผู้โจมตีตามพลังโจมตีพื้นฐาน (คริติคอลได้) และมอบเลือดไหล + เหน็บชาให้ผู้ที่โดน" },
+  kimCounter: { icon: "⚔️", label: "Counter Stance", cls: "bg-echo-magenta", desc: "Counter Stance (Bamboo-Hatted Kim): โดนความเสียหายจากการโจมตีปกติหรือสกิลเมื่อไหร่ สวนกลับผู้ที่ทำความเสียหายตามพลังโจมตีพื้นฐาน (คริติคอลได้) และมอบเลือดไหล + เหน็บชาให้ผู้ที่โดน" },
   weak:      { icon: "🥀", label: "อ่อนแอ", cls: "bg-echo-hp", desc: "อ่อนแอ: ดาเมจที่ทำได้ลดลงตามจำนวนที่ระบุ ตามจำนวนเทิร์นที่เหลือ" },
   fragile:   { icon: "💔", label: "เปราะบาง", cls: "bg-echo-hp", desc: "เปราะบาง: ดาเมจที่ได้รับเพิ่มขึ้นตามจำนวนที่ระบุ ตามจำนวนเทิร์นที่เหลือ" },
   might:     { icon: "💪", label: "เสริมพลัง", cls: "bg-echo-gold text-gray-900", desc: "เสริมพลัง: ดาเมจที่ทำได้เพิ่มขึ้นตามจำนวนที่ระบุ ตามจำนวนเทิร์นที่เหลือ" },
@@ -1623,7 +1623,7 @@ function statusEntries(p, full) {
     out.push({ key: "kimScabbard", v: 1, icon: "🗡️", label: `Resentful Scabbard ${k.scabbard}/${k.scabbardMax}`, cls: k.awake ? "bg-echo-hp" : "bg-echo-gold text-gray-900",
       desc: "Resentful Scabbard: 30+ สร้างความเสียหายแล้วฟื้นพลังชีวิต +1 · 55+ เลือดไหล/เหน็บชาที่มอบให้คนอื่น +1 เทิร์น · 80+ พลังโจมตี +1 ถูกโจมตีฟื้นแต้มสกิล +1 และเข้าร่าง Awake · 100 ฟื้นพลังชีวิตเพิ่มอีก +1" });
     out.push({ key: "kimPoise", v: 1, icon: "🍃", label: `Poise ${k.poise}/${k.poiseMax} · คริติคอล ${k.crit}%`, cls: "bg-echo-cyan text-gray-900",
-      desc: "Poise: 1 หน่วย = โอกาสคริติคอล 1.2% (สูงสุด 60%) ความเสียหาย ×2 · ติดคริติคอลแล้ว -15 · ทุก 5 เทิร์นลดลง 2-5" });
+      desc: "Poise: 1 หน่วย = โอกาสคริติคอล 1.2% (สูงสุด 60%) ความเสียหาย ×2 · ติดคริติคอลแล้ว -15 · โจมตีปกติ +1-4 · ทุก 3 เทิร์นลดลง 2-5" });
     if (k.coin) out.push({ key: "kimCoin", v: 1, icon: "🪙", label: k.coin === "heads" ? "หัว" : "ก้อย", cls: "bg-white/20",
       desc: k.coin === "heads" ? "หัว: พลังชีวิต 4 หรือน้อยกว่า คริติคอล +15% · 5 ขึ้นไป ฟื้นแต้มสกิล +1 (ต้นเทิร์น)" : "ก้อย: พลังชีวิต 5 หรือน้อยกว่า ฟื้นเกราะ +1 · 5 ขึ้นไป Poise +1-3 (ต้นเทิร์น)" });
     if (!k.resentUsed) out.push({ key: "kimResent", v: 1, icon: "😤", label: "Resentment", cls: "bg-echo-armor", desc: "Resentment: ครั้งแรกที่ได้รับความเสียหายจนพลังชีวิตหมด พลังชีวิตจะค้างที่ 1 (ครั้งเดียวต่อเกม)" });
@@ -1631,7 +1631,7 @@ function statusEntries(p, full) {
     if (k.ymf) out.push({ key: "kimYmf", v: 1, icon: "🩸", label: "Yield My Flesh", cls: "bg-echo-hp", desc: "Yield My Flesh: พลังโจมตี +1 · หมัดที่โดนมอบเลือดไหล + เหน็บชา (ไม่มีผลกับ Counter Stance)" });
     if (k.tctb) out.push({ key: "kimTctb", v: 1, icon: "🦴", label: "To Claim Their Bones", cls: "bg-echo-gold text-gray-900", desc: "To Claim Their Bones: ฟื้นแต้มสกิล +1 ทุกต้นเทิร์น" });
     if (k.bones) out.push({ key: "kimBones", v: 1, icon: "⚔️", label: "Yield My Flesh To Claim Their Bones", cls: "bg-echo-magenta",
-      desc: "อยู่จนกว่าจะถูกโจมตี — ทุกคนต้องโจมตี Kim เท่านั้น · ถูกโจมตีแล้วสวนกลับตามพลังโจมตี (คริติคอลได้) +1 และฟันผู้เล่นคนอื่นคนละ 1 หน่วย ทุกคนที่โดนติดเลือดไหล + เหน็บชา · Poise +2-8" });
+      desc: "อยู่จนกว่าจะโดนความเสียหายจากการโจมตีปกติหรือสกิล — ทุกคนต้องโจมตี Kim เท่านั้น · โดนแล้วสวนกลับตามพลังโจมตี (คริติคอลได้) +1 และฟันผู้เล่นคนอื่นคนละ 1 หน่วย ทุกคนที่โดนติดเลือดไหล + เหน็บชา · Poise +2-8" });
   }
   if (p.character?.id === "the_supplicant") {
     out.push({ key: "supPrayers", v: 1, icon: "🙏", label: `คำวิงวอน ${p.supPrayers || 0}/${p.supPrayersMax || 15}`, cls: "bg-echo-cyan text-gray-900", desc: "ภาชนะคำวิงวอน: ล้างดีบัฟได้ 1 ขั้น = +1 — ครบ 4 ได้ \"กระแสเวท\" ถาวร · ครบ 8 เพิ่มฟื้นพลังงาน +1 ต่อการล้าง 1 ขั้น · ครบ 12 เพิ่มเกราะศรัทธา +1 ต่อการล้าง 1 ขั้น" });
@@ -3317,7 +3317,7 @@ function StrikerWirePanel({ repair }) {
               className="cursor-pointer" onClick={() => connect(i)} />
           ))}
         </svg>
-        <div className="text-xs opacity-75 text-center">คลิกสายซ้าย แล้วคลิกขั้วขวาสีเดียวกัน · สำเร็จฟื้นพลังชีวิต 2</div>
+        <div className="text-xs opacity-75 text-center">คลิกสายซ้าย แล้วคลิกขั้วขวาสีเดียวกัน · สำเร็จฟื้นพลังชีวิต 3 + เกราะ 1</div>
       </div>
     </div>
   );
@@ -5998,7 +5998,7 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
                     onClick={() => { clickSound(); socket.emit("strikerRepairStart"); }}
                     disabled={(st.repairCd || 0) > 0 || !!st.repairing || frozenByClockUp}
                     className="text-[11px] font-bold rounded-lg px-2 py-1 border bg-white/5 border-white/25 disabled:opacity-35"
-                    title="งานช่าง: ต่อสายไฟ ฟื้นพลังชีวิต 2 (เทิร์นนี้ชนะก็โจมตีไม่ได้)"
+                    title="งานช่าง: ต่อสายไฟ ฟื้นพลังชีวิต 3 + เกราะ 1 (เทิร์นนี้ชนะก็โจมตีไม่ได้)"
                   >
                     🔧 ซ่อม{(st.repairCd || 0) > 0 ? ` (อีก ${st.repairCd} เทิร์น)` : ""}
                   </button>

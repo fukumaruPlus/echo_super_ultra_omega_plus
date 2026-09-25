@@ -4083,7 +4083,10 @@ function eijiOrdinalScale(id) {
 }
 // ORT สกิลติดตัว 2: สวนกลับทุกคนที่จองไว้ระหว่างการกระทำที่เพิ่งจบ (สกิล/ปืน/เอฟเฟกต์หลังเปิดไพ่)
 function flushOrtCounters() {
-  if (CHAR_HOOKS.ort.flushCounters(engine)) broadcastState();
+  const ort = CHAR_HOOKS.ort.flushCounters(engine);
+  // Bamboo-Hatted Kim: สวนกลับ "ดาเมจจากสกิล" ที่จองไว้ ลงจังหวะเดียวกับสวนกลับของ ORT (หลังสกิล/ไอเทม/คลิปจบ)
+  const kim = CHAR_HOOKS.kim.flushCounters(engine);
+  if (ort || kim) broadcastState();
 }
 //  ท่าที่ "เล่นวีดีโอก่อน แล้วค่อยลงผล" (เข้าเฟส CUTSCENE) ยังไม่สวนตอนนี้ — pausePlayingForCutscene สวนให้หลังผลลงจริง
 function useSkill(id, tier, targets, item) {

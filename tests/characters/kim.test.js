@@ -67,7 +67,7 @@ test('ข้อมูล: พลังชีวิต 8 · เกราะ 2 · 
   assert.equal(kim.damageBonus(engine, K), 0, 'พลังโจมตีพื้นฐาน 1');
 });
 
-test('โยนเหรียญ: 50/50 ตอนเลือดเต็ม · เสียเลือดทุก 1 หน่วย ก้อย +5% · ผลของหัว/ก้อยตามพลังชีวิต', () => {
+test('โยนเหรียญ: 50/50 ตอนเลือดเต็ม · เสียเลือดทุก 1 หน่วย ก้อย +3% · ผลของหัว/ก้อยตามพลังชีวิต', () => {
   const { K } = setup();
   withRandom(0.49, () => kim.onRoundStartTick(engine, K));
   assert.equal(K.kim.coin, 'tails');
@@ -78,11 +78,11 @@ test('โยนเหรียญ: 50/50 ตอนเลือดเต็ม ·
   assert.equal(K.kim.coin, 'heads');
   assert.equal(K.skillPoints, 1, 'หัว + เลือด >= 5 -> แต้มสกิล +1');
 
-  K.hp = 4; // เสียไป 4 -> ก้อย 70%
-  withRandom(0.69, () => kim.onRoundStartTick(engine, K));
+  K.hp = 4; // เสียไป 4 -> ก้อย 62%
+  withRandom(0.61, () => kim.onRoundStartTick(engine, K));
   assert.equal(K.kim.coin, 'tails');
   assert.equal(K.armor, 1, 'ก้อย + เลือด <= 5 -> เกราะ +1');
-  withRandom(0.71, () => kim.onRoundStartTick(engine, K));
+  withRandom(0.63, () => kim.onRoundStartTick(engine, K));
   assert.equal(K.kim.coin, 'heads');
   K.kim.poise = 0;
   assert.equal(kim.critChance(K), 15, 'หัว + เลือด <= 4 -> คริติคอล +15%');
@@ -102,7 +102,7 @@ test('ชักดาบ: คูลดาวน์ 2 เทิร์น · ห�
 
   withRandom(0.99, () => attack('K', 'T'));
   assert.equal(K.kim.drawArmed, false);
-  assert.equal(K.kim.poise, 5, 'Poise +2-5 (สุ่มสูงสุด)');
+  assert.equal(K.kim.poise, 9, 'ชักดาบ +2-5 และโจมตีปกติ +1-4 (สุ่มสูงสุด)');
   assert.equal(K.kim.scabbard, 8, 'โจมตีโดน ฝักดาบ +3-8');
   assert.equal(T.statuses.hbleed, 1);
   assert.equal(T.kimNumbPending, 1);
@@ -187,6 +187,35 @@ test('ฝักดาบ: ได้รับความเสียหายท
   const fx = kim.onAttackLanded(engine, K, engine.players.T, 0);
   assert.equal(K.kim.scabbard, 30, 'หมัดที่ดาเมจ 0 ไม่นับ');
   void fx;
+});
+
+test('Counter Stance / บัพรวมร่าง: โดนดาเมจจากสกิลก็สวนกลับผู้ลงมือ (ลงหลังสกิลจบ) · สถานะไม่นับ', () => {
+  const { K, T } = setup();
+  K.statuses.kimCounter = 2;
+  withRandom(0.99, () => engine.withEffectSource(T, () => engine.dealMixed(K, 2))); // สกิลของ T
+  assert.equal(T.hp, 7, 'ยังไม่สวนกลางท่อดาเมจของสกิล');
+  withRandom(0.99, () => kim.flushCounters(engine));
+  assert.equal(T.hp, 6, 'สวนกลับด้วยพลังโจมตีพื้นฐาน 1');
+  assert.equal(T.statuses.hbleed, 1);
+  K.statuses.hbleed = 1;
+  withRandom(0.99, () => require('../../characters/_universal_status').tickBleed(engine, K));
+  assert.equal(kim.flushCounters(engine), false, 'ดาเมจจากสถานะไม่สวน');
+
+  delete K.statuses.kimCounter;
+  K.kim.bones = true;
+  withRandom(0.99, () => engine.withEffectSource(T, () => engine.dealMixed(K, 1)));
+  withRandom(0.99, () => kim.flushCounters(engine));
+  assert.equal(K.kim.bones, false, 'บัพรวมร่างหมดเมื่อโดนดาเมจจากสกิล');
+  assert.equal(T.hp, 4, 'สวน 1 + 1');
+});
+
+test('โจมตีปกติได้ Poise +1-4 (โดนหรือถูกหลบ) · Poise ลดทุก 3 เทิร์น', () => {
+  const { K } = setup();
+  withRandom(0.99, () => attack('K', 'T'));
+  assert.equal(K.kim.poise, 4);
+  engine.setRoundNumber(6);
+  withRandom(0.99, () => kim.onRoundStartTick(engine, K)); // เทิร์น 6 = ครบ 3 -> ลด 2-5 (สุ่มสูงสุด 5) · เหรียญก้อยไม่ได้ (0.99)
+  assert.equal(K.kim.poise, 0);
 });
 
 test('Resentment: ความเสียหายเกินพลังชีวิตครั้งแรกค้างที่ 1 · ครั้งที่สองตายจริง', () => {
