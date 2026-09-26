@@ -1064,7 +1064,10 @@ function mark42Run(p, plan, onUsed) {
   if (onUsed) onUsed();
   const after = () => withEffectSource(p, plan.after);
   if (plan.video && gameState === "PLAYING") {
-    engine.queueCutscene(p, plan.video); // ผ่าน engine — เทสต์แทนที่ได้ (ในเกมจริงคือฟังก์ชันเดียวกัน)
+    // ระเบิดเล่นทุกครั้ง · ใส่เอง/ใส่ให้/เรียกคืน เต็มครั้งแรกครั้งเดียว (ครั้งถัดไปแค่การ์ดแจ้งเตือน ไม่หยุดเกม)
+    //  ผ่าน engine — เทสต์แทนที่ได้ (ในเกมจริงคือฟังก์ชันเดียวกัน)
+    if (plan.video === "mark42Bomb") engine.queueCutscene(p, plan.video);
+    else engine.triggerCutscene(p, plan.video);
     if (cutsceneQueue.length) { pausePlayingForCutscene(after); return; }
   }
   after();

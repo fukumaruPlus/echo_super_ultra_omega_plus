@@ -2086,7 +2086,7 @@ function InventoryModal({ me, players, gameState, roundNumber, frozen, onPickGun
             <div className="flex flex-wrap gap-2">
               {!suitOut.self && <AvButton className="px-3 py-1.5 text-xs" disabled={!!suitBlock || !!me?.mark42} title={me?.mark42 ? "ใส่ชุดอยู่แล้ว" : suitBlock || ""} onClick={() => suitControl("recall")}>เรียกคืนมาใส่เอง</AvButton>}
               <AvButton className="px-3 py-1.5 text-xs" disabled={!!suitBlock} title={suitBlock || ""} onClick={() => suitControl("remove")}>ถอดออก</AvButton>
-              {!suitOut.self && <AvButton className="px-3 py-1.5 text-xs" disabled={!!suitBlock} title={suitBlock || ""} onClick={() => suitControl("detonate")}>💥 สั่งระเบิด (4)</AvButton>}
+              {!suitOut.self && <AvButton className="px-3 py-1.5 text-xs" disabled={!!suitBlock} title={suitBlock || ""} onClick={() => suitControl("detonate")}>💥 สั่งระเบิด (2)</AvButton>}
             </div>
           </div>
         )}
@@ -2130,7 +2130,7 @@ function InventoryModal({ me, players, gameState, roundNumber, frozen, onPickGun
                       <div className="flex flex-wrap gap-2">
                         <AvButton className="px-3 py-1.5 text-xs" disabled={!!suitBlock || !!me?.mark42} title={me?.mark42 ? "ใส่ชุดอยู่แล้ว" : ""} onClick={() => applySuit(it.uid, "self")}>🦾 ใส่ให้ตัวเอง</AvButton>
                         <AvButton className="px-3 py-1.5 text-xs" disabled={!!suitBlock || !suitTargets.length} onClick={() => { clickSound(); setSuitMode(suitMode === "give" ? null : "give"); }}>ใส่ให้ผู้เล่นอื่น</AvButton>
-                        <AvButton className="px-3 py-1.5 text-xs" disabled={!!suitBlock || !suitTargets.length} onClick={() => { clickSound(); setSuitMode(suitMode === "bomb" ? null : "bomb"); }}>💥 ใส่ให้แล้วระเบิด (4)</AvButton>
+                        <AvButton className="px-3 py-1.5 text-xs" disabled={!!suitBlock || !suitTargets.length} onClick={() => { clickSound(); setSuitMode(suitMode === "bomb" ? null : "bomb"); }}>💥 ใส่ให้แล้วระเบิด (2)</AvButton>
                       </div>
                       {suitMode && (
                         <div className="rounded-lg bg-black/40 p-2">

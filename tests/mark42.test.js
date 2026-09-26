@@ -111,12 +111,12 @@ test('ใส่ให้คนอื่น: คนใส่ถอดเองไ
   assert.equal(Mark42.canBuy(engine, A), false, 'ยังมีชุดในกระเป๋า = ซื้อซ้ำไม่ได้');
 });
 
-test('ระเบิด: ใส่ให้แล้วระเบิดทันที 4 (ลดเกราะก่อน) · สั่งระเบิดชุดบนตัวคนอื่น = ชุดพังแล้ว 4 ลงตัวจริง', () => {
+test('ระเบิด: ใส่ให้แล้วระเบิดทันที 2 (ลดเกราะก่อน) · สั่งระเบิดชุดบนตัวคนอื่น = ชุดพังแล้ว 2 ลงตัวจริง', () => {
   const { A, B, C } = setup();
   giveSuit(A);
   use(A, 'bomb', 'B');
   assert.equal(B.mark42, null);
-  assert.deepEqual([B.armor, B.hp], [0, 4]);
+  assert.deepEqual([B.armor, B.hp], [0, 6]);
   assert.equal(A.inventory.length, 0, 'ชุดถูกใช้ไปแล้ว');
   assert.equal(Mark42.buyLockLeft(engine, A), 0, 'ระเบิดเองไม่ติดคูลดาวน์');
 
@@ -124,8 +124,26 @@ test('ระเบิด: ใส่ให้แล้วระเบิดทั
   use(A, 'give', 'C');
   mark42Control('A', 'detonate');
   assert.equal(C.mark42, null);
-  assert.deepEqual([C.armor, C.hp], [0, 4]);
+  assert.deepEqual([C.armor, C.hp], [0, 6]);
   assert.equal(A.mark42Owned, null);
+});
+
+test('วีดีโอ: ใส่/ใส่ให้/เรียกคืน ผ่าน triggerCutscene (เต็มครั้งแรกครั้งเดียว) · ระเบิดคิวทุกครั้ง', () => {
+  const { A } = setup();
+  const calls = [];
+  const t0 = engine.triggerCutscene, q0 = engine.queueCutscene;
+  engine.triggerCutscene = (p, k) => calls.push('T:' + k);
+  engine.queueCutscene = (p, k) => calls.push('Q:' + k);
+  try {
+    giveSuit(A);
+    use(A, 'give', 'B');
+    mark42Control('A', 'recall');
+    mark42Control('A', 'remove');
+    use(A, 'self');
+    mark42Control('A', 'remove');
+    use(A, 'bomb', 'C');
+  } finally { engine.triggerCutscene = t0; engine.queueCutscene = q0; }
+  assert.deepEqual(calls, ['T:mark42SuitSome', 'T:mark42Recall', 'T:mark42Suitup', 'Q:mark42Bomb']);
 });
 
 test('ใส่ซ้อนไม่ได้ · ORT ใส่ไม่ได้ · ซื้อจากร้านได้ชุดเดียว', () => {
@@ -139,9 +157,9 @@ test('ใส่ซ้อนไม่ได้ · ORT ใส่ไม่ได้
   assert.equal(Mark42.validWearer(engine, { ...B, mark42: null, isBoss: true, id: '__ort__' }), false);
 
   const { A: A2 } = setup();
-  engine.setShopItems([{ id: 's1', type: 'mark42', price: 15, sold: false }, { id: 's2', type: 'mark42', price: 15, sold: false }]);
+  engine.setShopItems([{ id: 's1', type: 'mark42', price: Mark42.PRICE, sold: false }, { id: 's2', type: 'mark42', price: Mark42.PRICE, sold: false }]);
   engine.buyShopItem('A', 's1');
   engine.buyShopItem('A', 's2');
   assert.equal(A2.inventory.filter((i) => i.type === 'mark42').length, 1);
-  assert.equal(A2.gold, 15);
+  assert.equal(A2.gold, 5, 'ราคา 25');
 });
