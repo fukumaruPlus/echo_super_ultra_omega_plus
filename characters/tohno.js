@@ -61,9 +61,11 @@ function freshState() {
     rest: false,          // "หลับให้สบาย" รอการโจมตี
     seq: null,            // ชุดเชือดเฉือนที่กำลังตี { hit } (1..FINISH_HITS)
     burst: false,         // หมัดนี้คือหมัดระเบิดรอยร้าว (ใช้ "หลับให้สบาย" ไปแล้ว)
-    plain: false,         // หมัดนี้เป็นการตีธรรมดา (ไม่ใช่ผลของสกิล) — ใช้เลือกเสียง
-    voice: null,          // เสียงพากย์ของหมัดธรรมดานี้ (สุ่มครั้งเดียวต่อหมัด)
+    plain: false,         // หมัดนี้เป็นการตีธรรมดา (ไม่ใช่ผลของสกิล) — ใช้เลือกเสียงฟัน
+    voice: null,          // เสียงพากย์ของหมัดนี้ (สุ่มครั้งเดียวต่อหมัด · ทุกหมัดรวมหมัดของสกิล)
     extraPending: false,  // ตระกูลโทโนะ: ได้ตีอีกครั้ง (เปิดที่ continueAttack)
+    hurtPending: null,    // เสียงร้องที่โดนระหว่างเฟสโจมตี — รอขึ้นพร้อมการ์ดสรุป (ไม่ทับคลิปที่คิวไว้)
+    ultVideo: false,      // กดไม้ตายครั้งนี้เล่นวีดีโอเต็ม = ไม่เล่นเสียงพากย์สกิลทับ
     chain: 0,             // จำนวนครั้งที่ได้ตีเพิ่มในเทิร์นนี้
     voiceAt: 0,
   };
@@ -98,7 +100,11 @@ module.exports = {
     if (tier === "ultimate") return !t.rest && !t.finish;
     return true;
   },
-  skillSound(p, tier) { return tier === "secondary" || tier === "ultimate" ? pick(SFX.skill) : null; },
+  // เสียงพากย์ตอนกด — ไม้ตายที่เพิ่งเล่นวีดีโอเต็ม (ครั้งแรกของเกม) ไม่เล่นทับคลิป
+  skillSound(p, tier) {
+    if (tier === "ultimate" && isTohno(p) && p.tohno.ultVideo) return null;
+    return tier === "secondary" || tier === "ultimate" ? pick(SFX.skill) : null;
+  },
   applyInstantSkill(engine, p, tier, item) {
     if (!isTohno(p)) return "";
     const t = p.tohno;
@@ -118,6 +124,7 @@ module.exports = {
       t.rest = true;
       engine.applyBuff(p, "accurate", null, 1);
       p.transformAt = engine.nextTransformCounter(); // ภาพ/เพลงร่างนี้ใช้ลำดับล่าสุด
+      t.ultVideo = !(p.cutsceneShown && p.cutsceneShown.tohnoSkill1);
       engine.triggerCutscene(p, "tohnoSkill1"); // ครั้งแรกวีดีโอเต็ม ครั้งต่อไปแจ้งเตือน
       engine.log(`👁️ ${p.name} มองเห็นแล้ว!! — ได้ "หลับให้สบาย" และ "แม่นยำ" 1 เทิร์น: การโจมตีครั้งถัดไปพลังโจมตี +${REST_ATK} และระเบิดรอยร้าวบนเป้าหมาย`);
       return " — หลับให้สบาย · แม่นยำ";
@@ -132,7 +139,7 @@ module.exports = {
     const t = a.tohno;
     t.burst = false;
     t.plain = false;
-    t.voice = null;
+    t.voice = pick(SFX.hitVoice);
     if (t.seq) return; // หมัดถัดไปของชุดเชือดเฉือน (continueAttack ขยับเลขครั้งแล้ว)
     if (t.finish) {
       t.finish = false;
@@ -146,7 +153,6 @@ module.exports = {
       return;
     }
     t.plain = true;
-    t.voice = pick(SFX.hitVoice);
   },
   // อ่านสถานะล้วน (computeAttackBase ถูกเรียกจาก buildStateFor ด้วย — ห้ามแก้ state ตรงนี้)
   damageBonus(engine, attacker) {
@@ -154,7 +160,7 @@ module.exports = {
     return (attacker.tohno.seq ? FINISH_ATK : 0) + (attacker.tohno.burst ? REST_ATK : 0);
   },
   attackSound(p) { return isTohno(p) && p.tohno.plain ? SFX.hit : undefined; },
-  attackVoice(p) { return isTohno(p) && p.tohno.plain ? p.tohno.voice : undefined; },
+  attackVoice(p) { return isTohno(p) && p.tohno.voice ? p.tohno.voice : undefined; },
 
   // ผ่านด่านหลบมาแล้ว — ระเบิดรอยร้าว (หมัดของ "หลับให้สบาย") · คืนดาเมจใหม่
   applyBurst(engine, attacker, target, dmg, fx) {
@@ -219,10 +225,15 @@ module.exports = {
   },
 
   // ได้รับความเสียหายจากคนอื่น (ทุกชนิด) -> ร้องเสียงเจ็บ · ไม่แก้ค่าดาเมจ
+  //  ระหว่างเฟสโจมตี ดาเมจลงก่อนคลิปที่คิวไว้ (สวนกลับ/หมัดพิเศษ) -> เก็บเสียงไว้เล่นพร้อมการ์ดสรุปแทน ไม่ให้ทับคลิป
   adjustIncomingDamage(engine, p, n) {
     if (!isTohno(p) || !p.alive || !(n > 0)) return n;
     const src = engine.effectSourceId;
     if (!src || src === p.id) return n;
+    if (engine.gameState === "ATTACK" || engine.gameState === "ATTACKING") {
+      if (!p.tohno.hurtPending) p.tohno.hurtPending = pick(SFX.hurt);
+      return n;
+    }
     const now = Date.now();
     if (now - (p.tohno.voiceAt || 0) >= VOICE_GAP_MS) {
       p.tohno.voiceAt = now;
@@ -231,9 +242,22 @@ module.exports = {
     return n;
   },
 
+  // เสียงร้องที่รอขึ้นการ์ดสรุป — ดึงแล้วล้าง (โทโนะมีได้คนเดียวต่อเกม)
+  takeHurtVoice(engine) {
+    let v;
+    for (const p of Object.values(engine.players)) {
+      if (!isTohno(p) || !p.tohno.hurtPending) continue;
+      v = v || p.tohno.hurtPending;
+      p.tohno.hurtPending = null;
+    }
+    return v;
+  },
+
   // ---------- โจมตีต่อ (เรียกจากหัว endTurn — ทุกทางจบหมัดไหลมาที่นี่) ----------
   //  คืน true = เปิดเฟส ATTACK ใหม่แล้ว (ผู้เรียกต้อง return)
   continueAttack(engine) {
+    // ดาเมจที่ลงหลังการ์ดสรุปไปแล้ว (เช่น สวนกลับที่ลงตอนจบหมัด) ไม่มีการ์ดให้เกาะ -> ร้องตอนนี้เลย
+    engine.sfx(this.takeHurtVoice(engine));
     for (const p of Object.values(engine.players)) {
       if (!isTohno(p)) continue;
       const t = p.tohno;

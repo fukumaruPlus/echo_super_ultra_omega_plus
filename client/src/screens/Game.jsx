@@ -1902,7 +1902,9 @@ function GutsVideoPreloader({ me, players }) {
   //  (เช็คจาก p.character.id ไม่ใช่ p.characterId — payload ของ buildStateFor ไม่มีฟิลด์ characterId)
   const preloadConnorIntro = (players || []).some((p) => p.character?.id === "conner");
   const preloadMuimi = (players || []).some((p) => p.character?.id === "muimi");
-  if (!ammoTypes.length && !preloadImpact && !preloadConnorIntro && !preloadMuimi) return null;
+  // โทโนะ ชิกิ: คลิปไม้ตาย (ครั้งแรก) + คลิประเบิดรอยร้าว ไฟล์ใหญ่ (~8-10 MB) — โหลดไว้ก่อน ไม่งั้นกระตุกตอนเล่นจาก R2
+  const preloadTohno = (players || []).some((p) => p.character?.id === "tohno" && p.alive);
+  if (!ammoTypes.length && !preloadImpact && !preloadConnorIntro && !preloadMuimi && !preloadTohno) return null;
   return (
     <div aria-hidden className="hidden">
       {ammoTypes.map((a) => GUTS_AMMO_INFO[a] && (
@@ -1912,6 +1914,8 @@ function GutsVideoPreloader({ me, players }) {
       {preloadConnorIntro && <video src="/characters/connor/conner_openning.mp4" preload="auto" muted playsInline />}
       {preloadMuimi && <video src="/characters/muimi/muimi_skill3.mp4" preload="auto" muted playsInline />}
       {preloadMuimi && <video src="/characters/muimi/muimi_skill3_short.mp4" preload="auto" muted playsInline />}
+      {preloadTohno && <video src="/characters/tohno/tohno_skill1.mp4" preload="auto" muted playsInline />}
+      {preloadTohno && <video src="/characters/tohno/tohno_update/tohno_skill3.mp4" preload="auto" muted playsInline />}
     </div>
   );
 }

@@ -57,7 +57,7 @@ test.before(() => {
   engine.triggerCutscene = (p, k) => cutscenes.push('T:' + k);
   engine.queueCutscene = (p, k) => cutscenes.push('Q:' + k);
   engine.skillFlash = () => {};
-  engine.sfx = (s) => sounds.push(s);
+  engine.sfx = (s) => { if (s) sounds.push(s); };
 });
 test.after(() => { Object.assign(engine, saved); for (const id of Object.keys(engine.players)) delete engine.players[id]; });
 test.afterEach(() => engine.clearPhaseTimer());
@@ -272,20 +272,48 @@ test('รอยร้าวจางลง 1 ขั้นทุก 10 เทิ�
   assert.equal(B.tohnoCrack, 1);
 });
 
-test('เสียง: ตีธรรมดามีเสียงฟัน + เสียงพากย์ · ตีด้วยสกิลไม่มี · โดนคนอื่นตีร้อง (สกิลเดียวร้องครั้งเดียว)', () => withRandom(0.99, () => {
-  const { A } = setup();
+test('เสียงพากย์ทุกหมัด (ตีธรรมดา / เชือดเฉือนทั้ง 4 ครั้ง / หมัดระเบิด) · เสียงฟันเฉพาะตีธรรมดา', () => withRandom(0.99, () => {
+  setup();
   attack('A', 'B');
   assert.equal(engine.lastAttack.byAttackSound, 'tohno_hit');
   assert.ok(Tohno.SFX.hitVoice.includes(engine.lastAttack.byVoice));
+  skill('secondary');
+  attack('A', 'B');
+  assert.ok(Tohno.SFX.hitVoice.includes(engine.lastAttack.byVoice), 'เชือดเฉือนครั้งที่ 1');
+  assert.equal(engine.lastAttack.byAttackSound, undefined);
+  for (let i = 2; i <= 4; i++) {
+    assert.ok(next('B'));
+    assert.ok(Tohno.SFX.hitVoice.includes(engine.lastAttack.byVoice), `เชือดเฉือนครั้งที่ ${i}`);
+  }
+  engine.players.A.skillUsedRound = false;
   skill('ultimate');
   attack('A', 'B');
-  assert.equal(engine.lastAttack.byAttackSound, undefined);
-  assert.equal(engine.lastAttack.byVoice, undefined);
+  assert.ok(Tohno.SFX.hitVoice.includes(engine.lastAttack.byVoice), 'หมัดระเบิดรอยร้าว');
+}));
+
+test('เสียงพากย์ตอนกดไม้ตาย: ครั้งแรก (วีดีโอเต็ม) ไม่เล่นทับคลิป · ครั้งต่อไปเล่นปกติ · สกิลรองเล่นเสมอ', () => {
+  const { A } = setup();
+  skill('ultimate');
+  assert.equal(A.tohno.ultVideo, true);
+  assert.equal(Tohno.skillSound(A, 'ultimate'), null);
+  A.cutsceneShown.tohnoSkill1 = true;
+  A.tohno.rest = false; A.skillUsedRound = false; A.skillPoints = 8;
+  skill('ultimate');
+  assert.equal(A.tohno.ultVideo, false);
+  assert.ok(Tohno.SFX.skill.includes(Tohno.skillSound(A, 'ultimate')));
+  assert.ok(Tohno.SFX.skill.includes(Tohno.skillSound(A, 'secondary')));
+});
+
+test('เสียงร้องตอนโดนตี: ระหว่างเฟสโจมตีขึ้นพร้อมการ์ดสรุป (ไม่ทับคลิป) · นอกเฟสโจมตีร้องทันที เว้นช่วงกันซ้ำ · ทำตัวเองไม่ร้อง', () => withRandom(0.99, () => {
+  const { A } = setup();
   attack('B', 'A');
-  assert.equal(sounds.length, 1);
-  assert.ok(Tohno.SFX.hurt.includes(sounds[0]));
+  assert.ok(Tohno.SFX.hurt.includes(engine.lastAttack.targetVoice));
+  assert.equal(sounds.length, 0, 'ไม่ยิงเสียงแยกระหว่างเฟสโจมตี');
+  attack('B', 'C');
+  assert.equal(engine.lastAttack.targetVoice, undefined, 'การ์ดถัดไปไม่มีเสียงค้าง');
   engine.withEffectSource(engine.players.C, () => { engine.dealMixed(A, 1); engine.dealMixed(A, 1); });
-  assert.equal(sounds.length, 1, 'ห่างกันไม่ถึง 1.5 วิ ร้องครั้งเดียว');
+  assert.equal(sounds.length, 1, 'สกิลเดียวลงหลายก้อน ร้องครั้งเดียว');
+  assert.ok(Tohno.SFX.hurt.includes(sounds[0]));
   engine.withEffectSource(A, () => engine.dealMixed(A, 1));
   assert.equal(sounds.length, 1, 'ทำตัวเองไม่ร้อง');
 }));

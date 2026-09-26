@@ -5842,6 +5842,7 @@ function doAttack(byId, targetId) {
     return;
   }
   clearPhaseTimer();
+  CHAR_HOOKS.tohno.takeHurtVoice(engine); // เสียงร้องค้างจากหมัดก่อน (ไม่ได้ขึ้นการ์ด) ทิ้งไป ไม่ให้ไปโผล่ในการ์ดของหมัดนี้
   attacker.didAttackRound = true;
   // คาเยนน์ "แน่จริงก็หลบสิ": หมัดนี้เป็นการโจมตีครั้งที่เท่าไหร่ของชุด (0 = โจมตีปกติธรรมดา)
   //  แต่ละครั้งคือการโจมตีปกติแยกกันจริง — ครั้งถัดไปเปิดจากต้น endTurn (ดู CHAR_HOOKS.cayenne.continueBarrage)
@@ -6443,7 +6444,8 @@ function doAttack(byId, targetId) {
     byName: attacker.name, byImg: displayImg(attacker), byColor: colorOf(attacker),
         byDoomWeapon: attacker.characterId === "doomguy" ? attacker.doomWeapon : undefined, // DoomGuy: อาวุธที่ใช้ยิงตอนนี้ (เสียงยิงฝั่ง client)
         byAttackSound: attackSoundOf(attacker), // เสียงโจมตีปกติเฉพาะตัว (ผู้สังหารเมจ / ฮารุกะระหว่างโอเมก้า)
-    byVoice: CHAR_HOOKS.tohno.attackVoice(attacker), // เสียงพากย์ตอนตีธรรมดา (โทโนะ — สุ่ม 1 จาก 6)
+    byVoice: CHAR_HOOKS.tohno.attackVoice(attacker), // เสียงพากย์ตอนตี (โทโนะ — สุ่ม 1 จาก 6 ทุกหมัด รวมหมัดของสกิล)
+    targetVoice: CHAR_HOOKS.tohno.takeHurtVoice(engine), // เสียงร้องของโทโนะที่โดนดาเมจระหว่างหมัดนี้ (เล่นพร้อมการ์ด ไม่ทับคลิป)
     targetName: target.name, targetImg: displayImg(target), targetColor: colorOf(target),
     dmg, aoe: ginga || storiumAtk, revenge: false, skills: fxSkills,
     fxMs: (fxSkills.length ? ATTACKFX_TIME + 2 : ATTACKFX_TIME) * 1000,
