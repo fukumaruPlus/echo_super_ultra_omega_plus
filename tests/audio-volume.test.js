@@ -18,6 +18,7 @@ function audioHarness(saved = null) {
     constructor(src) { super(); this.src = src; this.paused = true; this.currentTime = 0; instances.push(this); }
     play() { this.paused = false; this.emit('playing'); return Promise.resolve(); }
     pause() { this.paused = true; this.emit('pause'); }
+    getAttribute(name) { return name === 'src' ? this.src : null; }
   }
   const window = new Events();
   const context = vm.createContext({ Audio, window, localStorage: { getItem: () => saved, setItem() {} } });
@@ -25,19 +26,23 @@ function audioHarness(saved = null) {
   vm.runInContext(source, context);
   return { api: context, instances, window, Audio };
 }
+// ระดับที่คาดหวัง (ไม่รวมหลอดเสียง): เพลง 0.5 × ค่าปรับรายไฟล์ · เอฟเฟกต์ 1 × ค่าปรับรายไฟล์
+const MUSIC = (api, name) => 0.5 * api.soundGain(name);
+const SFX = (api, name) => 1 * api.soundGain(name);
+const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, `${msg || ''} ${a} != ${b}`);
 
 test('music starts at 80%, follows saved volume, and mute persists across track changes', () => {
   const { api, instances } = audioHarness();
   api.playMusic('sc_day');
-  assert.equal(instances[0].volume, api.masterGain());
+  near(instances[0].volume, MUSIC(api, 'sc_day') * api.masterGain());
   api.setMasterVolume(0);
   api.playMusic('sc_rest');
   assert.equal(instances.at(-1).volume, 0);
   api.setMasterVolume(1);
-  assert.equal(instances.at(-1).volume, 1);
+  near(instances.at(-1).volume, MUSIC(api, 'sc_rest'));
   const saved = audioHarness('0.35');
   saved.api.playMusic('sc_duel_day');
-  assert.equal(saved.instances[0].volume, saved.api.masterGain());
+  near(saved.instances[0].volume, MUSIC(saved.api, 'sc_duel_day') * saved.api.masterGain());
 });
 
 test('switching music leaves one track; foreground audio blocks retries until released', async () => {
@@ -68,11 +73,11 @@ test('switching music leaves one track; foreground audio blocks retries until re
 test('effects follow live volume and stopped voice cannot resume after a late play promise', async () => {
   const { api } = audioHarness();
   const effect = api.playSfx('attack');
-  assert.equal(effect.volume, 0.85 * api.masterGain());
+  near(effect.volume, SFX(api, 'attack') * api.masterGain());
   api.setMasterVolume(0);
   assert.equal(effect.volume, 0);
   api.setMasterVolume(1);
-  assert.equal(effect.volume, 0.85);
+  near(effect.volume, SFX(api, 'attack'));
   api.stopSfx(effect);
   await Promise.resolve();
   assert.equal(effect.paused, true);
@@ -97,7 +102,7 @@ test('blocked cutscene autoplay restores audible playback on a gesture without r
   assert.equal(video.muted, false);
   assert.equal(video.currentTime, 3);
   api.setMasterVolume(0.5);
-  assert.equal(video.volume, api.videoVolume());
+  assert.equal(video.volume, api.videoVolume('cutscene.mp4'));
   dispose();
   assert.equal(video.paused, true);
   assert.equal(instances[0].paused, false);
@@ -126,9 +131,9 @@ test('a blocked sound loop restores music volume instead of leaving it ducked', 
   api.playMusic('sc_day');
   Audio.prototype.play = () => Promise.reject({ name: 'NotAllowedError' });
   api.startLoopSfx('conner_think');
-  assert.equal(instances[0].volume, api.masterGain() * 0.25);
+  near(instances[0].volume, MUSIC(api, 'sc_day') * api.masterGain() * 0.25);
   await Promise.resolve(); await Promise.resolve();
-  assert.equal(instances[0].volume, api.masterGain());
+  near(instances[0].volume, MUSIC(api, 'sc_day') * api.masterGain());
   assert.equal(instances[1].paused, true);
 });
 
@@ -137,14 +142,14 @@ test('temporary sound loops duck music and restore its full level when closed', 
   api.playMusic('sc_duel_night');
   const music = instances[0];
   api.startLoopSfx('sc_rest');
-  assert.equal(music.volume, api.masterGain() * 0.25);
+  near(music.volume, MUSIC(api, 'sc_duel_night') * api.masterGain() * 0.25);
   api.setMasterVolume(0.6);
-  assert.equal(music.volume, api.masterGain() * 0.25);
+  near(music.volume, MUSIC(api, 'sc_duel_night') * api.masterGain() * 0.25);
   api.stopLoopSfx();
-  assert.equal(music.volume, api.masterGain());
+  near(music.volume, MUSIC(api, 'sc_duel_night') * api.masterGain());
   api.resetMusicPositions();
   api.playMusic('sc_day');
-  assert.equal(instances.at(-1).volume, api.masterGain());
+  near(instances.at(-1).volume, MUSIC(api, 'sc_day') * api.masterGain());
 });
 
 // ผู้เล่นรายงานว่า "เสียงดังไม่เท่ากัน": เพลงกับเอฟเฟกต์เคยคูณหลอดตรงๆ ส่วนวีดีโอกับลูปคูณหลอดยกกำลังสอง
@@ -163,11 +168,10 @@ test('every sound source scales by the same master curve', () => {
     api.setMasterVolume(level);
     const gain = api.masterGain();
     assert.equal(gain, Math.pow(level, 1.6), `หลอด ${level}`);
-    assert.equal(music.volume, gain * 0.25, `เพลงที่หลอด ${level}`); // ถูกหรี่อยู่เพราะลูปเสียงยังเล่น
-    assert.equal(effect.volume, 0.85 * gain, `เอฟเฟกต์ที่หลอด ${level}`);
-    assert.equal(loop.volume, 0.85 * gain, `ลูปเสียงที่หลอด ${level}`);
-    assert.equal(video.volume, api.videoVolume(), `วีดีโอที่หลอด ${level}`);
-    assert.equal(api.videoVolume() / gain, api.videoVolume() / api.masterGain(), `วีดีโอต้องอิง curve เดียวกัน`);
+    near(music.volume, MUSIC(api, 'sc_day') * gain * 0.25, `เพลงที่หลอด ${level}`); // ถูกหรี่อยู่เพราะลูปเสียงยังเล่น
+    near(effect.volume, SFX(api, 'attack') * gain, `เอฟเฟกต์ที่หลอด ${level}`);
+    near(loop.volume, MUSIC(api, 'conner_think') * gain, `ลูปเสียงที่หลอด ${level}`);
+    near(video.volume, gain, `วีดีโอที่หลอด ${level}`);
   }
 });
 
@@ -217,4 +221,20 @@ test('prewarmed effects play from the pool without a fresh allocation', () => {
   assert.equal(warmed, 1);
   api.playSfx('action_button');
   assert.equal(instances.length, warmed, 'เสียงที่อุ่นไว้แล้วต้องไม่สร้าง element ใหม่ตอนเล่น');
+});
+
+// ผู้เล่นรายงานว่า "เอฟเฟกต์สำคัญเบากว่าเพลง" และ "บางไฟล์ดังบางไฟล์เบา"
+//  -> เอฟเฟกต์ต้องไม่เบากว่าเพลงประกอบ · ไฟล์ที่ดังเกินต้องถูกลด (รายไฟล์) · ไฟล์เบาไม่ถูกลดเพิ่ม
+test('effects sit above background music and loud files are evened out per file', () => {
+  const { api, Audio, instances } = audioHarness('1');
+  api.playMusic('sc_day');
+  const music = instances.at(-1).volume;
+  const hit = api.playSfx('attack').volume;
+  assert.ok(hit >= music * 1.5, `เอฟเฟกต์ ${hit} ต้องดังกว่าเพลง ${music} ชัดเจน`);
+  assert.ok(api.soundGain('kaiVoice3') < 0.6, 'เสียงพากย์ไคดังเกินต้นฉบับ ต้องถูกลด');
+  assert.equal(api.soundGain('recruit_reload'), 1, 'ไฟล์ที่เบาอยู่แล้วห้ามลดเพิ่ม');
+  assert.equal(api.soundGain('action_button'), 1, 'เสียงคลิกใช้ระดับของตัวเอง');
+  const loudVideo = new Audio('/characters/escanor/Last Stand.mp4');
+  api.playCutsceneVideo(loudVideo);
+  assert.ok(loudVideo.volume < 1, 'วีดีโอที่ดังเกินต้องถูกลด');
 });

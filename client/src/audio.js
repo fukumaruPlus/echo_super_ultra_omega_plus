@@ -199,10 +199,170 @@ const MUSIC_POSITION_GROUPS = {
   //  แล้วเพลงใหม่ที่ยังไม่โหลด metadata จะมี duration = NaN -> seek เลยจุดจบเพลง = เงียบสนิท
 };
 
-const MUSIC_BASE = 1;
-const SFX_BASE = 0.85;
+// สัดส่วนผสมเสียง: เอฟเฟกต์/เสียงพากย์ต้องเด่นกว่าเพลงประกอบ (เพลงเป็นพื้นหลัง)
+//  ระหว่างวีดีโอเพลงถูกพักอยู่แล้ว วีดีโอจึงเต็ม 1 ได้โดยไม่แย่งกับเพลง
+const MUSIC_BASE = 0.5;
+const SFX_BASE = 1;
 const CLICK_BASE = 0.55;
-const VIDEO_BASE = 0.8;
+const VIDEO_BASE = 1;
+
+// ความดังต่อไฟล์ (สร้างจากการวัดจริง: RMS แบบตัดช่วงเงียบ) — ไฟล์ต้นฉบับดังไม่เท่ากันมาก (ต่างกันถึง ~30 dB)
+//  เป้า: เพลง -14 · เอฟเฟกต์ -14 · วีดีโอ -16 dBFS — ลดได้อย่างเดียว (HTMLAudio ตั้ง volume เกิน 1 ไม่ได้)
+//  ไฟล์ที่เบากว่าเป้ามากถูกทำให้ดังขึ้นที่ตัวไฟล์แล้ว (ต้นฉบับสำรองไว้ที่ R2 _backup_audio/)
+//  ไฟล์ใหม่ที่ไม่อยู่ในตาราง = 1 (ไม่ลด) · key = path ของไฟล์ (ตรงกับ FILES / MUSIC_SEQUENCES / วีดีโอ src)
+const LOUDNESS_GAIN = {
+  "/characters/Bamboo-Hatted Kim/Limbus Company OST - Intervallo VII-2 Boss Battle Theme [-Lu6w6_P1NA].mp3": 0.49,
+  "/characters/Recruit/สกิลอันติเมต/สกิลอัลติเมติ.mp4": 0.44,
+  "/characters/Recruit/โจมตีปกติ/โจมตีปกติ.mov": 0.66,
+  "/characters/appleguy/appleguy_final.mp4": 0.4,
+  "/characters/bard/bard_dim.mp4": 0.33,
+  "/characters/bard/bard_dim_theme.mp3": 0.76,
+  "/characters/bard/bard_melody3.mp3": 0.77,
+  "/characters/bat_ben/bat_ben_theme.mp3": 0.68,
+  "/characters/bat_ben/bat_update/skill3.2/bat_ben_skill3.2.mp4": 0.89,
+  "/characters/brian_r34/brian_duel_theme.m4a": 0.54,
+  "/characters/brian_r34/brian_theme.mp3": 0.47,
+  "/characters/brian_r34/skill1/brian_skill1.mp4": 0.44,
+  "/characters/brian_r34/skill1/brian_skill1_boost.mp4": 0.42,
+  "/characters/brian_r34/skill2/brian_skill2.mp4": 0.43,
+  "/characters/brian_r34/skill3/brian_skill3.2.mp4": 0.51,
+  "/characters/brian_r34/skill3/brian_skill3.2_hit.mp4": 0.59,
+  "/characters/brian_r34/skill3/duel/brian_duel.mp4": 0.42,
+  "/characters/brian_r34/skill3/duel/brian_duel_lost.mp4": 0.45,
+  "/characters/brian_r34/skill3/duel/brian_duel_win.mp4": 0.5,
+  "/characters/cayenne/cayenne_theme.m4a": 0.72,
+  "/characters/cayenne/gepard.mp4": 0.64,
+  "/characters/cayenne/gun_sound.mp3": 0.88,
+  "/characters/cayenne/skill2/cayenne_skill2.mp4": 0.7,
+  "/characters/cayenne/skill3/cayenne_skill3.mp4": 0.74,
+  "/characters/connor/arrest/connor_arrest_1.mp4": 0.56,
+  "/characters/connor/arrest/connor_arrest_2.mp4": 0.71,
+  "/characters/connor/arrest/connor_arrest_3.mp4": 0.54,
+  "/characters/connor/arrest/connor_arrest_false.mp4": 0.61,
+  "/characters/connor/arrest/connor_arrest_true.mp4": 0.58,
+  "/characters/connor/conner_theme.m4a": 0.68,
+  "/characters/connor/conner_think.m4a": 0.92,
+  "/characters/connor/connor_passive4.mp4": 0.53,
+  "/characters/connor/skill3/connor_skill3.mp4": 0.47,
+  "/characters/daichi/daichi_theme.mp3": 0.54,
+  "/characters/daisuke/daisuke.mp4": 0.62,
+  "/characters/daisuke/daisuke_skill1.mp4": 0.83,
+  "/characters/daisuke/daisuke_skill2.mp4": 0.72,
+  "/characters/daisuke/daisuke_skill3.mp4": 0.58,
+  "/characters/dan/dan_passive.mp4": 0.61,
+  "/characters/doomguy/sound/BFG.mp3": 0.81,
+  "/characters/doomguy/sound/BT Skill.mp3": 0.87,
+  "/characters/doomguy/sound/CG SKill.mp3": 0.91,
+  "/characters/doomguy/sound/CG Shoot.mp3": 0.74,
+  "/characters/doomguy/sound/RK Skill.mp3": 0.75,
+  "/characters/doomguy/sound/SS Skill.mp3": 0.81,
+  "/characters/doomguy/สกิลอัลติเมติ/Doom Eternal OST - The Only Thing They Fear Is You (Mick Gordon) [Doom Eternal Theme].mp3": 0.51,
+  "/characters/doomguy/สกิลอัลติเมติ/doom.mp4": 0.86,
+  "/characters/eiji/skill3/eiji_skill3_connect.m4a": 0.76,
+  "/characters/escanor/Last Stand.mp4": 0.42,
+  "/characters/escanor/สกิลพื้นฐาน/สกิลพื้นฐาน 1 บอลเพลิงสุริยะ.mp4": 0.84,
+  "/characters/escanor/สกิลรอง/สกิลรอง 1 เพลิงปะทุ.mp4": 0.34,
+  "/characters/escanor/สกิลรอง/สกิลรอง 3 หมัดเพลิงสุริยัน.mp4": 0.29,
+  "/characters/escanor/สกิลอัลติเมต/สกิลอัลติเมต 1 Divin Axe Rhitta.mp4": 0.37,
+  "/characters/escanor/สกิลอัลติเมต/สกิลอัลติเมต 3 ดวงอาทิตย์จำลอง.mp4": 0.31,
+  "/characters/hikaru/ginga_song.mp3": 0.47,
+  "/characters/hikaru/hikaru_update/ginga_theme2.mp3": 0.43,
+  "/characters/hisakawa_sister/skill3/O-Ku-Ri-Mo-No.mp3": 0.42,
+  "/characters/ippo/ippo_dodge.mp4": 0.82,
+  "/characters/ippo/ippo_theme.mp3": 0.51,
+  "/characters/kagami/kagami.mp4": 0.54,
+  "/characters/kagami/kagami_skill1.mp4": 0.67,
+  "/characters/kagami/kagami_skill2.mp4": 0.72,
+  "/characters/kagami/kagami_skill3_final.mp4": 0.6,
+  "/characters/kagami/kagami_skill3_one.mp4": 0.62,
+  "/characters/kagami/kagami_skill3_three.mp4": 0.6,
+  "/characters/kai/voice/kai_voice1.m4a": 0.79,
+  "/characters/kai/voice/kai_voice2.m4a": 0.54,
+  "/characters/kai/voice/kai_voice3.m4a": 0.49,
+  "/characters/kai/voice/kai_voice4.m4a": 0.56,
+  "/characters/kai/voice/kai_voice5.m4a": 0.63,
+  "/characters/kotone/rework/สกิลอัลติเมต3/ULT3.mp3": 0.58,
+  "/characters/kotone/rework/สกิลอัลติเมต3/ULT3.mp4": 0.75,
+  "/characters/kotone/rework/สกิลอัลติเมต4/ULT4.mp3": 0.77,
+  "/characters/kotone/rework/สกิลอัลติเมต4/ULT4.mp4": 0.73,
+  "/characters/kotone/rework/สกิลอัลติเมต5/ULT5.mp3": 0.61,
+  "/characters/kotone/rework/สกิลอัลติเมติ1/ULT1.mp3": 0.88,
+  "/characters/mageslayer/SFX_Skill_2.mp3": 0.53,
+  "/characters/mageslayer/VDO_Skill_1.mp4": 0.47,
+  "/characters/muimi/muimi_skill3_short.mp4": 0.88,
+  "/characters/muimi/mumi_ub_hit.mp3": 0.79,
+  "/characters/nanaya/voice/nanaya_voice4.m4a": 0.62,
+  "/characters/nanaya/voice/nanaya_voice5.m4a": 0.64,
+  "/characters/oguri/Skill 3 The Beat of Victory.mp4": 0.92,
+  "/characters/oguri/Skill 3-2 Ashen Trail Cinderella Gray.mp4": 0.39,
+  "/characters/ort/ort_theme.mp3": 0.87,
+  "/characters/princess_shiki/p_shiki_theme.m4a": 0.74,
+  "/characters/producer_lumi/anzu/anzu_idol_intro.mp4": 0.91,
+  "/characters/producer_lumi/anzu/anzu_idol_song.m4a": 0.89,
+  "/characters/producer_lumi/haruka/haruka_idol_song.m4a": 0.91,
+  "/characters/producer_lumi/kaho/kaho_idol_intro.mp4": 0.94,
+  "/characters/producer_lumi/kaho/kaho_idol_song.m4a": 0.91,
+  "/characters/producer_lumi/kohaku/kohaku_idol_intro.mp4": 0.66,
+  "/characters/producer_lumi/kohaku/kohaku_idol_song.m4a": 0.76,
+  "/characters/producer_lumi/luminus/luminus_burst.mp4": 0.56,
+  "/characters/producer_lumi/luminus/luminus_song.m4a": 0.79,
+  "/characters/producer_lumi/mirai/mirai_idol_intro.mp4": 0.8,
+  "/characters/satoru/Ultimate.mp4": 0.38,
+  "/characters/satoru/wonderofu_theme.mp3": 0.78,
+  "/characters/shido/shido_theme.mp3": 0.94,
+  "/characters/shiki/shiki_theme.mp3": 0.46,
+  "/characters/shiki/shiki_theme2.mp3": 0.71,
+  "/characters/striker/skill2/striker_skill2.mp4": 0.66,
+  "/characters/striker/skill2/striker_skill2_final.mp4": 0.54,
+  "/characters/striker/skill3/striker_skill3.2.mp4": 0.63,
+  "/characters/striker/skill3/striker_skill3.2_final.mp4": 0.54,
+  "/characters/striker/skill3/striker_skill3.mp4": 0.69,
+  "/characters/striker/striker_intro.mp4": 0.53,
+  "/characters/striker/striker_passive.mp4": 0.58,
+  "/characters/striker/striker_passive3.mp4": 0.64,
+  "/characters/takumi/all_around.mp3": 0.86,
+  "/characters/takumi/forever.mp3": 0.57,
+  "/characters/takumi/secret_love.mp3": 0.83,
+  "/characters/takumi/takumi_skill3_second.mp4": 0.92,
+  "/characters/takuto/takuto_theme.mp3": 0.68,
+  "/characters/takuto/upadate/takuto_theme2.m4a": 0.47,
+  "/characters/temari/temari_final_theme.mp3": 0.58,
+  "/characters/tepeu/tepeu_theme.mp3": 0.87,
+  "/characters/the_supplicant/sup_strike.mp3": 0.73,
+  "/characters/tohno/tohno_theme.mp3": 0.51,
+  "/characters/tsurugi/tsurugi.mp4": 0.65,
+  "/characters/tsurugi/tsurugi_skill1.mp4": 0.63,
+  "/characters/tsurugi/tsurugi_skill2.mp4": 0.52,
+  "/characters/tsurugi/tsurugi_skill3_final.mp4": 0.6,
+  "/characters/tsurugi/tsurugi_skill3_first.mp4": 0.56,
+  "/characters/ultraman_trigger/skill3/trigger_skill3.mp4": 0.92,
+  "/characters/ultraman_trigger/trigger_theme.mp3": 0.86,
+  "/characters/usagi/usagi_theme.mp3": 0.85,
+  "/characters/yaguruma/yaguruma.mp4": 0.68,
+  "/characters/yaguruma/yaguruma_skill1.mp4": 0.66,
+  "/characters/yaguruma/yaguruma_skill3.mp4": 0.65,
+  "/characters/yui/skill2/yui_skill2.mp4": 0.66,
+  "/characters/yui/skill3/yui_skill3_false.mp4": 0.68,
+  "/characters/yui/song/song_3.1.mp3": 0.65,
+  "/characters/yui/song/song_3.2.mp3": 0.73,
+  "/characters/yuna/Break Beat Bark!.mp3": 0.59,
+  "/characters/yuna/Delete.mp3": 0.56,
+  "/characters/yuna/Longing.mp3": 0.62,
+  "/item/guts_key/shockwave_boost.mp4": 0.92,
+  "/mooncell/day5theme/day_mooncell.mp3": 0.79,
+  "/mooncell/day5theme/night_mooncell.mp3": 0.74,
+  "/mooncell/sond_effect/noti2.mp3": 0.75,
+  "/mooncell/theme/day1-4.mp3": 0.5,
+  "/mooncell/theme/rest_time.mp3": 0.51,
+  "/overload_force/overload_force_connect.m4a": 0.67,
+  "/overload_force/overload_force_theme.mp3": 0.53,
+  "/theme_song/FULL FORCE.mp3": 0.44,
+  "/theme_song/battle_phase.mp3": 0.65,
+  "/theme_song/day_4.0.mp3": 0.78,
+  "/theme_song/main_home_4.0.mp3": 0.69,
+};
+function pathGain(path) { return LOUDNESS_GAIN[path] ?? 1; }
+export function soundGain(name) { return pathGain(FILES[name]); }
 const activeSfx = new Map();
 const musicSuspensions = new Set();
 
@@ -214,8 +374,12 @@ const MUSIC_TRACK_SCALE = {
 //  (ถ้าใช้ pause จะถูกสั่ง play() กลับมาทันทีในบรอดแคสต์ถัดไป)
 let musicDuck = 1;
 let loopSfx = null; // ลูปเสียงเฉพาะกิจที่เล่นอยู่ (ดู startLoopSfx ท้ายไฟล์)
+function musicPath(name) {
+  const sequence = MUSIC_SEQUENCES[name];
+  return sequence ? sequence[musicCache[name]?._echoSequenceStage || 0] : FILES[name];
+}
 function trackVolume(name) {
-  return Math.min(1, MUSIC_BASE * (MUSIC_TRACK_SCALE[name] ?? 1) * masterGain() * musicDuck);
+  return Math.min(1, MUSIC_BASE * pathGain(musicPath(name)) * (MUSIC_TRACK_SCALE[name] ?? 1) * masterGain() * musicDuck);
 }
 
 // ---------- master volume (จำค่าไว้ใน localStorage) ----------
@@ -233,13 +397,13 @@ const volListeners = new Set();
 export function masterGain() { return Math.pow(masterVolume, 1.6); }
 
 export function getMasterVolume() { return masterVolume; }
-export function videoVolume() { return VIDEO_BASE * masterGain(); } // ให้ <video> ใช้ (ผ่าน curve เดียวกัน)
+export function videoVolume(src) { return VIDEO_BASE * pathGain(src) * masterGain(); } // ให้ <video> ใช้ (ผ่าน curve เดียวกัน)
 export function onVolumeChange(fn) { volListeners.add(fn); return () => volListeners.delete(fn); }
 export function setMasterVolume(v) {
   masterVolume = Math.max(0, Math.min(1, v));
   try { localStorage.setItem("echo_vol", String(masterVolume)); } catch {}
   if (currentMusic) getMusic(currentMusic).volume = trackVolume(currentMusic);
-  if (loopSfx) loopSfx.volume = SFX_BASE * masterGain(); // ลูปเสียงเฉพาะกิจต้องตามหลอดเสียงด้วย
+  if (loopSfx) loopSfx.volume = loopVolume(loopSfx._echoName); // ลูปเสียงเฉพาะกิจต้องตามหลอดเสียงด้วย
   for (const [a, base] of activeSfx) a.volume = base * masterGain();
   volListeners.forEach((fn) => fn(masterVolume));
 }
@@ -267,6 +431,7 @@ function getMusic(name) {
         a.src = sequence[1];
         a.loop = true;
         a.currentTime = 0;
+        a.volume = trackVolume(name); // ไฟล์ช่วงถัดไปดังไม่เท่าไฟล์แรก
         playCurrentMusic(name, a);
       });
     }
@@ -403,7 +568,7 @@ export function prewarmSfx(names) {
 export function playSfx(name) {
   if (!FILES[name]) return null;
   const a = takeVoice(name);
-  const base = name === "action_button" ? CLICK_BASE : SFX_BASE;
+  const base = name === "action_button" ? CLICK_BASE : SFX_BASE * soundGain(name);
   a.volume = base * masterGain();
   a._echoPlay = ++playSeq;
   activeSfx.set(a, base);
@@ -427,12 +592,15 @@ export function clickSound() { playSfx("action_button"); }
 //  (เพลงคิดของคอนเนอร์: เล่นระหว่างกำลังเรียงลำดับในโมดัล แล้วหยุดทันทีที่ปิด)
 //  ระหว่างเล่น เพลงหลักจะถูกหรี่ลงเหลือ DUCK_LEVEL แทนการหยุด — ดูคอมเมนต์ที่ musicDuck
 const DUCK_LEVEL = 0.25;
+// ลูปเสียงเฉพาะกิจ (เพลงคิดของคอนเนอร์) ทำหน้าที่แทนเพลงประกอบ -> ใช้ระดับเดียวกับเพลง
+function loopVolume(name) { return MUSIC_BASE * soundGain(name) * masterGain(); }
 export function startLoopSfx(name) {
   if (!FILES[name]) return null;
   stopLoopSfx();
   const a = new Audio(FILES[name]);
   a.loop = true;
-  a.volume = SFX_BASE * masterGain();
+  a._echoName = name;
+  a.volume = loopVolume(name);
   loopSfx = a;
   musicDuck = DUCK_LEVEL;
   if (currentMusic) getMusic(currentMusic).volume = trackVolume(currentMusic);
@@ -478,7 +646,7 @@ export function playCutsceneVideo(video) {
   const releaseMusic = suspendMusic();
   let disposed = false;
   let awaitingGesture = false;
-  const updateVolume = () => { video.volume = videoVolume(); };
+  const updateVolume = () => { video.volume = videoVolume(video.getAttribute("src")); };
   updateVolume();
   video.currentTime = 0;
   video.muted = false;
