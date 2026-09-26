@@ -1481,6 +1481,12 @@ body {
    (ผู้เล่นรายงานว่าเกจสีล้วนดูไม่ออกว่าอันไหนคืออะไร) */
 .sr { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .sr-ico { width: 15px; height: 15px; flex: 0 0 auto; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.85)); }
+/* รอยร้าว (โทโนะ ชิกิ): วงม่วงรอบไอคอนเกราะ — เติมตามจำนวนขั้น 1-8 */
+.sr-crack { position: relative; display: inline-flex; flex: 0 0 auto; }
+.sr-crack-ring {
+  position: absolute; inset: -5px; width: calc(100% + 10px); height: calc(100% + 10px);
+  pointer-events: none; filter: drop-shadow(0 0 3px rgba(192, 132, 252, 0.8));
+}
 .sr-sp-label {
   flex: 0 0 auto;
   width: 15px;

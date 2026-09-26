@@ -74,6 +74,7 @@ const {
   consumeEvadeStack,
   tickEvadeStacks,
   numbFizzles,
+  accurateActive,
 } = require("./characters/_universal_status");
 // เพดานค่าใช้พลังงานของสกิล: ตัวปรับราคา "ขาขึ้น" ทุกชนิด (กลางคืน / ภาระเวท) ดันราคาได้ไม่เกินนี้
 //  สกิลที่ราคาแตะเพดานอยู่แล้ว (เช่นท่าไม้ตาย 8) จะไม่ถูกดันให้แพงขึ้นไปอีก — ส่วนกระแสเวทยังลดราคาได้ตามปกติ
@@ -574,7 +575,7 @@ const PSHIKI_ULT_IMG = "/characters/princess_shiki/p_shiki_skill3.jpg";
 const BAT_SKILL3_IMG = "/characters/bat_ben/bat_ben_skill3.jpg";
 // ---------- โทโนะ ชิกิ (patch 2.1.7) ----------
 // ค่าคงที่/logic ส่วนใหญ่ย้ายไปอยู่ characters/tohno.js แล้ว — เหลือแค่ภาพที่โค้ดส่วนกลาง (TRANSFORMS/displayImg) ยังใช้อยู่
-const TOHNO_DEATH_IMG = CHAR_HOOKS.tohno.DEATH_IMG; // ร่างระหว่างสกิลติดตัวเปิดใช้งาน (ระดับ 2 ขึ้นไป)
+const TOHNO_DEATH_IMG = CHAR_HOOKS.tohno.DEATH_IMG; // ร่างระหว่างถือ "หลับให้สบาย"
 // ---------- นานายะ ชิกิ (patch 2.1.9) ----------
 // ค่าคงที่/logic ทั้งหมดย้ายไปอยู่ characters/nanaya.js แล้ว
 // สกิลติดตัวถูก "อันนี้ของนายรึเปล่า" หรือ MOON*CELL (คิชินามิ ฮาคุโนะ) ปิดใช้งานอยู่ไหม
@@ -592,11 +593,10 @@ const MIYAKO_KILL_REDUCE = 0.40;      // นั่นพี่จ๋าหรอ
 function killSealed(p) {
   return !!p && ((p.statuses && p.statuses.miyakoSeal) || 0) > 0;
 }
-// ตัวละครนี้ "มี" ความสามารถสังหารทันทีติดตัวไหม (โทโนะ ชิกิ / นานายะ ชิกิ: นับแม้กำลังปิดสกิลติดตัวไว้อยู่ — ป้องกันเปิดกลับมาใช้ทีหลัง
+// ตัวละครนี้ "มี" ความสามารถสังหารทันทีติดตัวไหม (นานายะ ชิกิ: นับแม้กำลังปิดสกิลติดตัวไว้อยู่ — ป้องกันเปิดกลับมาใช้ทีหลัง
 //  หลังโดนปิดใช้งานจากหนูจะทำให้พี่ตาสว่างเอง / เรียวกิ ชิกิ: ต้องมีท่าไม้ตายสังหารทันทีเปิดใช้งานอยู่จริงเท่านั้น เพราะเป็นทรัพยากรที่ต้องเสียแต้มเปิดใหม่)
 function hasKillCapability(p) {
   if (!p || !p.alive) return false;
-  if (p.characterId === "tohno") return true;
   if (p.characterId === "nanaya") return true;
   if (p.characterId === "shiki" && (((p.statuses.deatheye || 0) > 0) || ((p.statuses.wither || 0) > 0))) return true;
   // เจ้าหญิงราก (patch 2.2.7): สกิลติดตัวคิดโอกาสสังหารจากเส้นชีวิตเสมอเมื่อได้โจมตีปกติ
@@ -608,6 +608,7 @@ function hasKillCapability(p) {
 // Apple guy: หลบหลีกสำเร็จระหว่างชิวๆครับน้องๆ สามารถรอดพ้นจากสกิลประเภท "สังหารทันที" ได้ด้วย
 //  (universal-dispatcher wrapper — ตรรกะจริงอยู่ characters/appleguy.js — ตัวละครสังหารทันทีอื่นเรียกผ่าน engine.appleGuyDodgesKill)
 function appleGuyDodgesKill(attacker, target) {
+  if (accurateActive(attacker)) return false; // "แม่นยำ": เจาะการหลบทุกแบบ
   return CHAR_HOOKS.appleguy.tryDodgeKill(engine, attacker, target);
 }
 // นั่นพี่จ๋าหรอ? (สกิลติดตัว): ลดโอกาสถูกสังหารทันทีของอาริมะ มิยาโกะ ตามจำนวนครั้งที่เคยรอด (สะสม 40%/ครั้ง)
@@ -1741,8 +1742,8 @@ function displayImg(p, unmasked) {
   // เรียวกิ ชิกิ: ระหว่างท่าไม้ตาย ฉันมองเห็นมันแล้ว / ความตายที่โรยรา = ภาพสถานะท่าไม้ตาย
   if (p.characterId === "shiki" && (p.statuses.wither || 0) > 0) return SHIKI_WITHER_IMG;
   if (p.characterId === "shiki" && (p.statuses.deatheye || 0) > 0) return SHIKI_DEATH_IMG;
-  // โทโนะ ชิกิ: มีดพับประจำตระกูล ระดับ 2 ขึ้นไป (เปิดใช้งานสกิลติดตัว) = ภาพ tohno_death
-  if (p.characterId === "tohno" && (p.tohnoLevel || 1) >= 2) return TOHNO_DEATH_IMG;
+  // โทโนะ ชิกิ: ระหว่างถือ "หลับให้สบาย" (กดท่าไม้ตายแล้วยังไม่ได้ตี) = ภาพ tohno_death
+  if (CHAR_HOOKS.tohno.deathForm(p)) return TOHNO_DEATH_IMG;
   // โอกูริ แคป: ระหว่างร่าง Zone (GrayBeast) = ภาพ zone_form
   if (p.characterId === "oguri" && (p.statuses.graybeast || 0) > 0) return OGURI_ZONE_IMG;
   // ผู้สังหารเมจ: เคยใช้ Witch Mark ไปแล้ว (ถาวร) = MS02.png แทน MS01.png ปกติ
@@ -1885,13 +1886,8 @@ function activeSkillMusic() {
     }
   }
   if (bestShiki) return bestShiki;
-  // มีดพับประจำตระกูล (โทโนะ ชิกิ patch 2.1.7): เพลง tohno_theme เล่นค้างระหว่างสกิลติดตัวเปิดใช้งาน (ระดับ 2 ขึ้นไป)
-  let bestTohno = null;
-  for (const p of alivePlayers()) {
-    if (p.characterId === "tohno" && (p.tohnoLevel || 1) >= 2) {
-      if (!bestTohno || (p.transformAt || 0) > bestTohno.at) bestTohno = { music: "tohno", at: p.transformAt || 0 };
-    }
-  }
+  // โทโนะ ชิกิ: เพลง tohno_theme เล่นค้างระหว่างถือ "หลับให้สบาย" (characters/tohno.js)
+  const bestTohno = CHAR_HOOKS.tohno.activeMusic(engine);
   if (bestTohno) return bestTohno;
   // Mystic eye of death perception (นานายะ ชิกิ patch 2.1.9): เพลง nanaya_theme เล่นค้างระหว่างเปิดใช้งาน — ปิดพร้อมกับปิดสกิลติดตัว
   let bestNanaya = null;
@@ -2374,7 +2370,7 @@ function resetCombat(p) {
   p.nightTaxTier = null;        // กลางคืน (patch 2.1.7): สกิลที่สุ่มโดนคืนนี้ใช้แต้มมากขึ้น +1 ("basic" | "secondary" | null)
   p.evadeStacks = [];            // หลบหลีก (สถานะ Universal): แต่ละสแตคมีอายุ EVADE_STACK_TURNS เทิร์นของตัวเอง
   p.fortuneIdle = 0;             // โชคลาภ (Bard patch 2.1.7): นับเทิร์นที่ไม่ได้ใช้ (ครบ 3 = หมดฤทธิ์เอง)
-  p.tohnoLevel = 1;              // โทโนะ ชิกิ (patch 2.1.7): ระดับมีดพับประจำตระกูล 1-5 (1 = ปิดสกิลติดตัว, ค่าเริ่มต้น)
+  CHAR_HOOKS.tohno.resetCombat(p); // โทโนะ ชิกิ: โหมด/สถานะที่รอ/ชุดโจมตี + รอยร้าวบนตัว (ใครก็ติดได้)
   // ---------- นานายะ ชิกิ (patch 2.1.9) ----------
   p.nanayaEyeOn = false;          // Mystic eye of death perception: เปิด/ปิดได้ระหว่างเกม (ค่าเริ่มต้นปิด)
   p.nanayaToggleUsed = false;     // เปิด/ปิดได้แค่ 1 ครั้งต่อเทิร์น (รีเซ็ตทุกเทิร์นใหม่)
@@ -2435,13 +2431,13 @@ function buildStateFor(viewerId) {
   const fullForce = CHAR_HOOKS.daisuke.clockUpHosts(engine).length > 1;
   const hisakawaBg = Object.values(players).some((p) => p.alive && p.characterId === "hisakawa_sister" && (p.statuses.hisakawaDream || 0) > 0);
   // ฉันมองเห็นมันแล้ว (ชิกิ): ภาพ shiki_fill.png ซ้อนทับฉากหลัง | ความตายที่โรยรา: ฉากหลังวีดีโอ shiki_fill2.mp4
-  //  โทโนะ ชิกิ (patch 2.1.7): มีดพับประจำตระกูล ระดับ 2 ขึ้นไป — ใช้ภาพซ้อนทับเดียวกับ "eye" (shiki_fill.png)
+  //  โทโนะ ชิกิ: ระหว่างถือ "หลับให้สบาย" — ใช้ภาพซ้อนทับเดียวกับ "eye" (shiki_fill.png)
   //  นานายะ ชิกิ (patch 2.1.9): Mystic eye of death perception เปิดใช้งาน — ใช้ภาพซ้อนทับเดียวกัน (shiki_fill.png)
   const shikiBg = Object.values(players).some((p) => p.alive && p.characterId === "shiki" && (p.statuses.wither || 0) > 0)
     ? "wither"
     : Object.values(players).some((p) => p.alive && (
         (p.characterId === "shiki" && (p.statuses.deatheye || 0) > 0) ||
-        (p.characterId === "tohno" && (p.tohnoLevel || 1) >= 2) ||
+        CHAR_HOOKS.tohno.deathForm(p) ||
         (p.characterId === "nanaya" && p.nanayaEyeOn) ||
         (p.characterId === "tepeu" && (p.tepeuEyeTurns || 0) > 0) ||
         (p.characterId === "princess_shiki" && (p.statuses.pshikiUlt || 0) > 0)
@@ -2737,6 +2733,9 @@ function buildStateFor(viewerId) {
         ...(mine ? CHAR_HOOKS.usagi.privateState(engine, p) : {}),
         // Bamboo-Hatted Kim: ฝักดาบ/Poise/เหรียญ/บัพ (เห็นทุกคน) · คูลดาวน์/ห้ามจั่ว (เห็นเจ้าตัวคนเดียว)
         kim: CHAR_HOOKS.kim.publicState(p),
+        // โทโนะ ชิกิ: โหมด/สถานะที่รอ (เห็นทุกคน) · รอยร้าวบนตัวผู้เล่นทุกคน (ขอบม่วงรอบไอคอนเกราะ)
+        tohno: CHAR_HOOKS.tohno.publicState(p),
+        tohnoCrack: p.tohnoCrack || 0,
         ...(mine ? CHAR_HOOKS.kim.privateState(engine, p) : {}),
         // Recruit: กระสุน/โควตาเตรียมตัว (เห็นทุกคน) · QTE (ตำแหน่งจุด) / คูลดาวน์ / การเลือกเป้า (เห็นเจ้าตัวคนเดียว)
         recruit: CHAR_HOOKS.recruit.publicState(p),
@@ -2940,7 +2939,6 @@ function buildStateFor(viewerId) {
         chillDodge: p.chillDodge != null ? p.chillDodge : 100, // Apple guy: อัตราหลบปัจจุบัน (%)
         tonkatsu: p.tonkatsu || 0, // เทมาริ: ชามทงคัสสึสะสม (UI สะสมชาม)
         phenexPain: p.phenexPain || 0, // ริต้า เบอร์นัล: ความเจ็บปวดสะสม (ไม่อยากให้ใครต้องเจ็บปวด — ปลดปล่อยตอนตกรอบจริง)
-        tohnoLevel: p.tohnoLevel || 1, // โทโนะ ชิกิ: ระดับมีดพับประจำตระกูลที่เลือกอยู่ (1-5)
         nanayaEyeOn: !!p.nanayaEyeOn,           // นานายะ ชิกิ: Mystic eye of death perception เปิดอยู่ไหม
         nanayaToggleUsed: !!p.nanayaToggleUsed, // นานายะ ชิกิ: เปิด/ปิดไปแล้วในเทิร์นนี้หรือยัง
         atCap: scoreOf(p) >= scoreCap(p), // แต้มเต็มเพดาน (21/UPG) -> ปิดปุ่มจั่ว รอเปิดไพ่เอง
@@ -3893,6 +3891,7 @@ function dealRound() {
     // Bamboo-Hatted Kim: เหน็บชาที่จองไว้เมื่อเทิร์นก่อนเริ่มมีผล (ทุกคน) · ของ Kim เอง: To Claim Their Bones /
     //  Poise ลดทุก 5 เทิร์น / โยนเหรียญ — อยู่หลังเลือดไหล/ฟื้นเกราะ เพราะเหรียญอ่านพลังชีวิตของต้นเทิร์นนี้
     CHAR_HOOKS.kim.onRoundStartTick(engine, p);
+    CHAR_HOOKS.tohno.onRoundStartTick(engine, p); // รอยร้าวจางลงทุก 10 เทิร์น · ล้างชุดโจมตีที่ค้างของโทโนะ
     CHAR_HOOKS.recruit.onRoundStartTick(engine, p); // Recruit: ล้างธงยิง/HeadShot/โจมตีอีกครั้งที่ค้างจากเทิร์นก่อน
     // สไตรเกอร์ ยูเรก้า: สตั้นจากหมัดเหล็กซ้ำ (ทุกคน · ก่อนบล็อกเช็คสตั้น) · Mark 5 แต้มสกิล · นับถอยหลังระเบิด · เตาปฏิกรณ์
     CHAR_HOOKS.striker.onRoundStartTick(engine, p);
@@ -4323,9 +4322,12 @@ function useSkillCore(id, tier, targets, item) {
   const isMuimi = p.characterId === "muimi";
   const isMuimiBasic = isMuimi && tier === "basic";
   if (isMuimi && !CHAR_HOOKS.muimi.canUseSkill(engine, p, tier)) return;
-  // มีดพับประจำตระกูล (โทโนะ ชิกิ สกิลพื้นฐาน): เลือกระดับ 1-5 — ไม่นับเป็นการใช้สกิลของเทิร์น (กดเปลี่ยนกี่ครั้งก็ได้)
-  const isTohnoPick = p.characterId === "tohno" && tier === "basic";
-  if (isTohnoPick && !CHAR_HOOKS.tohno.validateBasicItem(item)) return; // ต้องเลือกระดับ 1-5 เท่านั้น (characters/tohno.js)
+  // ขอบคุณอาจารย์มากๆ (โทโนะ ชิกิ สกิลพื้นฐาน): สลับโหมด ใจเย็น/เดือดดาล — ไม่นับเป็นการใช้สกิลของเทิร์น (สลับกี่ครั้งก็ได้)
+  const isTohnoSkill = p.characterId === "tohno";
+  const isTohnoPick = isTohnoSkill && tier === "basic";
+  if (isTohnoPick && !CHAR_HOOKS.tohno.validateBasicItem(item)) return; // ต้องเลือก "calm" / "rage" (characters/tohno.js)
+  // เชือดเฉือน / มองเห็นแล้ว!! กดซ้อนกันไม่ได้ (ถือ "จบสิ้นซะ" หรือ "หลับให้สบาย" อยู่)
+  if (isTohnoSkill && !CHAR_HOOKS.tohno.canUseSkill(engine, p, tier)) return;
   // เธอ/นาย คือฉันหรอ? (คิชินามิ ฮาคุโนะ สกิลพื้นฐาน): สลับเพศ — ไม่นับเป็นการใช้สกิลของเทิร์น แต่กดสลับได้แค่ 1 ครั้งต่อเทิร์น
   // DoomGuy (patch 2.2 full): สกิลติดตัว "ไม่ติดคูลดาวน์การใช้สกิล" — Quick Swap (พื้นฐาน) และ Weapon (รอง)
   //  ไม่นับเป็นการใช้สกิลของเทิร์น กดได้ทั้งคู่ในเทิร์นเดียวกัน (Quick Swap เองยังจำกัด 1 ครั้ง/เทิร์นแยกต่างหาก)
@@ -4674,10 +4676,8 @@ function useSkillCore(id, tier, targets, item) {
   // ไรเดอร์ Zect: กด Clock Up/Clock Over กลางเฟสจั่วไพ่ — ต้องแก้เวลาที่เหลือตอนนี้
   //  ก่อนที่ pausePlayingForCutscene() จะอ่าน timeLeft ไปเก็บไว้คืนหลังคลิปจบ
   if ((isDaisukePick || isYagurumaPick || isKagamiPick || isTsurugiPick) && tier === "secondary") syncClockUpPhaseTime();
-  // ---------- โทโนะ ชิกิ: มีดพับประจำตระกูล — เลือกระดับสกิลติดตัว 1-5 (กดเปลี่ยนกี่ครั้งก็ได้) (characters/tohno.js) ----------
-  if (isTohnoPick) {
-    flashSuffix = CHAR_HOOKS.tohno.applyBasicPick(engine, p, item);
-  }
+  // ---------- โทโนะ ชิกิ (characters/tohno.js): สลับโหมด / เชือดเฉือน / มองเห็นแล้ว!! ----------
+  if (isTohnoSkill) flashSuffix = CHAR_HOOKS.tohno.applyInstantSkill(engine, p, tier, item) || flashSuffix;
   // ---------- Apple guy: เอาแบบนี้ได้ไหม / เอาไปสิ (characters/appleguy.js) ----------
   if (isApplePick) {
     flashSuffix = CHAR_HOOKS.appleguy.applyBasicPick(p, item, engine.log);
@@ -4889,7 +4889,8 @@ function useSkillCore(id, tier, targets, item) {
     // คอนเนอร์: เพลงคิด conner_think.m4a "ไม่" เล่นที่นี่ — มันต้องเล่นระหว่างกำลังเรียงลำดับในโมดัล
     //  (ฝั่ง client คุมเอง ดู ConnorPredictModal) ตอนกดยืนยันคือตอนที่คิดเสร็จแล้ว เพลงต้องหยุดพอดี
     const flashSound = (isTepeuCook || isTepeuPonder) ? "tepeu_skill1_2" : isHisakawaSkill ? CHAR_HOOKS.hisakawa_sister.skillVoice(p, tier, skill)
-      : isKimPick ? CHAR_HOOKS.kim.skillSound(p, tier) : null; // Bamboo-Hatted Kim: เสียงชักดาบ / ฟาดฟันลง
+      : isKimPick ? CHAR_HOOKS.kim.skillSound(p, tier) // Bamboo-Hatted Kim: เสียงชักดาบ / ฟาดฟันลง
+      : isTohnoSkill ? CHAR_HOOKS.tohno.skillSound(p, tier) : null; // โทโนะ: เสียงพากย์สุ่มตอนกดสกิลรอง/ท่าไม้ตาย
     // อิสึกะ ชิโด "ฝากด้วยนะตัวฉัน": สกิลเงียบ — ห้ามมีแบนเนอร์ให้ใครเห็นว่าเขากดอะไรไป
     if (!CHAR_HOOKS.shido.silentSkill(p, tier)) {
       io.emit("skillFlash", { name: skill.name + flashSuffix, img: flashImg, by: p.name, color: colorOf(p), sound: flashSound });
@@ -5764,6 +5765,7 @@ function nanayaCancelReattack(id) {
 function attackSoundOf(attacker) {
   if (!attacker) return undefined;
   if (attacker.characterId === "mageslayer") return "mageslayer_attack";
+  if (attacker.characterId === "tohno") return CHAR_HOOKS.tohno.attackSound(attacker); // ตีธรรมดา (ไม่ใช่ผลของสกิล)
   if (attacker.characterId === "recruit") return CHAR_HOOKS.recruit.attackSound(attacker); // เสียงปืน
   if (attacker.characterId === "striker") return CHAR_HOOKS.striker.attackSound(attacker);
   if (attacker.characterId === "cayenne") return CHAR_HOOKS.cayenne.attackSound(attacker); // ร่างเกพาร์ด: เสียงปืน           // BA.mp3
@@ -5850,6 +5852,10 @@ function doAttack(byId, targetId) {
   CHAR_HOOKS.usagi.onAttack(engine, attacker);
   // Bamboo-Hatted Kim: จำว่าออกหมัด (ก่อนด่านหลบทั้งหมด) — ถูกหลบ = ฝักดาบ +10 ตัดสินที่หมัดถัดไป/endTurn
   CHAR_HOOKS.kim.beforeAttack(engine, attacker);
+  // โทโนะ ชิกิ: หมัดนี้เป็นหมัดแบบไหน (ธรรมดา / เชือดเฉือน / ระเบิดรอยร้าว) — ใช้สถานะที่รอไว้ตอนออกหมัด
+  CHAR_HOOKS.tohno.beginAttack(engine, attacker);
+  // "แม่นยำ" (บัฟ Universal — โทโนะ มองเห็นแล้ว!!): เจาะการหลบหลีกทุกแบบของเป้าหมาย (โล่กันครั้งยังกันได้ตามปกติ)
+  const accurate = accurateActive(attacker);
   attacker.nanayaReattackReady = false; // หัวใจฆาตกร (นานายะ ชิกิ): กำลังใช้โอกาสโจมตีซ้ำนี้อยู่ (หรือไม่เกี่ยวข้องกับตัวละครนี้)
 
   let phenexTaunted = false;
@@ -5898,7 +5904,7 @@ function doAttack(byId, targetId) {
 
   // หลบหลีก (Encore / มิติมายาบรรเลง — Bard / สถานะพื้นฐาน patch 2.0.8): หลบการโดนโจมตีตาม % ที่ระบุ
   //  (ไม่ระบุ = 100%) — ซ้อนทับได้ หมดไปทีละ 1 ครั้งเมื่อถูกเลือกโจมตี ไม่ว่าหลบพ้นหรือไม่
-  if ((target.statuses.evade || 0) > 0) {
+  if (!accurate && (target.statuses.evade || 0) > 0) {
     const evadePct = statusAmtOf(target, "evade") || 100;
     consumeEvadeStack(target);
     if (Math.random() * 100 < evadePct) {
@@ -5935,11 +5941,6 @@ function doAttack(byId, targetId) {
   const witherLines = shikiWither ? (target.statuses.deathline || 0) : 0;
   if (shikiWither && !killSealed(attacker)) {
     if (CHAR_HOOKS.shiki.onAttackWither(engine, attacker, target)) return;
-  }
-
-  // ---------- โทโนะ ชิกิ: Mystic eye of death perception (patch 2.1.7) — ย้ายไป characters/tohno.js ----------
-  if (attacker.characterId === "tohno") {
-    if (CHAR_HOOKS.tohno.onAttack(engine, attacker, target)) return;
   }
 
   // ---------- เจ้าหญิงราก: Mystical Eye of Death Perception (Truth) (characters/princess_shiki.js) ----------
@@ -5992,29 +5993,31 @@ function doAttack(byId, targetId) {
   }
 
   // สกิลติดตัว Apple guy (ชิวๆ ไม่โดนหรอกครับ, characters/appleguy.js): ขณะชิวๆครับน้องๆ ทำงาน มีโอกาสหลบการถูกเลือกโจมตี
-  if (CHAR_HOOKS.appleguy.onAttackTryDodge(engine, attacker, target)) return;
+  if (!accurate && CHAR_HOOKS.appleguy.onAttackTryDodge(engine, attacker, target)) return;
 
   // โอกูริ แคป (Rework, characters/oguri.js — Training บัฟเสริม Flow): โอกาสหลบการโจมตี 50%
-  if (CHAR_HOOKS.oguri.tryFlowDodge(engine, attacker, target)) return;
-  if (CHAR_HOOKS.escanor.tryNightDodge(engine, attacker, target)) return;
+  if (!accurate && CHAR_HOOKS.oguri.tryFlowDodge(engine, attacker, target)) return;
+  if (!accurate && CHAR_HOOKS.escanor.tryNightDodge(engine, attacker, target)) return;
 
   // โปรดิวเซอร์ (luminous): นับจำนวนครั้งที่ถูกตี — ต้องนับ "การถูกเล็ง" ไม่ใช่ "การโดนดาเมจ"
   //  จึงต้องอยู่ก่อนด่านหลบหลีกทั้งหมด · luminous มีการหลบ 40% ของคาโฮะติดมาด้วย ถ้านับหลังด่านหลบ
   //  หมัดที่ถูกหลบ (~40%) จะหายไปเงียบๆ จนรางวัลแทบไม่มีทางเกิดขึ้นเลย
   const lumiBurst = CHAR_HOOKS.producer_lumi.onAttackedNormally(engine, attacker, target);
   // เอจิ (characters/eiji.js): อัตราหลบหลีกรวม (ว่องไว + ไม่ว่ายังก็ตาม + Ordinal Scale) — 1 ครั้งต่อเทิร์น
-  if (CHAR_HOOKS.eiji.tryAttackDodge(engine, attacker, target)) return;
+  if (!accurate && CHAR_HOOKS.eiji.tryAttackDodge(engine, attacker, target)) return;
   // อิปโป (characters/ippo.js): หลบการโจมตีปกติ — หลบพ้นแล้วจบเทิร์นด้วยฉากหลบ
-  if (CHAR_HOOKS.ippo.tryAttackDodge(engine, attacker, target)) return;
+  if (!accurate && CHAR_HOOKS.ippo.tryAttackDodge(engine, attacker, target)) return;
   // สไตรเกอร์ ยูเรก้า (Mark 5): หลบการโจมตีปกติ 5%
-  if (CHAR_HOOKS.striker.tryAttackDodge(engine, attacker, target)) return;
+  if (!accurate && CHAR_HOOKS.striker.tryAttackDodge(engine, attacker, target)) return;
   // โปรดิวเซอร์ (Tsubasa 283 ของคาโฮะ): หลบหลีก 40%
-  if (CHAR_HOOKS.producer_lumi.tryAttackDodge(engine, attacker, target)) return;
+  if (!accurate && CHAR_HOOKS.producer_lumi.tryAttackDodge(engine, attacker, target)) return;
   // Zect (characters/daisuke.js): ระหว่าง Clock Up หลบการโจมตีได้ 25%
-  if (CHAR_HOOKS.daisuke.tryAttackDodge(engine, attacker, target)) return;
-  if (CHAR_HOOKS.yaguruma.tryAttackDodge(engine, attacker, target)) return;
-  if (CHAR_HOOKS.kagami.tryAttackDodge(engine, attacker, target)) return;
-  if (CHAR_HOOKS.tsurugi.tryAttackDodge(engine, attacker, target)) return;
+  if (!accurate && CHAR_HOOKS.daisuke.tryAttackDodge(engine, attacker, target)) return;
+  if (!accurate && CHAR_HOOKS.yaguruma.tryAttackDodge(engine, attacker, target)) return;
+  if (!accurate && CHAR_HOOKS.kagami.tryAttackDodge(engine, attacker, target)) return;
+  if (!accurate && CHAR_HOOKS.tsurugi.tryAttackDodge(engine, attacker, target)) return;
+  // โทโนะ ชิกิ: หลบหลีก 5% (ตระกูลโทโนะ · ใจเย็น) / 15% (เดือดดาล)
+  if (!accurate && CHAR_HOOKS.tohno.tryAttackDodge(engine, attacker, target)) return;
   // เอจิ สกิลติดตัว 1 (ผู้เล่นอันดับ 2): ผู้ชนะไปตีคนอื่นที่ไม่ใช่เอจิ -> 25% ขัดจังหวะแล้วสวนคืน
   if (CHAR_HOOKS.eiji.tryInterrupt(engine, attacker, target)) return;
 
@@ -6126,6 +6129,9 @@ function doAttack(byId, targetId) {
   dmg = CHAR_HOOKS.usagi.applyCrit(engine, attacker, dmg, usagiCritFx); // อุซากิ: คริติคอล 7% ต่อปรุๆ (×2)
   const kimCritFx = {};
   dmg = CHAR_HOOKS.kim.applyCrit(engine, attacker, dmg, kimCritFx); // Bamboo-Hatted Kim: Poise 1.2%/หน่วย (+หัว 15%) ×2
+  // โทโนะ ชิกิ (มองเห็นแล้ว!!): ผ่านด่านหลบแล้ว -> ระเบิดรอยร้าวบนเป้า ดาเมจ +จำนวนรอยร้าว (รอยร้าวถูกใช้หมดแม้โล่จะกัน)
+  const tohnoBurstFx = {};
+  dmg = CHAR_HOOKS.tohno.applyBurst(engine, attacker, target, dmg, tohnoBurstFx);
   // ฮารุกะ (characters/haruka.js): จงไปสู่สุขติ — จุดชนวน "เลือดไหล" ของเป้าหมายให้ระเบิดรวมกับหมัดนี้
   //  ต้องอ่านค่าเลือดไหล "ก่อน" ความเสียหายลง และก่อนที่โอเมก้าจะแปะเลือดไหลก้อนใหม่ (onAttackLanded ด้านล่าง)
   const harukaPunishFx = {};
@@ -6218,6 +6224,8 @@ function doAttack(byId, targetId) {
   // Bamboo-Hatted Kim: หมัดของ Kim ลง (ฝักดาบ/ชักดาบ/Yield My Flesh/ฟื้นเลือด) · Kim ถูกตี (ฝักดาบ + สวนกลับ)
   const kimAtkFx = CHAR_HOOKS.kim.onAttackLanded(engine, attacker, target, dmg);
   const kimCounterFx = CHAR_HOOKS.kim.onAttackedNormally(engine, attacker, target, dmg);
+  // โทโนะ ชิกิ: ใจเย็น ฟื้นพลังชีวิต + ตระกูลโทโนะ 10% ตีอีกครั้ง · เดือดดาล รอยร้าว +1 (ตี 0 ก็นับว่าตีโดน)
+  const tohnoAtkFx = CHAR_HOOKS.tohno.onAttackLanded(engine, attacker, target);
   // สไตรเกอร์ ยูเรก้า: มือมีดมอบเลือดไหล · เตาปฏิกรณ์ 15% แทงสวน (วีดีโอเล่นก่อนสรุปความเสียหาย)
   const strikerBleed = CHAR_HOOKS.striker.onAttackLanded(engine, attacker, target);
   const strikerCounterFx = CHAR_HOOKS.striker.onAttackedNormally(engine, attacker, target);
@@ -6352,6 +6360,9 @@ function doAttack(byId, targetId) {
   if (mark42Atk > 0) addFx({ name: `เกราะ Mark 42 +${mark42Atk}`, img: Mark42.IMG.suit, by: attacker.name, color: colorOf(attacker) }, "atk");
   if (kimCritFx.crit) addFx({ name: `Poise คริติคอล ×2 (${kimCritFx.chance}%)`, img: displayImg(attacker), by: attacker.name, color: colorOf(attacker) }, "atk");
   for (const name of kimAtkFx) addFx({ name, img: displayImg(attacker), by: attacker.name, color: colorOf(attacker) }, "atk");
+  if (accurate) addFx({ name: "แม่นยำ — เจาะการหลบหลีก", img: CHAR_HOOKS.tohno.IMG.ultimate, by: attacker.name, color: colorOf(attacker) }, "atk");
+  if (tohnoBurstFx.fired) addFx({ name: `มองเห็นแล้ว!! — ระเบิดรอยร้าว ${tohnoBurstFx.cracks} ขั้น (+${tohnoBurstFx.cracks})`, img: CHAR_HOOKS.tohno.IMG.ultimate, by: attacker.name, color: colorOf(attacker) }, "atk");
+  for (const name of tohnoAtkFx) addFx({ name, img: CHAR_HOOKS.tohno.IMG.basic, by: attacker.name, color: colorOf(attacker) }, "atk");
   if (strikerFistFx) addFx({ name: `หมัดเหล็ก +1${strikerFistFx.stripped ? ` · ปาด "${strikerFistFx.stripped.label}"` : ""}${strikerFistFx.combo ? " · ซ้ำเป้าเดิม สตั้นเทิร์นหน้า" : ""}`, img: CHAR_HOOKS.striker.IMG.skill2, by: attacker.name, color: colorOf(attacker) }, "atk");
   if (strikerBleed > 0) addFx({ name: `มือมีด — เลือดไหล +${strikerBleed}`, img: CHAR_HOOKS.striker.IMG.skill1, by: attacker.name, color: colorOf(attacker) }, "atk");
   if (strikerCounterFx) addFx({ name: `เตาปฏิกรณ์ — แทงสวน -${strikerCounterFx.dmg}`, img: CHAR_HOOKS.striker.IMG.base, by: target.name, color: colorOf(target) }, "def");
@@ -6432,6 +6443,7 @@ function doAttack(byId, targetId) {
     byName: attacker.name, byImg: displayImg(attacker), byColor: colorOf(attacker),
         byDoomWeapon: attacker.characterId === "doomguy" ? attacker.doomWeapon : undefined, // DoomGuy: อาวุธที่ใช้ยิงตอนนี้ (เสียงยิงฝั่ง client)
         byAttackSound: attackSoundOf(attacker), // เสียงโจมตีปกติเฉพาะตัว (ผู้สังหารเมจ / ฮารุกะระหว่างโอเมก้า)
+    byVoice: CHAR_HOOKS.tohno.attackVoice(attacker), // เสียงพากย์ตอนตีธรรมดา (โทโนะ — สุ่ม 1 จาก 6)
     targetName: target.name, targetImg: displayImg(target), targetColor: colorOf(target),
     dmg, aoe: ginga || storiumAtk, revenge: false, skills: fxSkills,
     fxMs: (fxSkills.length ? ATTACKFX_TIME + 2 : ATTACKFX_TIME) * 1000,
@@ -6447,7 +6459,7 @@ function doAttack(byId, targetId) {
   //  / อย่าอยู่เลย แกน่ะ! (ริต้า เบอร์นัล patch 2.1.6) / ฉันยัง...มองเห็นอยู่!!! กันตาย + อย่างนายน่ะ จะไปเข้าใจอะไร (สึงาชิ ทาคุโตะ patch 2.2.4):
   //  เล่นวีดีโอที่ค้างคิวก่อน แล้วค่อยขึ้นสรุปความเสียหาย
   //  (ปกติทุกท่าอื่นจะขึ้นสรุปความเสียหายก่อนแล้วค่อยเล่นวีดีโอค้างคิวตอนจบ — ท่าเหล่านี้กลับลำดับเฉพาะตัว)
-  if ((storiumAtk || phenexPurgeAtk || miyakoUltAtk || triggerMultiAtk || triggerZeperionAtk || escanorAttackVideoQueued || (beatSaveFired && target.characterId === "takuto") || takutoUlt2VideoQueued || eijiSwordFx.videoQueued || harukaPunishFx.videoQueued || (harukaCounterFx && harukaCounterFx.videoQueued) || (danCounterFx && danCounterFx.videoQueued) || (yuiCounterFx && yuiCounterFx.videoQueued) || batGunFired || daisukeRiderFired || yagurumaStingFired || kagamiKickFired || tsurugiSlashFired || strikerFistFx || strikerCounterFx) && cutsceneQueue.length) runCutsceneQueue(showAttackFx);
+  if ((storiumAtk || phenexPurgeAtk || miyakoUltAtk || triggerMultiAtk || triggerZeperionAtk || escanorAttackVideoQueued || (beatSaveFired && target.characterId === "takuto") || takutoUlt2VideoQueued || eijiSwordFx.videoQueued || harukaPunishFx.videoQueued || (harukaCounterFx && harukaCounterFx.videoQueued) || (danCounterFx && danCounterFx.videoQueued) || (yuiCounterFx && yuiCounterFx.videoQueued) || batGunFired || daisukeRiderFired || yagurumaStingFired || kagamiKickFired || tsurugiSlashFired || strikerFistFx || strikerCounterFx || tohnoBurstFx.videoQueued) && cutsceneQueue.length) runCutsceneQueue(showAttackFx);
   else showAttackFx();
 }
 
@@ -6508,6 +6520,8 @@ function endTurn() {
   // คาเยนน์ "แน่จริงก็หลบสิ": ชุดกระสุนยังยิงไม่ครบ -> เปิดเฟสโจมตีครั้งถัดไปแทนการจบเทิร์น
   //  วางไว้บนสุดเพราะทุกทางจบหมัด (โดน/ถูกหลบ/ถูกสะท้อน/ถูกลบล้าง) ไหลมาจบที่ endTurn เหมือนกันหมด
   if (CHAR_HOOKS.cayenne.continueBarrage(engine)) return;
+  // โทโนะ ชิกิ: เชือดเฉือนยังตีไม่ครบ 4 ครั้ง / ตระกูลโทโนะได้ตีอีกครั้ง (ถูกหลบก็ตีต่อได้ — เหตุผลเดียวกับคาเยนน์)
+  if (CHAR_HOOKS.tohno.continueAttack(engine)) return;
   // คามิชิโร่ ซึรุงิ "Rider Slash": ฟันไปแค่จังหวะเดียว -> เปิดเฟสโจมตีอีกครั้งแทนการจบเทิร์น
   //  อยู่ตรงนี้เพราะหมัดที่ "ถูกหลบ" return ตั้งแต่ด่านหลบ ไม่ผ่าน postAttackFollowup — สเปคบอกว่าถูกหลบก็ต้องได้ตีจังหวะสอง
   if (CHAR_HOOKS.tsurugi.continueSlash(engine)) return;
@@ -7073,7 +7087,7 @@ function newPlayerRecord({ playerId, sessionToken, socketId, name, color, pos, c
     dmgHp: 0, dmgArmor: 0, gainedSkill: 0,
     wasAttacked: false, isWinner: false, isLoser: false,
     phenexPain: 0, phenexReborn: false, phenexNtdPermanent: false, phenexLastHitBy: null,
-    tohnoLevel: 1,
+    tohno: null, tohnoCrack: 0, tohnoCrackAt: 0,
   };
 }
 
@@ -7542,6 +7556,9 @@ const engine = {
   log(msg) { lastLog.push(msg); },
   // การ์ดสกิลเด้งบนกระดาน (ไม่หยุดเกม) — payload.sound = คีย์ใน client/src/audio.js ให้เล่นพร้อมการ์ด
   skillFlash(payload) { io.emit("skillFlash", payload); },
+  sfx(sound) { if (sound) io.emit("sfx", { sound }); }, // เสียงสั้นๆ ที่ทุกคนได้ยิน (ไม่มีป้าย) — เช่น โทโนะร้องตอนโดนตี
+  // ผู้ลงมือของดาเมจก้อนนี้ติด "แม่นยำ" ไหม — ด่านหลบดาเมจจากสกิลของตัวละครต่างๆ (อิปโป/เอจิ/luminous) ใช้เช็ค
+  sourceAccurate() { return !!effectSourceId && accurateActive(players[effectSourceId]); },
   colorOf(p) { return colorOf(p); },
   nextTransformCounter() { return ++transformCounter; },
   // มีการแช่ทั้งสนามจากตัวละครอื่นอยู่ไหม (การไล่ล่าของคอนเนอร์ / การแข่งของไบรอน)

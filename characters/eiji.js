@@ -261,7 +261,7 @@ module.exports = {
   // เรียกจาก adjustIncomingDamage() (universal dispatcher) — หลบดาเมจจากสกิล
   //  การโจมตีปกติจัดการที่ tryAttackDodge ไปแล้ว จึงข้าม isNormalAttack ที่นี่
   adjustIncomingDamage(engine, p, n, isNormalAttack) {
-    if (!isEiji(p) || n <= 0 || isNormalAttack || p._statusDamage) return n;
+    if (!isEiji(p) || n <= 0 || isNormalAttack || p._statusDamage || engine.sourceAccurate()) return n; // "แม่นยำ" เจาะการหลบ
     return this.tryDodge(engine, p, "ความเสียหายจากสกิล") ? 0 : n;
   },
 

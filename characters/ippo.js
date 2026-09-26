@@ -235,7 +235,7 @@ module.exports = {
   adjustIncomingDamage(engine, p, n, isNormalAttack) {
     if (!isIppo(p) || n <= 0) return n;
     if (p._itemDamage) engine.log(`🔫 ${p.name} — กระสุนจากไอเทมหลบไม่ได้ — โดนเต็มๆ`);
-    if (!isNormalAttack && !p._statusDamage && !p._itemDamage && this.tryDodge(engine, p, "ความเสียหายจากสกิล")) return 0;
+    if (!isNormalAttack && !p._statusDamage && !p._itemDamage && !engine.sourceAccurate() && this.tryDodge(engine, p, "ความเสียหายจากสกิล")) return 0; // "แม่นยำ" เจาะการหลบ
     // หลบไม่พ้น (หรือเป็นการโจมตีปกติที่หลุดด่าน tryAttackDodge มาแล้ว) = โดนเต็มๆ
     if (standStacks(p) > 0) {
       engine.log(`🧍 ${p.name} ผู้ยืนหยัด — โดนหมัดเข้าเต็มๆ อัตราหลบหลีกที่สะสมไว้ (+${standStacks(p)}%) หายหมด`);

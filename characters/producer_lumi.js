@@ -319,7 +319,7 @@ module.exports = {
   // เรียกจาก adjustIncomingDamage() ของ server — รวมทั้งการหลบและการหน่วงดาเมจไว้ที่เดียว
   adjustIncomingDamage(engine, p, n, isNormalAttack) {
     if (!isLumi(p) || n <= 0 || p._lumiNoDelay) return n;
-    if (!isNormalAttack && !p._statusDamage && this.tryDodge(engine, p, "ความเสียหายจากสกิล")) return 0;
+    if (!isNormalAttack && !p._statusDamage && !engine.sourceAccurate() && this.tryDodge(engine, p, "ความเสียหายจากสกิล")) return 0; // "แม่นยำ" เจาะการหลบ
     return this.delayIncoming(engine, p, n);
   },
 

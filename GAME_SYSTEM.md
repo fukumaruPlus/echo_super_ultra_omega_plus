@@ -489,6 +489,24 @@ qtePending() / sweepQte()                กันสรุปรอบ + กว
 - สกิลพิเศษ "เตรียมตัว" = socket `recruitPrep` (ไม่ผ่าน `useSkill` → ไม่กินโควตา) แต่ยังเช็คด่านห้ามสกิล/เหน็บชาเอง
 - เทสต์: [tests/characters/recruit.test.js](tests/characters/recruit.test.js)
 
+**โทโนะ ชิกิ (ยาก · unique · rework)** — `characters/tohno.js` · สถานะของตัวเองอยู่ที่ `p.tohno` (ไม่ใช่ `p.statuses`)
+- สกิลพื้นฐานสลับโหมด `calm`/`rage` (item ของ `useSkill`) · 0 แต้ม ไม่กินโควตาเทิร์น (`isTohnoPick`) · สกิลรอง/ท่าไม้ตายกันซ้อนที่ `canUseSkill` + `tohnoBusy` ฝั่งปุ่ม
+- **รอยร้าวเก็บที่ตัวเป้า** `t.tohnoCrack` / `t.tohnoCrackAt` (ใครก็ติดได้ · ล้างใน `resetCombat` ของทุกคน) — ส่งให้ทุกคนเป็น `tohnoCrack`
+  แล้ว client วาดวงม่วง (`CrackRing`) รอบไอคอนเกราะ · จางลงที่ `onRoundStartTick` เมื่อไม่เพิ่มครบ 10 เทิร์น
+- `beginAttack` (หัว `doAttack` ถัดจาก `kim.beforeAttack` ก่อนด่านหลบ) ตัดสินชนิดหมัด: เชือดเฉือน (`seq`) / ระเบิด (`burst`) / ธรรมดา (`plain` — ใช้เลือกเสียง)
+  · ใช้ "จบสิ้นซะ"/"หลับให้สบาย" ตั้งแต่ออกหมัด (ถูกหลบ = ท่าหายแต่รอยร้าวยังอยู่) · `damageBonus` อ่านธงล้วน (ห้ามแก้ state — `buildStateFor` เรียกด้วย)
+- ระเบิดที่ `applyBurst` ถัดจากคริติคอลของ Kim (ผ่านด่านหลบแล้ว) = ดาเมจ + จำนวนรอยร้าว แล้วล้างรอยร้าว **ก่อน** ดาเมจลง
+  (โล่/สะท้อน/ดูดซับรับไว้ รอยร้าวก็หายแล้ว) · คิว `tohnoBurst` ทุกครั้งและเล่นก่อนการ์ดสรุป · รอยร้าวใหม่ของโหมดเดือดดาลลงทีหลังที่ `onAttackLanded`
+- **หมัดต่อเนื่อง (เชือดเฉือน 4 ครั้ง / ตระกูลโทโนะ 10%) เปิดจากหัว `endTurn` (`continueAttack`) ถัดจากคาเยนน์** —
+  หมัดที่ถูกหลบ return ตั้งแต่ด่านหลบ ไม่ผ่าน `postAttackFollowup` ถ้าเปิดจากที่นั่นชุดจะขาดกลางทาง · ลูกโซ่ตีเพิ่มมีเพดาน `CHAIN_CAP` 5
+- เสียง: ตีธรรมดา `byAttackSound` (`tohno_hit`) + `byVoice` (สุ่ม 1 จาก 6 — `App.jsx` เล่นคู่กัน) · กดสกิลรอง/ไม้ตาย = `skillFlash.sound` สุ่ม ·
+  ได้รับความเสียหายจากคนอื่น = `adjustIncomingDamage` ยิง event `sfx` ใหม่ (`engine.sfx`) เว้นช่วง 1.5 วิ กันสกิลหลายก้อนร้องซ้ำ
+- **"แม่นยำ" (`accurate`) — บัฟ Universal ใหม่** (`accurateActive` ใน `_universal_status.js` · อยู่ใน `BUFF_KEYS`):
+  `doAttack` คำนวณ `accurate` ครั้งเดียวแล้วข้ามด่านหลบทุกตัว (สถานะหลบหลีก · ชิวๆ · Flow · Night · เอจิ · อิปโป · Mark 5 · luminous · Zect ×4 · โทโนะ)
+  + `appleGuyDodgesKill` · ด่านหลบดาเมจจากสกิล (อิปโป/เอจิ/luminous) เช็ค `engine.sourceAccurate()` · **ด่านหลบใหม่ต้องเช็ค `accurate` ด้วย**
+  · ไม่นับเป็นการหลบ: โล่ · ลบล้างของซาโตรุ · ขัดจังหวะของเอจิ
+- เทสต์: [tests/tohno.test.js](tests/tohno.test.js)
+
 **สไตรเกอร์ ยูเรก้า (พิเศษ · ตัวละครคู่)** — กลไกต่อสู้ `characters/striker.js` · ระบบคู่หูอยู่ใน `server.js` ("Striker Eureka: คู่หู")
 - **ระบบคู่หู — ในเกมมีระเบียนผู้เล่นแค่ 1 ระเบียน** (ของคนที่เลือกตัวละครก่อน = host) คนที่สองเก็บที่ `p.pair.co`
   engine ต่อสู้จึงเห็นยูเรก้าเป็นผู้เล่นคนเดียวโดยไม่ต้องแก้ลูปใดๆ ("แพ้ก็แพ้คู่" ได้มาฟรี) · **ห้ามใส่คู่หูลงใน `players`**
@@ -568,7 +586,7 @@ qtePending() / sweepQte()                กันสรุปรอบ + กว
 - `p.statusAmt[key]` = **ขนาดของผล** (เช่น guard 2 = ลดดาเมจ 2) — อ่านด้วย `statusAmtOf(p,key)` เสมอ
 - ลดเทิร์นทั้งหมดที่ลูปใน `endTurn()` `:5397` — **key ที่ไม่ควรลดเทิร์นต้อง `continue;` ในลูปนั้นเอง** (มี ~40 ข้อยกเว้น พร้อมคอมเมนต์เหตุผลรายบรรทัด)
 
-**บัฟกลาง** (`_universal_status.js`): `spellflow` (สกิลถูกลง) · `might`/`empower` (เสริมพลัง) · `guard` (คุ้มครอง) · `resist` (ต้านสถานะ) · `fortune` (โชคลาภ) · `evade` (หลบหลีก) · `netramana` (โอกาสสังหาร 20%)
+**บัฟกลาง** (`_universal_status.js`): `spellflow` (สกิลถูกลง) · `might`/`empower` (เสริมพลัง) · `guard` (คุ้มครอง) · `resist` (ต้านสถานะ) · `fortune` (โชคลาภ) · `evade` (หลบหลีก) · `netramana` (โอกาสสังหาร 20%) · `accurate` (แม่นยำ — เจาะการหลบทุกแบบ)
 
 **ดีบัฟกลาง**: `spellburden` (ภาระเวท — ดูกล่องด้านล่าง) · `weak` · `fragile` · `sleep` · `stun` · `nodraw` · `noskill` · `nohealing` · `invert` (ผกผัน) · `hburn` (ลุกไหม้) · `hbleed` (เลือดไหล — ดูกล่องด้านล่าง) · `chaa` (จั่ว 1 ครั้งได้ 2 ใบ) · `decay` (ผุพัง เกราะไม่ฟื้น)
 

@@ -273,10 +273,10 @@ module.exports = function buildTransforms(img) {
     // shikiWitherKill: ความตายที่โรยรา — โจมตีปกติแล้วสุ่มสังหารสำเร็จ (เล่นก่อนสังหารทุกครั้ง)
     shikiWitherKill: { img: img.SHIKI_WITHER_IMG, video: "/characters/shiki/shiki_skill3.2_hit.mp4", title: "ความตายที่โรยรา", label: "ความตายมาเยือน", seconds: 9, music: null, afterReveal: false }, // วีดีโอ 8.7 วิ
     // ---------- โทโนะ ชิกิ (patch 2.1.7) ----------
-    // tohnoSkill1: มีดพับประจำตระกูล — เข้าระดับ 2 ขึ้นไปครั้งแรก (ครั้งต่อไปแจ้งเตือนเฉยๆ) วีดีโอ 9.32 วิ
-    tohnoSkill1: { img: "/characters/tohno/tohno_skill1.webp", video: "/characters/tohno/tohno_skill1.mp4", title: "มีดพับประจำตระกูล", label: "เปิดใช้งานสกิลติดตัว", seconds: 10, music: null, afterReveal: false },
-    // tohnoKill: Mystic eye of death perception — สังหารสำเร็จ (เล่นก่อนสังหารทุกครั้ง) วีดีโอ 6.41 วิ
-    tohnoKill: { img: img.TOHNO_DEATH_IMG, video: "/characters/tohno/tohno_passive_hit.mp4", title: "Mystic eye of death perception", label: "สังหารด้วยเนตรมาร", seconds: 7, music: null, afterReveal: false },
+    // tohnoSkill1: มองเห็นแล้ว!! (ท่าไม้ตาย) — กดครั้งแรกของเกมวีดีโอเต็ม ครั้งต่อไปแจ้งเตือนเฉยๆ · วีดีโอ 9.32 วิ
+    tohnoSkill1: { img: "/characters/tohno/tohno_update/tohno_skill3.jpg", video: "/characters/tohno/tohno_skill1.mp4", title: "มองเห็นแล้ว!!", label: "หลับให้สบาย", seconds: 10, music: null, afterReveal: false },
+    // tohnoBurst: มองเห็นแล้ว!! — ระเบิดรอยร้าว (เล่นทุกครั้ง ก่อนการ์ดสรุปความเสียหาย) · วีดีโอ 8.9 วิ
+    tohnoBurst: { img: "/characters/tohno/tohno_update/tohno_skill3.jpg", video: "/characters/tohno/tohno_update/tohno_skill3.mp4", title: "มองเห็นแล้ว!!", label: "ระเบิดรอยร้าว", seconds: 9, music: null, afterReveal: false },
     // nanayaKill: Mystic eye of death perception (นานายะ ชิกิ) — สังหารสำเร็จ (เล่นก่อนสังหารทุกครั้ง) วีดีโอ ~7.98 วิ
     nanayaKill: { img: "/characters/nanaya/nanaya.png", video: "/characters/nanaya/nana_passvie_hit.mp4", title: "Mystic eye of death perception", label: "สังหารด้วยเนตรมาร", seconds: 8, music: null, afterReveal: false },
     // ---------- อาริมะ มิยาโกะ (patch 2.2.0) ----------

@@ -838,7 +838,7 @@ function ModalMounts({
   showChar, ch, me, onCloseChar,
   hakunoCmdOpen, onUseHakunoCmd, onCloseHakunoCmd,
   appleOpen, onPickAppleItem, onCloseApple,
-  tohnoOpen, onPickTohnoLevel, onCloseTohno,
+  tohnoOpen, onPickTohnoMode, onCloseTohno,
   connorArrestAsk, onAnswerConnorArrest,
   contractOffer, onAnswerContract,
   locaOffer, onAnswerLoca,
@@ -860,7 +860,7 @@ function ModalMounts({
       {showChar && ch && <CharModal ch={ch} me={me} onClose={onCloseChar} />}
       {hakunoCmdOpen && me && <HakunoCommandModal me={me} onUse={onUseHakunoCmd} onClose={onCloseHakunoCmd} />}
       {appleOpen && me && <AppleItemModal me={me} onPick={onPickAppleItem} onClose={onCloseApple} />}
-      {tohnoOpen && me && <TohnoLevelModal me={me} onPick={onPickTohnoLevel} onClose={onCloseTohno} />}
+      {tohnoOpen && me && <TohnoModeModal me={me} onPick={onPickTohnoMode} onClose={onCloseTohno} />}
       {connorArrestAsk && me?.alive && <ConnorArrestModal ask={connorArrestAsk} onAnswer={onAnswerConnorArrest} />}
       {contractOffer && me?.alive && <ContractOfferModal offer={contractOffer} onAnswer={onAnswerContract} />}
       {locaOffer && me?.alive && <LocaOfferModal offer={locaOffer} onAnswer={onAnswerLoca} />}
@@ -1298,6 +1298,7 @@ const STATUS_INFO = {
   freecast:  { icon: "👸", label: "การ์ดราชินี", cls: "bg-echo-gold text-gray-900", desc: "การ์ดราชินี: ใช้สกิลครั้งถัดไปไม่เสียแต้มสกิล (หายเมื่อจบเทิร์นถ้าไม่ได้ใช้)" },
   stun:      { icon: "😵", label: "สตั้น", cls: "bg-echo-hp", desc: "สตั้น: ไม่สามารถทำอะไรได้จนจบเทิร์นหรือจนกว่าดีบัฟจะหมดเวลา" },
   chaa:     { icon: "🌀", label: "สภาพชา", cls: "bg-echo-hp", desc: "สภาพชา: กดจั่วการ์ด 1 ครั้งจะได้ไพ่ 2 ใบ (ใบที่ 2 สุ่มปกติ โชคลาภไม่ช่วย)" },
+  accurate: { icon: "🎯", label: "แม่นยำ", cls: "bg-echo-gold text-gray-900", desc: "แม่นยำ: การโจมตีเจาะการหลบหลีกทุกแบบของเป้าหมาย (โล่กันครั้งยังกันได้)" },
   numb:     { icon: "🫨", label: "เหน็บชา", cls: "bg-echo-hp", desc: "เหน็บชา: กดสกิลแล้วมีโอกาส 30% ที่สกิลจะไม่ทำงาน แต่แต้มสกิลยังถูกหักตามเดิม" },
   kimCounter: { icon: "⚔️", label: "Counter Stance", cls: "bg-echo-magenta", desc: "Counter Stance (Bamboo-Hatted Kim): โดนความเสียหายจากการโจมตีปกติหรือสกิลเมื่อไหร่ สวนกลับผู้ที่ทำความเสียหายตามพลังโจมตีพื้นฐาน (คริติคอลได้) และมอบเลือดไหล + เหน็บชาให้ผู้ที่โดน" },
   weak:      { icon: "🥀", label: "อ่อนแอ", cls: "bg-echo-hp", desc: "อ่อนแอ: ดาเมจที่ทำได้ลดลงตามจำนวนที่ระบุ ตามจำนวนเทิร์นที่เหลือ" },
@@ -1617,6 +1618,17 @@ function statusEntries(p, full) {
       desc: `สกิลพิเศษ เตรียมตัว: Bandage เหลือ ${r.bandage} ครั้ง · Armor เหลือ ${r.armorUses} ครั้ง · Reload ไม่จำกัด` });
     if (r.aiming) out.push({ key: "recruitAim", v: 1, icon: "🎯", label: "กำลังเล็ง", cls: "bg-echo-hp", desc: "Recruit กำลังเล่น QTE เล็งยิง" });
   }
+  // โทโนะ ชิกิ: โหมด / สถานะที่รอ / ชุดเชือดเฉือน — ข้อมูลสาธารณะ
+  if (p.tohno) {
+    const t = p.tohno;
+    out.push(t.mode === "rage"
+      ? { key: "tohnoMode", v: 1, icon: "🔥", label: `เดือดดาล · หลบ ${t.dodge}%`, cls: "bg-echo-hp", desc: "เดือดดาล: ตีโดนสร้างรอยร้าว +1 บนเป้าหมาย · หลบหลีก 15% · ตระกูลโทโนะไม่ทำงาน" }
+      : { key: "tohnoMode", v: 1, icon: "🍵", label: `ใจเย็น · หลบ ${t.dodge}%`, cls: "bg-echo-cyan text-gray-900", desc: "ใจเย็น: ตีโดนฟื้นพลังชีวิต +1 · ตระกูลโทโนะ (หลบหลีก 5% · 10% ได้ตีอีกครั้ง) · ไม่สร้างรอยร้าว" });
+    if (t.finish) out.push({ key: "tohnoFinish", v: 1, icon: "🔪", label: "จบสิ้นซะ", cls: "bg-echo-hp", desc: "จบสิ้นซะ: ครั้งถัดไปที่ได้โจมตี พลังโจมตี -1 แต่ตีได้ 4 ครั้ง" });
+    if (t.seqHit > 0) out.push({ key: "tohnoSeq", v: 1, icon: "🔪", label: `เชือดเฉือน ${t.seqHit}/${t.seqMax}`, cls: "bg-echo-hp", desc: "กำลังเชือดเฉือน (พลังโจมตี -1)" });
+    if (t.rest) out.push({ key: "tohnoRest", v: 1, icon: "👁️", label: "หลับให้สบาย", cls: "bg-echo-magenta", desc: "หลับให้สบาย: การโจมตีครั้งถัดไป พลังโจมตี +1 และระเบิดรอยร้าวทั้งหมดบนเป้าหมาย (+1 ต่อรอยร้าว)" });
+  }
+  if ((p.tohnoCrack || 0) > 0) out.push({ key: "tohnoCrack", v: 1, icon: "💜", label: `รอยร้าว ${p.tohnoCrack}/8`, cls: "bg-purple-700 text-white", desc: "รอยร้าว (โทโนะ ชิกิ): ระเบิดด้วย \"มองเห็นแล้ว!!\" = ความเสียหาย +1 ต่อขั้น · จางลง 1 ขั้นทุก 10 เทิร์นที่ไม่เพิ่ม" });
   // Bamboo-Hatted Kim: ฝักดาบ / Poise / เหรียญ / บัพเฉพาะตัว — ข้อมูลสาธารณะ
   if (p.kim) {
     const k = p.kim;
@@ -2237,7 +2249,26 @@ function ShieldGlyph({ tone }) {
 const SEG_LIMIT = 9;
 const SEG_LIMIT_BIG = 14;
 
-function StatRow({ kind, value, max, extra = 0, extraLabel, big, tone }) {
+// รอยร้าว (โทโนะ ชิกิ): วงขอบสีม่วงรอบไอคอนเกราะ ไล่เติมทีละขั้นจนครบ 8 = ม่วงทั้งวง
+const CRACK_MAX = 8;
+function CrackRing({ n, children }) {
+  if (!(n > 0)) return children;
+  const r = 10.5;
+  const c = 2 * Math.PI * r;
+  const filled = (Math.min(n, CRACK_MAX) / CRACK_MAX) * c;
+  return (
+    <span className="sr-crack" title={`รอยร้าว ${n}/${CRACK_MAX}`}>
+      {children}
+      <svg viewBox="0 0 24 24" className="sr-crack-ring" aria-hidden="true">
+        <circle cx="12" cy="12" r={r} fill="none" stroke="rgba(168,85,247,.25)" strokeWidth="2.2" />
+        <circle cx="12" cy="12" r={r} fill="none" stroke="#c084fc" strokeWidth="2.2" strokeLinecap="round"
+          strokeDasharray={`${filled} ${c}`} transform="rotate(-90 12 12)" />
+      </svg>
+    </span>
+  );
+}
+
+function StatRow({ kind, value, max, extra = 0, extraLabel, big, tone, crack = 0 }) {
   // ทาคุมิ ฟุจิวาระ: ถึงจะมองไม่เห็น แต่ฉันยังอยู่ — ค่าถูกซ่อนเป็น null
   if (max == null) {
     return (
@@ -2249,7 +2280,7 @@ function StatRow({ kind, value, max, extra = 0, extraLabel, big, tone }) {
   }
   const total = max + extra;
   const label = `${kind === "hp" ? "พลังชีวิต" : "เกราะ"} ${value}/${max}${extra > 0 && extraLabel ? ` · ${extraLabel} ${extra}` : ""}`;
-  const icon = kind === "hp" ? <HeartGlyph /> : <ShieldGlyph tone={tone} />;
+  const icon = kind === "hp" ? <HeartGlyph /> : <CrackRing n={crack}><ShieldGlyph tone={tone} /></CrackRing>;
   const num = <span className="sr-num">{value}<span className="sr-max">/{max}</span></span>;
 
   // หลอดต่อเนื่อง: ขีดแบ่งทุกหน่วยยังวาดอยู่ จึงนับได้เหมือนเดิมถ้าอยากนับ
@@ -2377,7 +2408,7 @@ function OtherPlayer({ p, phase, slot, targetable, onAttack, picked, onInspect, 
                     {p.name}{!p.connected && <span className="ml-1 text-[10px] text-echo-hp">•offline</span>}
                   </div>
                   <StatRow kind="hp" value={p.hp} max={p.maxHp} extra={p.tempHp || 0} extraLabel="เลือดชั่วคราว" />
-                  <StatRow kind="ar" value={p.armor} max={p.maxArmor} extra={p.supFaith || 0} extraLabel="เกราะศรัทธา" tone={armorToneOf(p)} />
+                  <StatRow kind="ar" value={p.armor} max={p.maxArmor} extra={p.supFaith || 0} extraLabel="เกราะศรัทธา" tone={armorToneOf(p)} crack={p.tohnoCrack || 0} />
                   <SpRow p={p} />
                 </div>
               </div>
@@ -2800,31 +2831,29 @@ function BylethKnowledgeBadge({ me, ch }) {
   );
 }
 
-// ---------- โทโนะ ชิกิ (สกิลพื้นฐาน): เมนูเลือกระดับมีดพับประจำตระกูล ----------
-const TOHNO_LEVELS = [
-  { level: 1, name: "1. ปิดใช้งานสกิลติดตัว (ค่าเริ่มต้น)", desc: "ทุกครั้งที่ได้โจมตี ฟื้นพลังชีวิต +2" },
-  { level: 2, name: "2. เปิดใช้งานสกิลติดตัว", desc: "โจมตีปกติมีโอกาสสังหารทันที 5% — พลาดเสียพลังชีวิต 1 หน่วย (ไม่สนเกราะ)" },
-  { level: 3, name: "3. เพิ่มโอกาสสังหาร", desc: "โอกาสสังหารทันที 10% — พลาดเสียพลังชีวิต 2 หน่วย (ไม่สนเกราะ)" },
-  { level: 4, name: "4. เพิ่มโอกาสสังหาร", desc: "โอกาสสังหารทันที 20% — พลาดเสียพลังชีวิต 4 หน่วย (ไม่สนเกราะ)" },
-  { level: 5, name: "5. เพิ่มโอกาสสังหาร", desc: "โอกาสสังหารทันที 50% — พลาดเสียพลังชีวิต 6 หน่วย (ไม่สนเกราะ)" },
+// ---------- โทโนะ ชิกิ (สกิลพื้นฐาน ขอบคุณอาจารย์มากๆ): เลือกโหมด ใจเย็น / เดือดดาล ----------
+const TOHNO_MODES = [
+  { mode: "calm", name: "ใจเย็น", desc: "ตีโดนฟื้นพลังชีวิต +1 · ตระกูลโทโนะทำงาน (หลบหลีก 5% · 10% ได้ตีอีกครั้ง) · ไม่สร้างรอยร้าว" },
+  { mode: "rage", name: "เดือดดาล", desc: "ตีโดนสร้างรอยร้าว +1 บนเป้าหมาย · หลบหลีก 15% · ตระกูลโทโนะไม่ทำงาน" },
 ];
-function TohnoLevelModal({ me, onPick, onClose }) {
+function TohnoModeModal({ me, onPick, onClose }) {
+  const cur = me.tohno?.mode || "calm";
   return (
     <div className="fixed inset-0 z-40 bg-black/60 grid place-items-center p-4" onClick={onClose}>
       <div className="bg-echo-navy rounded-2xl p-5 max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="text-lg font-black text-echo-gold">🔪 มีดพับประจำตระกูล — เลือกระดับ</div>
-        <div className="text-sm opacity-80 mb-3">กดเปลี่ยนระดับได้กี่ครั้งก็ได้ — สังหารสำเร็จจะไม่เสียพลังชีวิตไม่ว่าระดับใด</div>
+        <div className="text-lg font-black text-echo-gold">🔪 ขอบคุณอาจารย์มากๆ — เลือกโหมด</div>
+        <div className="text-sm opacity-80 mb-3">สลับได้ไม่จำกัดครั้งก่อนเปิดการ์ด · ไม่นับเป็นการใช้สกิลของเทิร์น</div>
         <div className="flex flex-col gap-2">
-          {TOHNO_LEVELS.map((it) => (
+          {TOHNO_MODES.map((it) => (
             <button
-              key={it.level}
-              onClick={() => { clickSound(); onPick(it.level); }}
+              key={it.mode}
+              onClick={() => { clickSound(); onPick(it.mode); }}
               className={`text-left flex items-center gap-3 rounded-xl border px-3 py-2 transition ${
-                (me.tohnoLevel || 1) === it.level ? "bg-echo-gold/20 border-echo-gold" : "bg-white/5 hover:bg-white/15 border-white/15"
+                cur === it.mode ? "bg-echo-gold/20 border-echo-gold" : "bg-white/5 hover:bg-white/15 border-white/15"
               }`}
             >
               <div>
-                <div className="font-bold text-echo-gold">{it.name}{(me.tohnoLevel || 1) === it.level ? " · เลือกอยู่" : ""}</div>
+                <div className="font-bold text-echo-gold">{it.name}{cur === it.mode ? " · เลือกอยู่" : ""}</div>
                 <div className="text-sm opacity-80">{it.desc}</div>
               </div>
             </button>
@@ -4060,7 +4089,7 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
   const [anataSel, setAnataSel] = useState(null); // เทมาริ: โหมดเลือกเป้าหมาย ANATA WAAAAAAAA (null = ไม่ได้เลือกอยู่)
   const [bgSel, setBgSel] = useState(false); // บานาจ: โหมดเลือกเป้าหมาย Absorb shield (เลือกตัวเองได้)
   const [appleOpen, setAppleOpen] = useState(false); // Apple guy: เมนูเลือกของส่งมอบ (สกิลพื้นฐาน)
-  const [tohnoOpen, setTohnoOpen] = useState(false); // โทโนะ ชิกิ: เมนูเลือกระดับมีดพับประจำตระกูล (สกิลพื้นฐาน)
+  const [tohnoOpen, setTohnoOpen] = useState(false); // โทโนะ ชิกิ: เมนูเลือกโหมด ใจเย็น/เดือดดาล (สกิลพื้นฐาน)
   const [appleSel, setAppleSel] = useState(false);   // Apple guy: โหมดเลือกเป้าหมายเอาไปสิ (เลือกตัวเองไม่ได้)
   const [bbSel, setBbSel] = useState(false);         // เจ้าแห่งเน็ตบ้าน: โหมดเลือกเป้าหมายยื่นข้อเสนอสัญญา
   const [shSel, setShSel] = useState(false);         // ชเรด เอลัน: โหมดเลือกเป้าหมายแสงจันทร์ส่องวิญญาณ (เลือกตัวเองไม่ได้)
@@ -4343,6 +4372,8 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
   const recruitBasicLocked = isRecruit && (recruitBusy || (recruitCd.basic || 0) > 0 || recruitBullets < 3);
   const recruitSecLocked = isRecruit && (recruitBusy || (recruitCd.secondary || 0) > 0 || recruitBullets < 6);
   const recruitUltLocked = isRecruit && (recruitBusy || (recruitCd.ultimate || 0) > 0 || recruitBullets < 6);
+  // โทโนะ ชิกิ: เชือดเฉือน / มองเห็นแล้ว!! กดซ้อนกันไม่ได้ระหว่างถือ "จบสิ้นซะ" หรือ "หลับให้สบาย"
+  const tohnoBusy = ch?.id === "tohno" && (!!me?.tohno?.finish || !!me?.tohno?.rest);
   // สไตรเกอร์ ยูเรก้า: สกิลเป็นของพลปืน · รออนุมัติ = กดอะไรไม่ได้ · นับถอยหลังระเบิด = กดได้แค่ท่าไม้ตายซ้ำ
   const isStriker = ch?.id === "striker";
   const st = (isStriker && me?.striker) || {};
@@ -4535,6 +4566,12 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
     };
     socket.on("transformNotice", onNotice);
     return () => socket.off("transformNotice", onNotice);
+  }, []);
+  // เสียงสั้นๆ จาก server ที่ทุกคนได้ยิน (ไม่มีป้าย) — เช่น โทโนะ ชิกิร้องตอนโดนตี
+  useEffect(() => {
+    const onSfx = (f) => { if (f?.sound) playSfx(f.sound); };
+    socket.on("sfx", onSfx);
+    return () => socket.off("sfx", onSfx);
   }, []);
   // เอฟเฟกต์ gif ทับไอคอนผู้เล่น (ผู้วิงวอน patch 3.4) — ไม่หยุดเกม เล่นทับพอร์เทรตแล้วหายไปเอง
   useEffect(() => {
@@ -4833,9 +4870,9 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
     socket.emit("useSkill", { tier: "basic", item: key });
     setAppleOpen(false);
   };
-  // เลือกระดับมีดพับประจำตระกูล (โทโนะ ชิกิ) -> ส่งไป server ทันที (ไม่ปิดเมนู — กดเปลี่ยนต่อได้เรื่อยๆ)
-  const pickTohnoLevel = (level) => {
-    socket.emit("useSkill", { tier: "basic", item: level });
+  // เลือกโหมด ใจเย็น/เดือดดาล (โทโนะ ชิกิ) -> ส่งไป server ทันที (ไม่ปิดเมนู — สลับต่อได้เรื่อยๆ)
+  const pickTohnoMode = (mode) => {
+    socket.emit("useSkill", { tier: "basic", item: mode });
   };
   // เลือกเป้าหมายมอบของ (เอาไปสิ) -> ส่งไป server ทันที
   const pickGive = (id) => {
@@ -5480,7 +5517,7 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
           showChar={showChar} ch={ch} me={me} onCloseChar={() => setShowChar(false)}
           hakunoCmdOpen={hakunoCmdOpen} onUseHakunoCmd={useHakunoCmd} onCloseHakunoCmd={() => setHakunoCmdOpen(false)}
           appleOpen={appleOpen} onPickAppleItem={pickAppleItem} onCloseApple={() => setAppleOpen(false)}
-          tohnoOpen={tohnoOpen} onPickTohnoLevel={pickTohnoLevel} onCloseTohno={() => setTohnoOpen(false)}
+          tohnoOpen={tohnoOpen} onPickTohnoMode={pickTohnoMode} onCloseTohno={() => setTohnoOpen(false)}
           connorArrestAsk={state.connorArrestAsk} onAnswerConnorArrest={(submit) => socket.emit("connorArrestAnswer", { submit })}
           contractOffer={state.contractOffer} onAnswerContract={(a) => socket.emit("contractAnswer", { accept: a, fromId: state.contractOffer?.fromId })}
           locaOffer={state.locaOffer} onAnswerLoca={(a) => socket.emit("locaAnswer", { accept: a, fromId: state.locaOffer?.fromId })}
@@ -5857,7 +5894,7 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
                   //  ด้วยไอคอน ตัวเลข และรูปทรงช่อง ไม่ต้องอาศัยสีอย่างเดียวเหมือนเกจแบบก่อน
                   <div className="self-vitals mt-1.5">
                     <StatRow big kind="hp" value={me.hp} max={me.maxHp} extra={me.tempHp || 0} extraLabel="เลือดชั่วคราว" />
-                    <StatRow big kind="ar" value={me.armor} max={me.maxArmor} extra={me.supFaith || 0} extraLabel="เกราะศรัทธา" tone={armorToneOf(me)} />
+                    <StatRow big kind="ar" value={me.armor} max={me.maxArmor} extra={me.supFaith || 0} extraLabel="เกราะศรัทธา" tone={armorToneOf(me)} crack={me.tohnoCrack || 0} />
                     <VitalExtras p={me} className="pc-extra-inline" />
                   </div>
                 )}
@@ -5960,10 +5997,10 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
                     <SkillSlot size="lg" label="พื้นฐาน" tier="basic" skill={ch?.basic} points={me.skillPoints} disabled={!me.alive || phase !== "PLAYING" || (!isHisakawa && (done || noSkill || moonCellOn)) || hisakawaSwitchLocked || miyakoHealPending || hakunoSecondaryPending || beatBasicLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || witchMarkCooldown || (me.skillUsed && !gambleRepeat && !isByleth && !isHaruka && !isApple && !isMuimi && !isBard && !isTohno && !isHakuno && !isDoomguy && !isKai && !isTakumi && !isHisakawa && !isSup && !isBrian && !isLumi && !isCay && !isDaichi && !isStriker) || harukaBasicLocked || muimiBasicLocked || bylethBasicLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || cassiusLocked || daisukeBasicLocked || frozenByClockUp || ktBasicLocked || (isHakuno && me.hakunoGenderSwitched) || doomBasicLocked || takutoBasicPending || tepeuCookLocked || tepeuPonderLocked || psBladeLocked || ippoBasicCd > 0 || supBudgetLocked || arjunaBasicLocked || connorPredictLocked || lumiBasicLocked || cayBasicLocked || daichiBasicLocked || kimBasicCd > 0 || recruitBasicLocked || strikerBasicLocked || !pairGunner} onUse={requestSkillUse} cooldown={witchMarkCd || ippoBasicCd || kimBasicCd || recruitCd.basic} ammo={isGambler ? me.gamblerUses : isMuimi ? me.muimiEmergencyUses : undefined} cost={isGambler && goldenOn ? halfCost(ch?.basic) : undefined} />
                   </div>
                   <div className="w-40 sm:w-48">
-                    <SkillSlot size="lg" label="รอง" tier="secondary" skill={ch?.secondary} points={me.skillPoints} disabled={done || phase !== "PLAYING" || noSkill || moonCellOn || miyakoComboPending || hakunoSecondaryPending || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || (me.skillUsed && !isByleth && !isBard && !isDoomguy && !isKai && !isTakumi && !isSup) || bylethSecLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || ohgerLocked || lanLocked || ktSecLocked || daisukeSecLocked || (frozenByClockUp && !dai) || skSecLocked || banagherAssaultLocked || doomNoEffectLocked || takutoSecPending || takutoNotApprivoiseLocked || monsterMe || tepeuPonderLocked || tepeuCookLocked || batKarmaLocked || psSealLocked || harukaSecLocked || muimiSecLocked || burdenCooldown || ippoSecCd > 0 || supBudgetLocked || arjunaSecLocked || brianSecLocked || lumiSecLocked || caySecLocked || daichiSecLocked || kimSecCd > 0 || recruitSecLocked || strikerSecLocked || !pairGunner} onUse={requestSkillUse} cooldown={burdenCd || ippoSecCd || kimSecCd || recruitCd.secondary} ammo={isApple ? me.appleGiveUses : isCay ? cayState.ammo : me.beamAmmo} cost={isGambler && goldenOn ? halfCost(ch?.secondary) : undefined} />
+                    <SkillSlot size="lg" label="รอง" tier="secondary" skill={ch?.secondary} points={me.skillPoints} disabled={done || phase !== "PLAYING" || noSkill || moonCellOn || miyakoComboPending || hakunoSecondaryPending || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || (me.skillUsed && !isByleth && !isBard && !isDoomguy && !isKai && !isTakumi && !isSup) || bylethSecLocked || bylethBudgetLocked || (isKai && (me.kaiSkillUsesRound || 0) >= 2) || takumiBudgetLocked || shCharging || rgCharging || phenexTaunting || bardNoteLocked || ohgerLocked || lanLocked || ktSecLocked || daisukeSecLocked || (frozenByClockUp && !dai) || skSecLocked || banagherAssaultLocked || doomNoEffectLocked || takutoSecPending || takutoNotApprivoiseLocked || monsterMe || tepeuPonderLocked || tepeuCookLocked || batKarmaLocked || psSealLocked || harukaSecLocked || muimiSecLocked || burdenCooldown || ippoSecCd > 0 || supBudgetLocked || arjunaSecLocked || brianSecLocked || lumiSecLocked || caySecLocked || daichiSecLocked || kimSecCd > 0 || recruitSecLocked || tohnoBusy || strikerSecLocked || !pairGunner} onUse={requestSkillUse} cooldown={burdenCd || ippoSecCd || kimSecCd || recruitCd.secondary} ammo={isApple ? me.appleGiveUses : isCay ? cayState.ammo : me.beamAmmo} cost={isGambler && goldenOn ? halfCost(ch?.secondary) : undefined} />
                   </div>
                   <div className="w-40 sm:w-48">
-                    {isBard ? <BardComposeSlot me={me} /> : isKai ? <KaiOverhaulSlot me={me} frozen={frozenByClockUp} /> : <SkillSlot size="lg" label="ท่าไม้ตาย" tier="ultimate" skill={ch?.ultimate} points={me.skillPoints} disabled={(done || phase !== "PLAYING" || noSkill || moonCellOn || beatMe || (me.skillUsed && !isByleth && !isSup && !isBrianN2O) || bylethUltLocked || bylethBudgetLocked || ultimateActive || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || takumiBudgetLocked || monsterMe || fourthLocked || doomUltLocked || takutoUltLockedNow || tepeuCookLocked || tepeuPonderLocked || offerLocked || ktUltLocked || shUltLocked || shCharging || rgCharging || phenexTaunting || shidoUltLocked || daisukeUltLocked || frozenByClockUp || eijiUltLocked || muimiUltLocked || ippoUltLocked || supBudgetLocked || supUltCd > 0 || arjunaUltCd > 0 || brianUltLocked || lumiUltLocked || cayUltLocked || daichiUltLocked || kimUltLocked || recruitUltLocked || strikerUltLocked || !pairGunner)} onUse={requestSkillUse} ammo={isCay ? cayState.ammo : undefined} cooldown={shidoUltCd || eijiUltCd || muimiUltCd || ippoUltCd || supUltCd || arjunaUltCd || kimUltCd || recruitCd.ultimate} cost={undefined} />}
+                    {isBard ? <BardComposeSlot me={me} /> : isKai ? <KaiOverhaulSlot me={me} frozen={frozenByClockUp} /> : <SkillSlot size="lg" label="ท่าไม้ตาย" tier="ultimate" skill={ch?.ultimate} points={me.skillPoints} disabled={(done || phase !== "PLAYING" || noSkill || moonCellOn || beatMe || (me.skillUsed && !isByleth && !isSup && !isBrianN2O) || bylethUltLocked || bylethBudgetLocked || ultimateActive || triggerCircleLocked || triggerMultiLocked || triggerZeperionLocked || takumiBudgetLocked || monsterMe || fourthLocked || doomUltLocked || takutoUltLockedNow || tepeuCookLocked || tepeuPonderLocked || offerLocked || ktUltLocked || shUltLocked || shCharging || rgCharging || phenexTaunting || shidoUltLocked || daisukeUltLocked || frozenByClockUp || eijiUltLocked || muimiUltLocked || ippoUltLocked || supBudgetLocked || supUltCd > 0 || arjunaUltCd > 0 || brianUltLocked || lumiUltLocked || cayUltLocked || daichiUltLocked || kimUltLocked || recruitUltLocked || tohnoBusy || strikerUltLocked || !pairGunner)} onUse={requestSkillUse} ammo={isCay ? cayState.ammo : undefined} cooldown={shidoUltCd || eijiUltCd || muimiUltCd || ippoUltCd || supUltCd || arjunaUltCd || kimUltCd || recruitCd.ultimate} cost={undefined} />}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -6091,7 +6128,7 @@ function GameBoard({ state, lowQ, skillConfirmOn = true, muteScenes = false, ros
         showChar={showChar} ch={ch} me={me} onCloseChar={() => setShowChar(false)}
         hakunoCmdOpen={hakunoCmdOpen} onUseHakunoCmd={useHakunoCmd} onCloseHakunoCmd={() => setHakunoCmdOpen(false)}
         appleOpen={appleOpen} onPickAppleItem={pickAppleItem} onCloseApple={() => setAppleOpen(false)}
-        tohnoOpen={tohnoOpen} onPickTohnoLevel={pickTohnoLevel} onCloseTohno={() => setTohnoOpen(false)}
+        tohnoOpen={tohnoOpen} onPickTohnoMode={pickTohnoMode} onCloseTohno={() => setTohnoOpen(false)}
         connorArrestAsk={state.connorArrestAsk} onAnswerConnorArrest={(submit) => socket.emit("connorArrestAnswer", { submit })}
           contractOffer={state.contractOffer} onAnswerContract={(a) => socket.emit("contractAnswer", { accept: a, fromId: state.contractOffer?.fromId })}
         locaOffer={state.locaOffer} onAnswerLoca={(a) => socket.emit("locaAnswer", { accept: a, fromId: state.locaOffer?.fromId })}

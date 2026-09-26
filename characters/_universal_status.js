@@ -49,13 +49,14 @@ const BUFF_KEYS = [
   "absorb",    // Absorb
   "awaken",    // ตื่นขึ้น
   "golden",    // 777 (เวลาทอง)
+  "accurate",  // แม่นยำ (โทโนะ ชิกิ): เจาะการหลบหลีกทุกแบบ
   "promo", "chill", "fiber", "tiger", // ของส่งมอบของ Apple guy
 ];
 const BUFF_LABEL = {
   resist: "ต้านสถานะผิดปกติ", guard: "คุ้มครอง", fortune: "โชคลาภ", mend: "เยียวยา",
   might: "เสริมพลัง", empower: "เสริมพลัง", evade: "หลบหลีก", spellflow: "กระแสเวท",
   freecast: "การ์ดราชินี", absorb: "Absorb",
-  awaken: "ตื่นขึ้น", golden: "777", promo: "เปิดแต้ม", chill: "ชิวๆ", fiber: "เน็ตแรง", tiger: "เสือนอนกิน",
+  awaken: "ตื่นขึ้น", golden: "777", accurate: "แม่นยำ", promo: "เปิดแต้ม", chill: "ชิวๆ", fiber: "เน็ตแรง", tiger: "เสือนอนกิน",
 };
 // ตัวนับลำดับ — เดินหน้าอย่างเดียวทั้งเกม จึงเทียบข้ามผู้เล่นได้
 let buffSeq = 0;
@@ -433,6 +434,12 @@ function tickBleed(engine, p) {
   if (p.statuses.hbleed <= 0) delete p.statuses.hbleed;
 }
 
+// "แม่นยำ" (accurate, บัฟ Universal — โทโนะ ชิกิ มองเห็นแล้ว!!): การโจมตี/ดาเมจของผู้ติดบัฟนี้เจาะการหลบหลีกทุกแบบ
+//  (สถานะหลบหลีก · อิปโป · เอจิ · Zect · luminous · Mark 5 · ชิวๆ ฯลฯ) — โล่กันครั้งไม่ใช่การหลบ จึงยังกันได้
+function accurateActive(p) {
+  return !!p && ((p.statuses && p.statuses.accurate) || 0) > 0;
+}
+
 // "เหน็บชา" (numb, สถานะ Universal — Bamboo-Hatted Kim): กดสกิลแล้วมีโอกาส NUMB_FAIL_CHANCE ที่สกิลไม่ทำงาน
 //  แต้มสกิลยังถูกหักตามเดิม — จุดโรลจริงอยู่ใน useSkillCore() ของ server.js ถัดจากจุดหักแต้ม
 //  ดีบัฟพื้นฐานธรรมดา: ลดเทิร์นตามลูปกลาง · ต้าน/ล้างได้ (อยู่ใน BASIC_DEBUFF_CLEAR)
@@ -517,6 +524,7 @@ module.exports = {
   statusAmtOf,
   applyBuff,
   BUFF_KEYS,
+  accurateActive,
   stripLatestBuff,
   applyDebuff,
   setTurnsNoRefresh,

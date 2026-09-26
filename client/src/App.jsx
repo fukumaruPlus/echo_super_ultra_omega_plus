@@ -282,6 +282,7 @@ export default function App() {
       const doomShoot = doomWeapon && DOOM_WEAPON_SOUNDS[doomWeapon]?.shoot;
       const attackSound = state?.attack?.byAttackSound;
       playSfx(doomShoot || attackSound || "attack");
+      if (state?.attack?.byVoice) playSfx(state.attack.byVoice); // เสียงพากย์ตอนตี (โทโนะ ชิกิ)
     }
   }, [stage, phase, cycle, skillMusic, skillMusicSeq, lowQ, mandatoryCutscene, state?.cutscene?.id, state?.attack?.id, state?.roundNumber, !!(state && state.seraph)]);
 

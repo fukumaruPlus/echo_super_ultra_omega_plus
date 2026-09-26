@@ -19,7 +19,7 @@ const FILES = {
   muimi_ub_hit: "/characters/muimi/mumi_ub_hit.mp3",
   shiki: "/characters/shiki/shiki_theme.mp3",         // เพลงระหว่างท่าไม้ตาย ฉันมองเห็นมันแล้ว (ชิกิ)
   shiki2: "/characters/shiki/shiki_theme2.mp3",       // เพลงระหว่างท่าไม้ตาย 2 ความตายที่โรยรา (ชิกิ patch 2.0.6)
-  tohno: "/characters/tohno/tohno_theme.mp3",         // เพลงระหว่างสกิลติดตัวโทโนะเปิดใช้งาน (ระดับ 2 ขึ้นไป — patch 2.1.7)
+  tohno: "/characters/tohno/tohno_theme.mp3",         // เพลงระหว่างโทโนะถือ "หลับให้สบาย" (กดท่าไม้ตายแล้วยังไม่ได้ตี)
   nanaya: "/characters/nanaya/nanaya_theme.mp3",      // เพลงระหว่างสกิลติดตัว 1 นานายะ ชิกิ เปิดใช้งาน (patch 2.1.9)
   nanayaVoice1: "/characters/nanaya/voice/nanaya_voice1.m4a", // เสียงพากย์สุ่มตอนนานายะชนะการจั่ว
   nanayaVoice2: "/characters/nanaya/voice/nanaya_voice2.m4a",
@@ -80,6 +80,18 @@ const FILES = {
   kaiVoice5: "/characters/kai/voice/kai_voice5.m4a",
   // ผู้สังหารเมจ: เสียงโจมตีปกติเฉพาะตัว / เสียงหลัง Mana Rupture / เพลงระหว่างมี Mana Burden (spellburden) ติดตัวเอง
   mageslayer_attack: "/characters/mageslayer/BA.mp3",
+  // โทโนะ ชิกิ (rework): เสียงตีธรรมดา + เสียงพากย์สุ่ม (ตี / โดนตี / กดสกิลรอง-ท่าไม้ตาย)
+  tohno_hit: "/characters/tohno/tohno_update/tohno_hit.mp3",
+  tohno_voice_hit1: "/characters/tohno/tohno_update/hit_sound/tohno_hit.m4a",
+  tohno_voice_hit2: "/characters/tohno/tohno_update/hit_sound/tohno_hit2.m4a",
+  tohno_voice_hit3: "/characters/tohno/tohno_update/hit_sound/tohno_hit3.m4a",
+  tohno_voice_hit4: "/characters/tohno/tohno_update/hit_sound/tohno_hit4.m4a",
+  tohno_voice_hit5: "/characters/tohno/tohno_update/hit_sound/tohno_hit5.m4a",
+  tohno_voice_hit6: "/characters/tohno/tohno_update/hit_sound/tohno_hit6.m4a",
+  tohno_hurt1: "/characters/tohno/tohno_update/hitby_sound/tohno_hitby01.m4a",
+  tohno_hurt2: "/characters/tohno/tohno_update/hitby_sound/tohno_hitby02.m4a",
+  tohno_skill1: "/characters/tohno/tohno_update/skill_sound/tohno_skill01.m4a",
+  tohno_skill2: "/characters/tohno/tohno_update/skill_sound/tohno_skill02.m4a",
   // มิซึซาว่า ฮารุกะ: เสียงโจมตีปกติระหว่างสถานะ "โอเมก้า" (ท่าไม้ตาย New Omega)
   haruka_attack: "/characters/haruka/hit_haruka.mp3",
   mageslayer_skill2: "/characters/mageslayer/SFX_Skill_2.mp3",
@@ -330,6 +342,17 @@ const LOUDNESS_GAIN = {
   "/characters/tepeu/tepeu_theme.mp3": 0.87,
   "/characters/the_supplicant/sup_strike.mp3": 0.73,
   "/characters/tohno/tohno_theme.mp3": 0.51,
+  "/characters/tohno/tohno_update/hit_sound/tohno_hit.m4a": 0.44,
+  "/characters/tohno/tohno_update/hit_sound/tohno_hit2.m4a": 0.73,
+  "/characters/tohno/tohno_update/hit_sound/tohno_hit3.m4a": 0.42,
+  "/characters/tohno/tohno_update/hit_sound/tohno_hit4.m4a": 0.65,
+  "/characters/tohno/tohno_update/hit_sound/tohno_hit5.m4a": 0.46,
+  "/characters/tohno/tohno_update/hit_sound/tohno_hit6.m4a": 0.42,
+  "/characters/tohno/tohno_update/hitby_sound/tohno_hitby01.m4a": 0.45,
+  "/characters/tohno/tohno_update/hitby_sound/tohno_hitby02.m4a": 0.44,
+  "/characters/tohno/tohno_update/skill_sound/tohno_skill01.m4a": 0.56,
+  "/characters/tohno/tohno_update/skill_sound/tohno_skill02.m4a": 0.58,
+  "/characters/tohno/tohno_update/tohno_skill3.mp4": 0.94,
   "/characters/tsurugi/tsurugi.mp4": 0.65,
   "/characters/tsurugi/tsurugi_skill1.mp4": 0.63,
   "/characters/tsurugi/tsurugi_skill2.mp4": 0.52,
